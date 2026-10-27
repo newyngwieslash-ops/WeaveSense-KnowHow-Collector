@@ -232,6 +232,9 @@ func (t Tools) now() time.Time {
 // approvalID must be the id of an approval already granted through the Pi
 // approval chain for tools that need approval; it is empty otherwise.
 func (t Tools) Invoke(ctx context.Context, conv model.FlowAgentConversation, ss SubjectScope, userID, callID, name string, args map[string]any, approvalID string) (ToolResult, error) {
+	if err := ensureConversationVideoProjection(t.DB, conv); err != nil {
+		return ToolResult{}, err
+	}
 	spec, ok := FindTool(name)
 	if !ok {
 		spec, ok = t.mcpSpec(ss.Scope, name)
@@ -276,6 +279,9 @@ func (t Tools) Invoke(ctx context.Context, conv model.FlowAgentConversation, ss 
 		if prior.RequestHash != hash {
 			return ToolResult{}, ErrToolConflict
 		}
+		if name == "intel_search_knowledge" || name == "intel_read_knowledge" || name == "intel_research_video_materials" {
+			return t.execute(ctx, prior, spec, ss, userID, args, "")
+		}
 		r := storedResult(prior)
 		if prior.Status == "unknown" && spec.local != nil {
 			// Unknown outcome: re-enter the executor, which reconciles before any retry.
@@ -312,9 +318,20 @@ func (t Tools) Invoke(ctx context.Context, conv model.FlowAgentConversation, ss 
 
 func (t Tools) finish(row model.FlowAgentToolCall, result ToolResult, args map[string]any) (ToolResult, error) {
 	stored, _ := json.Marshal(result)
-	err := t.DB.Model(&model.FlowAgentToolCall{}).Where("id = ?", row.ID).
-		Updates(map[string]any{"status": result.Status, "result": string(stored), "updated_at": t.now()}).Error
-	return result, err
+	updated := t.DB.Model(&model.FlowAgentToolCall{}).Where("id = ?", row.ID).
+		Where("NOT (status = ? AND arguments = ? AND result LIKE ?)", "failed", "{}", `%"error":"source content unavailable"%`).
+		Updates(map[string]any{"status": result.Status, "result": string(stored), "updated_at": t.now()})
+	if updated.Error != nil {
+		return ToolResult{}, updated.Error
+	}
+	if updated.RowsAffected == 0 {
+		var current model.FlowAgentToolCall
+		if err := t.DB.First(&current, "id = ?", row.ID).Error; err != nil {
+			return ToolResult{}, err
+		}
+		return storedResult(current), nil
+	}
+	return result, nil
 }
 
 func (t Tools) execute(ctx context.Context, row model.FlowAgentToolCall, spec ToolSpec, ss SubjectScope, userID string, args map[string]any, idem string) (ToolResult, error) {
@@ -331,6 +348,24 @@ func (t Tools) execute(ctx context.Context, row model.FlowAgentToolCall, spec To
 		return t.finish(row, result, args)
 	}
 	method, path, body := spec.route(args)
+	if spec.Name == "intel_search_knowledge" || spec.Name == "intel_read_knowledge" {
+		snapshot, pinErr := t.pinnedVideoKnowledgeSnapshot(ss.Scope, row.ConversationID)
+		if pinErr != nil {
+			return t.finish(row, ToolResult{CallID: row.CallID, Tool: row.ToolName, Status: "failed", Error: pinErr.Error()}, args)
+		}
+		if snapshot != nil {
+			if method == http.MethodGet {
+				path += "?snapshot_id=" + url.QueryEscape(snapshot.ID)
+			} else {
+				frozen := map[string]any{}
+				for k, v := range args {
+					frozen[k] = v
+				}
+				frozen["snapshot_id"] = snapshot.ID
+				body = frozen
+			}
+		}
+	}
 	var payload []byte
 	if body != nil {
 		payload, _ = json.Marshal(body)
@@ -493,7 +528,7 @@ func (t Tools) mcpSpec(scope Scope, name string) (ToolSpec, bool) {
 		return ToolSpec{}, false
 	}
 	conn, tool, ok := t.MCP.ResolveAgentTool(scope, name)
-	if !ok {
+	if !ok || conn.Status != "approved" {
 		return ToolSpec{}, false
 	}
 	return ToolSpec{Name: name, Class: "write", Scope: "intel.mcp.use", Timeout: time.Duration(conn.TimeoutMS) * time.Millisecond, OutputCap: conn.OutputCap, rawArgs: true, CostBasis: "mcp_call: per call (flow_mcp_usages) + reservation against the MCP connection budget",

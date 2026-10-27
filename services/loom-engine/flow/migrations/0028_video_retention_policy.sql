@@ -1,0 +1,26 @@
+ALTER TABLE flow_video_jobs ADD COLUMN retention_policy JSONB;
+ALTER TABLE flow_video_jobs ADD COLUMN retention_policy_hash TEXT;
+ALTER TABLE flow_video_jobs ADD COLUMN retention_anchor_at TIMESTAMPTZ;
+ALTER TABLE flow_video_jobs ADD COLUMN text_access_expires_at TIMESTAMPTZ;
+ALTER TABLE flow_video_jobs ADD COLUMN text_max_expires_at TIMESTAMPTZ;
+ALTER TABLE flow_video_jobs ADD COLUMN text_retention_erased_at TIMESTAMPTZ;
+ALTER TABLE flow_video_jobs ADD COLUMN text_retention_revoked_at TIMESTAMPTZ;
+ALTER TABLE flow_video_objects ADD COLUMN retention_class TEXT CHECK(retention_class IN ('media','audio','frame','transcript','evidence'));
+ALTER TABLE flow_video_objects ADD COLUMN access_expires_at TIMESTAMPTZ;
+ALTER TABLE flow_video_objects ADD COLUMN max_expires_at TIMESTAMPTZ;
+ALTER TABLE flow_video_objects ADD COLUMN retention_policy_hash TEXT;
+ALTER TABLE flow_video_objects ADD COLUMN reference_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE flow_video_objects ADD COLUMN retained_for_evidence BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE flow_video_objects ADD COLUMN expiry_reason TEXT;
+ALTER TABLE flow_documents ADD COLUMN video_text_access_expires_at TIMESTAMPTZ;
+ALTER TABLE flow_documents ADD COLUMN video_text_max_expires_at TIMESTAMPTZ;
+ALTER TABLE flow_document_revisions ADD COLUMN video_text_access_expires_at TIMESTAMPTZ;
+ALTER TABLE flow_document_revisions ADD COLUMN video_text_max_expires_at TIMESTAMPTZ;
+ALTER TABLE flow_evidence ADD COLUMN video_expires_at TIMESTAMPTZ;
+CREATE INDEX flow_video_text_retention_due ON flow_video_jobs(text_max_expires_at) WHERE text_retention_erased_at IS NULL;
+CREATE INDEX flow_video_object_retention_due ON flow_video_objects(access_expires_at) WHERE state='accepted';
+CREATE INDEX flow_video_temporal_frame_retention ON flow_video_temporal_evidence(tenant_id,workspace_id,frame_ref) WHERE frame_ref IS NOT NULL;
+CREATE INDEX flow_video_temporal_media_retention ON flow_video_temporal_evidence(tenant_id,workspace_id,media_sha256) WHERE media_sha256 IS NOT NULL;
+-- Legacy evidence insertion paths must inherit the frozen material deadline too.
+CREATE FUNCTION flow_video_stamp_evidence_expiry() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE deadline TIMESTAMPTZ; BEGIN SELECT video_text_access_expires_at INTO deadline FROM flow_documents WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id AND id=NEW.document_id; IF deadline IS NOT NULL THEN NEW.video_expires_at := LEAST(NEW.video_expires_at,deadline); END IF; RETURN NEW; END $$;
+CREATE TRIGGER flow_video_evidence_expiry BEFORE INSERT ON flow_evidence FOR EACH ROW EXECUTE FUNCTION flow_video_stamp_evidence_expiry();

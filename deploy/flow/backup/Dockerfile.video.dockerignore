@@ -1,0 +1,25 @@
+# Restrict the remote build context to the reviewed source/lockfiles needed by this image.
+**
+!services/
+!services/loom-engine/
+!services/loom-engine/package.json
+!services/loom-engine/package-lock.json
+!services/loom-engine/flow/
+!services/loom-engine/flow/**
+!services/loom-engine/src/
+!services/loom-engine/src/**
+!services/loom-engine/scripts/
+!services/loom-engine/scripts/**
+!deploy/
+!deploy/flow/
+!deploy/flow/backup/
+!deploy/flow/backup/**
+**/.env*
+**/*.key
+**/*.pem
+**/*.session
+**/*.sqlite*
+**/*.dump
+**/*.log
+**/node_modules
+**/__pycache__

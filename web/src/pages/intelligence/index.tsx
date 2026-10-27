@@ -12,11 +12,19 @@ import { ApprovalDetails, credits } from "./plan-card";
 import { TopicsPanel } from "./topics-panel";
 import { MonitorEditor } from "./monitor-editor";
 import { extractHandoffCanvasUrl } from "./canvas-handoff-modal";
+import { VideoDomainProfiles } from "./video-domain-profiles";
+import { VideoIngestionJobs } from "./video-ingestion-jobs";
+import { VideoKnowledgeReview } from "./video-knowledge-review";
+import { VideoSkillCandidates } from "./video-skill-candidates";
 
 /** PRD §5.1 navigation: 总览/信源/关键词/内容库/专题/报告/任务/行业包/连接设置. */
 export const INTEL_VIEWS = [
     { key: "overview", label: "总览" },
     { key: "sources", label: "信源" },
+    { key: "domains", label: "知识域" },
+    { key: "video-jobs", label: "视频任务" },
+    { key: "video-knowledge", label: "视频知识" },
+    { key: "video-skills", label: "方法版本" },
     { key: "keywords", label: "关键词" },
     { key: "library", label: "内容库" },
     { key: "topics", label: "专题" },
@@ -77,6 +85,8 @@ export default function IntelligencePage() {
 
     useEffect(() => {
         let cancelled = false;
+        setWorkspaces([]);
+        setWorkspaceId(undefined);
         setConversations(cachedConversations());
         setActive(undefined);
         setMessages([]);
@@ -86,7 +96,7 @@ export default function IntelligencePage() {
         void listIntelWorkspaces().then((list) => {
             if (cancelled) return;
             setWorkspaces(list);
-            setWorkspaceId((current) => current ?? list[0]?.id);
+            setWorkspaceId(list[0]?.id);
         }).catch(onError);
         void listConversations(userId).then((list) => { if (!cancelled) setConversations(list); }).catch(onError);
         return () => { cancelled = true; };
@@ -367,6 +377,10 @@ export default function IntelligencePage() {
                 {nav}
                 {view === "overview" && <OverviewView workspaceId={workspaceId} />}
                 {view === "sources" && <SourcesPanel workspaceId={workspaceId} />}
+                {view === "domains" && <VideoDomainProfiles key={workspaceId} workspaceId={workspaceId} />}
+                {view === "video-jobs" && <VideoIngestionJobs key={workspaceId} workspaceId={workspaceId} />}
+                {view === "video-knowledge" && <VideoKnowledgeReview key={workspaceId} workspaceId={workspaceId} />}
+                {view === "video-skills" && <VideoSkillCandidates key={workspaceId} workspaceId={workspaceId} />}
                 {view === "keywords" && <KeywordsView workspaceId={workspaceId} onOpenAgent={() => setAgentDrawerOpen(true)} onEditMonitor={setEditingMonitor} />}
                 {view === "library" && <LibraryView workspaceId={workspaceId} onNavigate={(url) => void navigate(url)} />}
                 {view === "reports" && <ReportsPanel workspaceId={workspaceId} onNavigate={(url) => void navigate(url)} />}

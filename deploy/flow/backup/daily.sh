@@ -24,7 +24,7 @@ prune() { # prune <dir>: drop dumps (and their manifest/sha) older than keep_day
     [ "$n" -le "$keep_min" ] && continue
     if [ -n "$(find "$f" -mtime +"$((keep_days - 1))" -print)" ]; then
       base="${f%.dump}"
-      rm -f "$f" "$f.sha256" "$base.manifest"
+      rm -f "$f" "$f.sha256" "$base.manifest" "$base.video-journal.json"
       echo "pruned $f"
     fi
   done

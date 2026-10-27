@@ -25,6 +25,10 @@ func (s *Service) initReadCaches() {
 // SSE 展示专用，不用于写路径和权限决策；userID 进入 key，回源仍检查任务归属。
 // 游标保留在 key 中，避免重连读取到其他客户端已经越过的增量窗口。
 func (s *Service) CachedTaskTextReplay(ctx context.Context, userID, taskID string, after int64) (*TextReplayResult, error) {
+	// A cache hit must never bypass a fresh retention/restore barrier.
+	if err := s.repo.WithContext(ctx).CheckVideoRunProjection(userID, taskID); err != nil {
+		return nil, err
+	}
 	s.initReadCaches()
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()

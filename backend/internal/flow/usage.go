@@ -30,6 +30,7 @@ const (
 const (
 	UsageLLMInputTokens  = "llm_input_tokens"
 	UsageLLMOutputTokens = "llm_output_tokens"
+	UsageLLMTotalTokens  = "llm_total_tokens"
 	UsageOCRPages        = "ocr_pages"
 	UsageASRSeconds      = "asr_seconds"
 	UsagePaidSourceCalls = "paid_source_calls"
@@ -37,12 +38,17 @@ const (
 	UsageStoredBytes     = "stored_bytes"
 	UsageNotifications   = "notifications"
 	// Canvas agent runs (mirrored from the run's settled billing orders; see app.recordCanvasRunUsage).
-	UsageCanvasModelCalls = "canvas_model_calls"
-	UsageCanvasMedia      = "canvas_media_generations"
+	UsageCanvasModelCalls   = "canvas_model_calls"
+	UsageCanvasMedia        = "canvas_media_generations"
+	UsageDownloadBytes      = "download_bytes"
+	UsageVideoSeconds       = "video_seconds"
+	UsageVideoFrames        = "video_frames"
+	UsageVLMRequests        = "vlm_requests"
+	UsageCollectionRequests = "collection_requests"
 )
 
-var UsageTypes = []string{UsageLLMInputTokens, UsageLLMOutputTokens, UsageOCRPages, UsageASRSeconds, UsagePaidSourceCalls, UsageMCPCalls, UsageStoredBytes, UsageNotifications,
-	UsageCanvasModelCalls, UsageCanvasMedia}
+var UsageTypes = []string{UsageLLMInputTokens, UsageLLMOutputTokens, UsageLLMTotalTokens, UsageOCRPages, UsageASRSeconds, UsagePaidSourceCalls, UsageMCPCalls, UsageStoredBytes, UsageNotifications,
+	UsageCanvasModelCalls, UsageCanvasMedia, UsageDownloadBytes, UsageVideoSeconds, UsageVideoFrames, UsageVLMRequests, UsageCollectionRequests}
 
 func validUsageType(t string) bool {
 	for _, u := range UsageTypes {
@@ -63,9 +69,10 @@ type PriceBook struct {
 // DefaultPriceBook: LLM tokens are charged through the Model Gateway task cost
 // (unit 0 here avoids double charging); OCR pages and ASR seconds carry a price.
 var DefaultPriceBook = PriceBook{Version: "price_v1", UnitMicro: map[string]int64{
-	UsageLLMInputTokens: 0, UsageLLMOutputTokens: 0, UsageOCRPages: 2000, UsageASRSeconds: 100,
+	UsageLLMInputTokens: 0, UsageLLMOutputTokens: 0, UsageLLMTotalTokens: 0, UsageOCRPages: 2000, UsageASRSeconds: 100,
 	UsagePaidSourceCalls: 0, UsageMCPCalls: 0, UsageStoredBytes: 0, UsageNotifications: 0,
 	UsageCanvasModelCalls: 0, UsageCanvasMedia: 0,
+	UsageDownloadBytes: 0, UsageVideoSeconds: 0, UsageVideoFrames: 0, UsageVLMRequests: 0, UsageCollectionRequests: 0,
 }}
 
 // CurrentPriceBook reads FLOW_PRICE_BOOK (JSON {"version","unit_micro"}) or returns the default.
@@ -191,13 +198,17 @@ func recordModelUsage(db *gorm.DB, t model.FlowModelTask, u ModelUsage, cost int
 	if u.InputTokens == 0 && u.OutputTokens == 0 {
 		return nil
 	}
-	_, err := DefaultUsageRecorder.Record(db, UsageInput{TenantID: t.TenantID, UsageType: UsageLLMInputTokens, Quantity: u.InputTokens, CostMicro: 0,
+	var scope struct {
+		WorkspaceID string `json:"workspace_id"`
+	}
+	_ = json.Unmarshal([]byte(t.Context), &scope)
+	_, err := DefaultUsageRecorder.Record(db, UsageInput{TenantID: t.TenantID, WorkspaceID: scope.WorkspaceID, UsageType: UsageLLMInputTokens, Quantity: u.InputTokens, CostMicro: 0,
 		SubjectRef: "model_task:" + t.ID, IdemKey: fmt.Sprintf("model:%s:in", t.IdemKey), ReservationID: t.ReservationID}, now)
 	if err != nil {
 		return err
 	}
 	// The settled task cost is attributed to the output line so the total matches the ledger.
-	_, err = DefaultUsageRecorder.Record(db, UsageInput{TenantID: t.TenantID, UsageType: UsageLLMOutputTokens, Quantity: u.OutputTokens, CostMicro: cost,
+	_, err = DefaultUsageRecorder.Record(db, UsageInput{TenantID: t.TenantID, WorkspaceID: scope.WorkspaceID, UsageType: UsageLLMOutputTokens, Quantity: u.OutputTokens, CostMicro: cost,
 		SubjectRef: "model_task:" + t.ID, IdemKey: fmt.Sprintf("model:%s:out", t.IdemKey), ReservationID: t.ReservationID}, now)
 	return err
 }

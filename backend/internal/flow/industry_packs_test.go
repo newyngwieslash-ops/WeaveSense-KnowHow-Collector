@@ -6,6 +6,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -16,6 +17,8 @@ import (
 //
 //	go test ./internal/flow -run TestIndustryPackExport -update-packs
 var updatePacks = flag.Bool("update-packs", false, "rewrite industry-packs/ from the embedded skill packs")
+var updateVideoPack = flag.Bool("update-video-pack", false, "additively refresh only industry-packs/video-knowledge-core from its embedded source")
+var updateVideoReleases = flag.Bool("update-video-releases", false, "additively export compiled immutable video releases without removing historical files")
 
 func industryPackFiles(t *testing.T) map[string][]byte {
 	t.Helper()
@@ -39,6 +42,11 @@ func industryPackFiles(t *testing.T) map[string][]byte {
 	}
 	out := map[string][]byte{}
 	for _, p := range ps {
+		dir, source := p.ID, "backend/internal/flow/skillpacks/"+p.ID+".json"
+		if p.Release != nil {
+			dir += "/releases/" + p.Version
+			source = "backend/internal/flow/skillpacks/releases/" + p.ID + "/" + p.Version + ".json"
+		}
 		for _, tool := range p.RequiredTools {
 			if !known[tool] {
 				t.Fatalf("pack %s requires unknown tool %s", p.ID, tool)
@@ -52,19 +60,19 @@ func industryPackFiles(t *testing.T) map[string][]byte {
 			if err := json.Unmarshal(s.OutputSchema, &schema); err != nil {
 				t.Fatalf("%s/%s output_schema: %v", p.ID, s.ID, err)
 			}
-			out[p.ID+"/"+f] = enc(schema)
+			out[dir+"/"+f] = enc(schema)
 		}
 		m := map[string]any{
 			"id": p.ID, "version": p.Version, "name": p.Name, "kind": p.Kind,
 			"skills": skills, "required_tools": p.RequiredTools, "optional_connectors": p.OptionalConns,
 			"mcp_requirements": nonNil(p.MCPRequirements),
-			"source":           "backend/internal/flow/skillpacks/" + p.ID + ".json",
+			"source":           source,
 			"note":             "generated from the embedded pack; edit the source and regenerate (see industry_packs_test.go)",
 		}
 		if len(p.ReportSchema) > 0 {
 			var rs any
 			_ = json.Unmarshal(p.ReportSchema, &rs)
-			out[p.ID+"/schemas/report.json"] = enc(rs)
+			out[dir+"/schemas/report.json"] = enc(rs)
 			m["report_schema"] = "schemas/report.json"
 		}
 		if len(p.EvalSamples) > 0 {
@@ -79,22 +87,25 @@ func industryPackFiles(t *testing.T) map[string][]byte {
 				b.Write(c.Bytes())
 				b.WriteByte('\n')
 			}
-			out[p.ID+"/evals/evidence-cases.jsonl"] = b.Bytes()
+			out[dir+"/evals/evidence-cases.jsonl"] = b.Bytes()
 			m["evaluation_set"] = "evals/evidence-cases.jsonl"
 		}
 		if len(p.SourceTemplates) > 0 {
 			var st any
 			_ = json.Unmarshal(p.SourceTemplates, &st)
-			out[p.ID+"/source-templates.json"] = enc(st)
+			out[dir+"/source-templates.json"] = enc(st)
 			m["source_templates"] = "source-templates.json"
 		}
 		if len(p.Glossary) > 0 {
 			var g any
 			_ = json.Unmarshal(p.Glossary, &g)
-			out[p.ID+"/glossary.json"] = enc(g)
+			out[dir+"/glossary.json"] = enc(g)
 			m["glossary"] = "glossary.json"
 		}
-		out[p.ID+"/manifest.json"] = enc(m)
+		if p.Release != nil {
+			m["release_lineage"] = p.Release
+		}
+		out[dir+"/manifest.json"] = enc(m)
 	}
 	return out
 }
@@ -102,6 +113,37 @@ func industryPackFiles(t *testing.T) map[string][]byte {
 func TestIndustryPackExport(t *testing.T) {
 	root := filepath.Join("..", "..", "..", "industry-packs")
 	want := industryPackFiles(t)
+	if *updateVideoReleases {
+		for name, b := range want {
+			if !strings.Contains(filepath.ToSlash(name), "/releases/") {
+				continue
+			}
+			p := filepath.Join(root, name)
+			if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+				t.Fatal(err)
+			}
+			if old, err := os.ReadFile(p); err == nil && !bytes.Equal(old, b) {
+				t.Fatalf("immutable historical export conflicts: %s", name)
+			}
+			if err := os.WriteFile(p, b, 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if *updateVideoPack {
+		for name, b := range want {
+			if filepath.ToSlash(filepath.Dir(name)) != "video-knowledge-core" && !strings.HasPrefix(filepath.ToSlash(name), "video-knowledge-core/") {
+				continue
+			}
+			p := filepath.Join(root, name)
+			if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(p, b, 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	if *updatePacks {
 		_ = os.RemoveAll(root)
 		for name, b := range want {

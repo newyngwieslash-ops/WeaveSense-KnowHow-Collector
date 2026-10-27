@@ -1,0 +1,26 @@
+{
+  "immutable": true,
+  "purpose": "Original user-approved implementation baseline; execution status is maintained only in PROGRESS.json",
+  "inputs": [
+    {
+      "file": "tasks.baseline.xlsx",
+      "source_name": "WeaveSense_完整开发任务清单_v1.xlsx",
+      "sha256": "0c38c8136ef7fa9a28b16ec9fc5eadcdf3364ba01d326a7f092999a402f2d357"
+    },
+    {
+      "file": "tasks.baseline.json",
+      "source_name": "WeaveSense_开发任务数据_v1.json",
+      "sha256": "0def0d9514aeaac544034dbd6994c76041d35f0c2968011ee02770c86ae2e046"
+    },
+    {
+      "file": "PRD.baseline.txt",
+      "source_name": "WeaveSense_PRD_纯文本_v1.txt",
+      "sha256": "28f1881f6561cb515bcc6f720f3d9a22fc15dc9bc0c32456a906922d75d7c5a8"
+    },
+    {
+      "file": "IMPLEMENTATION_PROMPT.baseline.md",
+      "source_name": "已粘贴的文本(1).txt",
+      "sha256": "eb79f7179aad6572208ca80735ba897c02966e18a1ef2605da643903fcc173ca"
+    }
+  ]
+}

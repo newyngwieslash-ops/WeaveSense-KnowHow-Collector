@@ -1,0 +1,143 @@
+# Optional overlay; no public port, registry publication or automatic deployment.
+# See docs/video-ingestion/RUNBOOK.md before enabling a workspace.
+x-video-journal-env: &video-journal-env
+  VIDEO_DELETION_JOURNAL_DIR: /var/lib/flow-deletion-journal/journal
+  VIDEO_DELETION_JOURNAL_ID: ${VIDEO_DELETION_JOURNAL_ID:-}
+  VIDEO_DELETION_JOURNAL_KEY: ${VIDEO_DELETION_JOURNAL_KEY:-}
+x-video-backup-build: &video-backup-build
+  context: .
+  dockerfile: deploy/flow/backup/Dockerfile.video
+  target: video-backup
+  args:
+    NODE_IMAGE: ${VIDEO_BACKUP_NODE_IMAGE:-}
+    POSTGRES_IMAGE: ${VIDEO_BACKUP_POSTGRES_IMAGE:-}
+    MC_IMAGE: ${VIDEO_BACKUP_MC_IMAGE:-}
+services:
+  platform:
+    environment:
+      FLOW_VIDEO_ENABLED: ${FLOW_VIDEO_ENABLED:-false}
+      FLOW_VIDEO_WORKSPACES: ${FLOW_VIDEO_WORKSPACES:-}
+      FLOW_TRUSTED_VIDEO_MCP_SERVICES: ${FLOW_TRUSTED_VIDEO_MCP_SERVICES:-[]}
+      FLOW_MODEL_GATEWAY_SUPPORTS_VISION: ${FLOW_MODEL_GATEWAY_SUPPORTS_VISION:-false}
+      FLOW_MODEL_GATEWAY_EMBEDDING_MODEL: ${FLOW_MODEL_GATEWAY_EMBEDDING_MODEL:-}
+      FLOW_MODEL_GATEWAY_EMBEDDING_MICRO_PER_1K_TOKENS: ${FLOW_MODEL_GATEWAY_EMBEDDING_MICRO_PER_1K_TOKENS:-0}
+      FLOW_MODEL_GATEWAY_EMBEDDING_DIMENSIONS: ${FLOW_MODEL_GATEWAY_EMBEDDING_DIMENSIONS:-0}
+  loom-engine:
+    environment:
+      <<: *video-journal-env
+      FLOW_VIDEO_ENABLED: ${FLOW_VIDEO_ENABLED:-false}
+      FLOW_VIDEO_WORKSPACES: ${FLOW_VIDEO_WORKSPACES:-}
+      VIDEO_WORKER_URL: http://video-worker:8799
+      VIDEO_SERVICE_TOKEN: ${VIDEO_SERVICE_TOKEN:-}
+      FLOW_PLATFORM_URL: http://platform:8080
+    volumes:
+      - video-deletion-journal:/var/lib/flow-deletion-journal
+  loom-scheduler:
+    environment:
+      <<: *video-journal-env
+      FLOW_VIDEO_ENABLED: ${FLOW_VIDEO_ENABLED:-false}
+      FLOW_VIDEO_WORKSPACES: ${FLOW_VIDEO_WORKSPACES:-}
+      VIDEO_WORKER_URL: http://video-worker:8799
+      VIDEO_SERVICE_TOKEN: ${VIDEO_SERVICE_TOKEN:-}
+      FLOW_PLATFORM_URL: http://platform:8080
+    volumes:
+      - video-deletion-journal:/var/lib/flow-deletion-journal
+  loom-enrich:
+    environment:
+      <<: *video-journal-env
+      FLOW_VIDEO_ENABLED: ${FLOW_VIDEO_ENABLED:-false}
+      FLOW_VIDEO_WORKSPACES: ${FLOW_VIDEO_WORKSPACES:-}
+      VIDEO_WORKER_URL: http://video-worker:8799
+      VIDEO_SERVICE_TOKEN: ${VIDEO_SERVICE_TOKEN:-}
+      FLOW_PLATFORM_URL: http://platform:8080
+    volumes:
+      - video-deletion-journal:/var/lib/flow-deletion-journal
+  flow-backup:
+    # Never overwrite/tag the inherited PostgreSQL image when building.
+    image: ${VIDEO_BACKUP_LOCAL_IMAGE:-weavesense-video-backup:local}
+    build: *video-backup-build
+    environment:
+      <<: *video-journal-env
+      BACKUP_VIDEO_JOURNAL_REQUIRED: "true"
+    volumes:
+      - video-deletion-journal:/var/lib/flow-deletion-journal:ro
+  loom-research:
+    environment:
+      <<: *video-journal-env
+      FLOW_VIDEO_ENABLED: ${FLOW_VIDEO_ENABLED:-false}
+      FLOW_VIDEO_WORKSPACES: ${FLOW_VIDEO_WORKSPACES:-}
+    volumes:
+      - video-deletion-journal:/var/lib/flow-deletion-journal
+  flow-backup-objects:
+    image: ${VIDEO_BACKUP_LOCAL_IMAGE:-weavesense-video-backup:local}
+    build: *video-backup-build
+    environment:
+      <<: *video-journal-env
+      BACKUP_VIDEO_JOURNAL_REQUIRED: "true"
+    volumes:
+      - video-deletion-journal:/var/lib/flow-deletion-journal:ro
+  video-worker:
+    profiles: [video]
+    build:
+      context: ./services/video-knowledge
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: [.env.flow]
+    environment:
+      VIDEO_PORT: "8799"
+      VIDEO_EXECUTION_DB: /data/executions.sqlite3
+      # Large media must not consume a RAM-backed tmpfs under the 2 GiB cgroup.
+      VIDEO_TEMP_ROOT: /data/tmp
+      VIDEO_SERVICE_TOKEN: ${VIDEO_SERVICE_TOKEN:-}
+      FLOW_INTERNAL_JWT_SIGNING_KEY: ${FLOW_INTERNAL_JWT_SIGNING_KEY:-}
+      VIDEO_MAX_BYTES: ${VIDEO_MAX_BYTES:-2147483648}
+      VIDEO_MIN_FREE_BYTES: ${VIDEO_MIN_FREE_BYTES:-268435456}
+      VIDEO_MIN_FREE_RATIO: ${VIDEO_MIN_FREE_RATIO:-0.05}
+      VIDEO_MAX_TEMP_BYTES: ${VIDEO_MAX_TEMP_BYTES:-4294967296}
+      # Optional aliases require a separate operator-owned read-only secret
+      # mount; no secret file is implicitly created or copied into the image.
+      DTK_CREDENTIAL_ROUTES_FILE: ${DTK_CREDENTIAL_ROUTES_FILE:-}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET: ${INTEL_BUCKET:-flow-intel}
+      MINIO_ACCESS_KEY: ${VIDEO_OBJECT_ACCESS_KEY:-}
+      MINIO_SECRET_KEY: ${VIDEO_OBJECT_SECRET_KEY:-}
+      MINIO_SECURE: "false"
+      ASR_ENABLED: ${ASR_ENABLED:-false}
+      ASR_URL: http://asr-worker:8797
+      ASR_SERVICE_TOKEN: ${ASR_SERVICE_TOKEN:-}
+      OCR_ENABLED: ${OCR_ENABLED:-false}
+      OCR_URL: http://ocr-worker:8796
+      OCR_SERVICE_TOKEN: ${OCR_SERVICE_TOKEN:-}
+      DTK_ENABLED: ${DTK_ENABLED:-false}
+      DTK_URL: ${DTK_URL:-}
+      DTK_SERVICE_TOKEN: ${DTK_SERVICE_TOKEN:-}
+      DTK_TENANT_ID: ${DTK_TENANT_ID:-}
+      DTK_WORKSPACE_ID: ${DTK_WORKSPACE_ID:-}
+      VIDEO_MODEL_ENABLED: ${VIDEO_MODEL_ENABLED:-false}
+      FLOW_PLATFORM_URL: http://platform:8080
+    volumes:
+      - videoexecutions:/data
+    tmpfs:
+      - /tmp:size=67108864,mode=1777
+    cpus: "2.0"
+    mem_limit: 2g
+    pids_limit: 256
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [internal]
+  asr-worker:
+    environment:
+      ASR_MODEL_DIR: /models
+      ASR_MODEL_MANIFEST: /models/model-lock.json
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - ${VIDEO_ASR_MODEL_HOST_DIR:-./.local/models/asr}:/models:ro
+
+volumes:
+  videoexecutions:
+  # Provision and initialize separately. Never restore or remove this authority
+  # with pgdata/objects; external volumes also survive compose down --volumes.
+  video-deletion-journal:
+    external: true
+    name: ${VIDEO_DELETION_JOURNAL_VOLUME:-weavesense-video-deletion-journal}

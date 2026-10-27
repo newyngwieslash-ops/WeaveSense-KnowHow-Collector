@@ -1,0 +1,6 @@
+__pycache__/
+test_*.py
+local_model_smoke.py
+qa_fixture_service.py
+*.sqlite*
+*.env

@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "scope": "Only source-baseline boundary tasks COL-001 and IF-001; not industry freeze or product acceptance",
+  "reviewed_by": "dot source review with independent clause audit",
+  "reviewed_at_utc": "2026-10-26T18:40:08.928909+00:00",
+  "tasks": {
+    "COL-001": {
+      "status": "passed",
+      "criteria": [
+        "基线文档每个现有能力有文件/符号/固定提交引用。",
+        "fixture、文档声明、源码实现、实测结果分别标注；未实测的下载成功率及性能不写成事实。"
+      ],
+      "boundary": "Source/document checks only; no business/profile/production approval inferred",
+      "independent_audit": "docs/video-ingestion/evidence/independent-task-coverage-latest.json"
+    },
+    "IF-001": {
+      "status": "passed",
+      "criteria": [
+        "PRD每项能力标为现有/复用修改/拟新增；不以仓库名或上游README推断已实现。",
+        "MCP、API、定时、手动入口在架构图指向同一个COL域服务。",
+        "确认P0、P1、P2边界及人工发布责任。"
+      ],
+      "boundary": "Source/document checks only; no business/profile/production approval inferred",
+      "independent_audit": "docs/video-ingestion/evidence/independent-task-coverage-latest.json"
+    }
+  },
+  "documents": [
+    {
+      "path": "docs/video-ingestion/BASELINE.md",
+      "sha256": "103091a7644ad199043822c474150086a61427840630991449df1525a551da3c"
+    },
+    {
+      "path": "docs/video-ingestion/ARCHITECTURE.md",
+      "sha256": "b60817bd8b6c767a24458ae9568ad6721d619e1b40e3c058fb860970e0002fb3"
+    },
+    {
+      "path": "docs/video-ingestion/CONTRACTS.md",
+      "sha256": "df28afad11d94b37118918804aac736c09d8d4ac6c0750a32f1d8f0fbeb9fba8"
+    },
+    {
+      "path": "docs/video-ingestion/DECISIONS.md",
+      "sha256": "d3d5d6290902a4dac916fd265518eea5387b0d48784c3626ca7cd4fe3ce90309"
+    },
+    {
+      "path": "docs/video-ingestion/upstream-media-lock.json",
+      "sha256": "b2a5c4a5a60ded6c499a11c1dbfdc2955cbe38ff8f7f9015ff1c9e718fe099e0"
+    },
+    {
+      "path": "docs/video-ingestion/spec/manifest.json",
+      "sha256": "fb1f3dda05af0f7c05dae2013c0b61471cfaeadc70fab3f52088d5163c2f5bbb"
+    }
+  ]
+}

@@ -1,0 +1,681 @@
+{
+  "schema": "weavesense.source-only-rebuild/v1",
+  "verified_at_utc": "2026-10-26T19:04:05Z",
+  "status": "passed_scoped_source_only_rebuild",
+  "baseline_commit": "cbc76b6c21f3098e7f7c311eef5973d7e9e1c0e5",
+  "scope": "Source-only archive rebuild of omitted generated binaries and focused payment runtime/package tests; not full product/V1 release acceptance.",
+  "source": {
+    "git_tracked_files": 5736,
+    "retained_files": 5695,
+    "retained_bytes": 146595846,
+    "omitted_generated_files": 41,
+    "retained_files_changed_by_bootstrap": [],
+    "retained_sha256_manifest_sha256": "5993518060623d3a44814de6a1c2f4b0a7a4bcad367a4955b76cfa52c62af56a",
+    "main_repo_status_clean": true,
+    "main_repo_commit_unchanged": true,
+    "legacy_source_zip_retained": "services/loom-engine/public/zhishi-loom-source.zip",
+    "other_plugin_bundles_retained": 97,
+    "tracked_only_no_git_dependency_dirs_or_live_dotenv_paths": true,
+    "secret_exclusion_scope": "Copied tracked files only, excluding cache/dependency and live .env paths; no environment values or credentials added. Not a fresh full-repository credential content audit."
+  },
+  "excluded_paths": [
+    "backend/server",
+    "plugin-packages/official-payment-alipay-page.yingce-plugin",
+    "plugin-packages/official-payment-alipay-page/backend/provider",
+    "plugin-packages/official-payment-alipay-page/backend/provider-darwin-amd64",
+    "plugin-packages/official-payment-alipay-page/backend/provider-darwin-arm64",
+    "plugin-packages/official-payment-alipay-page/backend/provider-linux-amd64",
+    "plugin-packages/official-payment-alipay-page/backend/provider-linux-arm64",
+    "plugin-packages/official-payment-alipay-page/backend/provider-windows-amd64.exe",
+    "plugin-packages/official-payment-alipay-page/backend/provider-windows-arm64.exe",
+    "plugin-packages/official-payment-epay.yingce-plugin",
+    "plugin-packages/official-payment-epay/backend/provider",
+    "plugin-packages/official-payment-epay/backend/provider-darwin-amd64",
+    "plugin-packages/official-payment-epay/backend/provider-darwin-arm64",
+    "plugin-packages/official-payment-epay/backend/provider-linux-amd64",
+    "plugin-packages/official-payment-epay/backend/provider-linux-arm64",
+    "plugin-packages/official-payment-epay/backend/provider-windows-amd64.exe",
+    "plugin-packages/official-payment-epay/backend/provider-windows-arm64.exe",
+    "plugin-packages/official-payment-wechat-native.yingce-plugin",
+    "plugin-packages/official-payment-wechat-native/backend/provider",
+    "plugin-packages/official-payment-wechat-native/backend/provider-darwin-amd64",
+    "plugin-packages/official-payment-wechat-native/backend/provider-darwin-arm64",
+    "plugin-packages/official-payment-wechat-native/backend/provider-linux-amd64",
+    "plugin-packages/official-payment-wechat-native/backend/provider-linux-arm64",
+    "plugin-packages/official-payment-wechat-native/backend/provider-windows-amd64.exe",
+    "plugin-packages/official-payment-wechat-native/backend/provider-windows-arm64.exe",
+    "plugin-packages/official-payment-xunhupay.yingce-plugin",
+    "plugin-packages/official-payment-xunhupay/backend/provider",
+    "plugin-packages/official-payment-xunhupay/backend/provider-darwin-amd64",
+    "plugin-packages/official-payment-xunhupay/backend/provider-darwin-arm64",
+    "plugin-packages/official-payment-xunhupay/backend/provider-linux-amd64",
+    "plugin-packages/official-payment-xunhupay/backend/provider-linux-arm64",
+    "plugin-packages/official-payment-xunhupay/backend/provider-windows-amd64.exe",
+    "plugin-packages/official-payment-xunhupay/backend/provider-windows-arm64.exe",
+    "plugin-packages/official-payment-zhifufm.yingce-plugin",
+    "plugin-packages/official-payment-zhifufm/backend/provider",
+    "plugin-packages/official-payment-zhifufm/backend/provider-darwin-amd64",
+    "plugin-packages/official-payment-zhifufm/backend/provider-darwin-arm64",
+    "plugin-packages/official-payment-zhifufm/backend/provider-linux-amd64",
+    "plugin-packages/official-payment-zhifufm/backend/provider-linux-arm64",
+    "plugin-packages/official-payment-zhifufm/backend/provider-windows-amd64.exe",
+    "plugin-packages/official-payment-zhifufm/backend/provider-windows-arm64.exe"
+  ],
+  "toolchain": {
+    "go": {
+      "filename": "go1.25.14.linux-amd64.tar.gz",
+      "os": "linux",
+      "arch": "amd64",
+      "version": "go1.25.14",
+      "sha256": "a21ae5633a269bcd7e90cf767e48225633795e99d831742cbf3397064fee7712",
+      "size": 59909419,
+      "kind": "archive"
+    },
+    "go_archive_sha256_rechecked": true,
+    "node": "v24.22.1",
+    "cc": "cc (Debian 14.2.0-19) 14.2.0",
+    "host": "linux/amd64"
+  },
+  "final_environment": {
+    "GOTOOLCHAIN": "local",
+    "GOFLAGS": "-buildvcs=false",
+    "GOPROXY": "off",
+    "GOSUMDB": "sum.golang.org",
+    "GOPATH": "existing verified runtime/gopath",
+    "GOCACHE": "existing runtime/gocache",
+    "PAYMENT_PLUGIN_GOOS": "unset (all default platforms)",
+    "PAYMENT_PLUGIN_GOARCH": "unset (all default platforms)",
+    "payment_CGO_ENABLED": "0",
+    "host_CGO_ENABLED": "1"
+  },
+  "module_integrity": {
+    "go_mod_verify": "passed: all modules verified",
+    "ordering": "successful go mod verify preceded final normal-sumdb payment rebuild, package verification, tests and host compile",
+    "downloads": "disabled with GOPROXY=off; reused existing module cache",
+    "local_replace": "backend/third_party/go-sms-sender retained and covered by source hash comparison; not independently covered by go mod verify"
+  },
+  "build_commands": {
+    "payment": "sh plugin-packages/build-packages.sh --payments-only",
+    "package_verification": "PAYMENT_PLUGIN_SMOKE_TEST=1 sh plugin-packages/verify-payment-packages.sh --all linux amd64",
+    "host": "cd backend && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o server ./cmd/server"
+  },
+  "package_contract": {
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64",
+      "darwin/amd64",
+      "darwin/arm64",
+      "windows/amd64",
+      "windows/arm64"
+    ],
+    "tagged_payloads": 30,
+    "canonical_linux_amd64_copies": 5,
+    "bundles_rebuilt": 5,
+    "host_binaries_rebuilt": 1,
+    "generated_files_total": 41,
+    "all_plugin_bundles_after_rebuild": 102,
+    "zip_payload_bytes_match_directory": true,
+    "all_platform_magic_and_go_buildinfo_verified": true,
+    "linux_native_invalid_request_smokes": 5,
+    "host_embedding": "Payment bundles are external runtime plugin packages, not host go:embed inputs; retained docs, builtin skill and seed resources support actual host embedding."
+  },
+  "tests": [
+    {
+      "package": "yingce/backend/internal/payment",
+      "elapsed_seconds": 0.042,
+      "top_level_pass": 9,
+      "top_level_skip": 1,
+      "top_level_fail": 0,
+      "test_and_subtest_pass": 19,
+      "tests": {
+        "TestRPCProviderUsesPaymentV1Contract": "pass",
+        "TestRPCProviderClassifiesExecutableStartFailures": "pass",
+        "TestRPCProviderRejectsIncompatibleFallbackBinary": "skip",
+        "TestResolveRPCBackendPathPrefersHostTaggedBinary": "pass",
+        "TestRPCProviderStartsOfficialHostArtifact": "pass",
+        "TestRPCProviderStartsFromRelativePackageDir": "pass",
+        "TestClassifyPaymentPluginStartError": "pass",
+        "TestRPCProviderDoesNotExposeProcessStderr": "pass",
+        "TestRPCProviderClassifiesInvalidJSONResponse": "pass",
+        "TestRPCProviderPreservesPluginValidationError": "pass"
+      }
+    },
+    {
+      "package": "yingce/backend/internal/protocol",
+      "elapsed_seconds": 4.103,
+      "top_level_pass": 9,
+      "top_level_skip": 0,
+      "top_level_fail": 0,
+      "test_and_subtest_pass": 14,
+      "tests": {
+        "TestOfficialProtocolPackagesAreSelfContainedDeclarativePlugins": "pass",
+        "TestParsePluginPackageRejectsBareManifest": "pass",
+        "TestParsePluginPackageValidatesWebEntry": "pass",
+        "TestParsePluginPackageAcceptsTaggedRPCBackend": "pass",
+        "TestInspectPluginPackageValidatesStructureWithoutContents": "pass",
+        "TestParsePluginPackageFilesLoadsOnlySelectedEntries": "pass",
+        "TestOfficialPaymentArtifactsAreCanonicalLinuxAMD64": "pass",
+        "TestPaymentRPCBackendCandidatesPreferPlatformTaggedFiles": "pass",
+        "TestHasAnyPaymentRPCBackendAcceptsTaggedArtifacts": "pass"
+      }
+    },
+    {
+      "package": "yingce/backend/internal/app",
+      "elapsed_seconds": 5.702,
+      "top_level_pass": 13,
+      "top_level_skip": 0,
+      "top_level_fail": 0,
+      "test_and_subtest_pass": 13,
+      "tests": {
+        "TestBundledPaymentPluginsMatchHostProviders": "pass",
+        "TestBundledPaymentPluginsLoadFromSystemSource": "pass",
+        "TestSystemPaymentPluginsRegisterRPCProviders": "pass",
+        "TestPaymentRegistryFailsClosedWhenOfficialPackagesAreMissing": "pass",
+        "TestXunHuPayOfficialPackageIsPaymentPlugin": "pass",
+        "TestZhiFuFMOfficialPackageIsPaymentPlugin": "pass",
+        "TestEpayOfficialPackageIsPaymentPlugin": "pass",
+        "TestPaymentRuntimeCacheUsesCompletePackageDigest": "pass",
+        "TestPaymentRuntimeReplacesInterruptedExtraction": "pass",
+        "TestBuiltInPaymentPackageUpgradeSelectsNewRuntimeDigest": "pass",
+        "TestPaymentRuntimeRejectsInvalidDigest": "pass",
+        "TestPaymentRuntimeReadyAcceptsTaggedBackend": "pass",
+        "TestPaymentRuntimeFromPackageExtractsOnlyHostArtifacts": "pass"
+      }
+    }
+  ],
+  "total_top_level_pass": 31,
+  "total_top_level_skip": 1,
+  "total_top_level_fail": 0,
+  "initial_failure": {
+    "command": "sh plugin-packages/build-packages.sh --payments-only without GOFLAGS",
+    "error": "error obtaining VCS status: exit status 128; Use -buildvcs=false to disable VCS stamping.",
+    "resolution": "export GOFLAGS=-buildvcs=false; no source changes",
+    "earlier_offline_setting": "GOSUMDB=off was used only in an earlier attempt, not presented as integrity evidence; final rebuild restored normal sumdb."
+  },
+  "generated_files": [
+    {
+      "path": "backend/server",
+      "bytes": 76351136,
+      "sha256": "31e1de9732a6e8a18e987b05c319b2a2e04b36417d51d764789d7a19a9aeed9f",
+      "kind": "host_binary",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "1"
+    },
+    {
+      "path": "plugin-packages/official-payment-alipay-page.yingce-plugin",
+      "bytes": 18622736,
+      "sha256": "0601cfa21c31d645b34576747ac7c83502ffaec4afd333799805f8f099eec1f0",
+      "kind": "payment_bundle",
+      "zip_entry_count": 10,
+      "zip_crc_verified": true
+    },
+    {
+      "path": "plugin-packages/official-payment-alipay-page/backend/provider",
+      "bytes": 6410424,
+      "sha256": "e28070d6f279717fbb9f00818933e499d3f2adb7782c4624ba4e997b56ecafe4",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-alipay-page/backend/provider-darwin-amd64",
+      "bytes": 6534480,
+      "sha256": "8ab8876e0e1907a2bff4bd08f1cff226cd380f54f07250ec758a4cbba43bdcb0",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "darwin",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-alipay-page/backend/provider-darwin-arm64",
+      "bytes": 6114834,
+      "sha256": "ad8ef2345c4d38549b6a0bad4dd1ee573d25c4ad575998a32593ec4452623b1d",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "darwin",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-alipay-page/backend/provider-linux-amd64",
+      "bytes": 6410424,
+      "sha256": "e28070d6f279717fbb9f00818933e499d3f2adb7782c4624ba4e997b56ecafe4",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-alipay-page/backend/provider-linux-arm64",
+      "bytes": 5963960,
+      "sha256": "138dc49411d83a8035e59242a38ef85bd3093f32985613551be13b85c3998f36",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-alipay-page/backend/provider-windows-amd64.exe",
+      "bytes": 6589440,
+      "sha256": "96f5d8fc0ea7152b9abf4796a324ad5a08c396c0221a28de6f455a3e9e7ddffb",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "windows",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-alipay-page/backend/provider-windows-arm64.exe",
+      "bytes": 6027776,
+      "sha256": "08a8e4eb042c65a7594e4c19d06fe17fab9e165b35c4d490b1d5c0958500ca8f",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "windows",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-epay.yingce-plugin",
+      "bytes": 17755107,
+      "sha256": "75d85362f52886a80fa4464a251d0c5e588cf6e2f11b36eaf44d05e5e9acdced",
+      "kind": "payment_bundle",
+      "zip_entry_count": 11,
+      "zip_crc_verified": true
+    },
+    {
+      "path": "plugin-packages/official-payment-epay/backend/provider",
+      "bytes": 6217912,
+      "sha256": "cfe153cf5d139b66896d0f7b347b48ece130a20ebe1ad7f7cf2ea2433fca09c8",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-epay/backend/provider-darwin-amd64",
+      "bytes": 6335488,
+      "sha256": "f7ec261ee1a325a21c5f341f59b6b46eabe6bc703bfb1c45b51638f344358d19",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "darwin",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-epay/backend/provider-darwin-arm64",
+      "bytes": 5914258,
+      "sha256": "e08f2c15e120e74d6afa07ab0f789e8c057898961931b77bf3e5de4cb5a770cf",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "darwin",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-epay/backend/provider-linux-amd64",
+      "bytes": 6217912,
+      "sha256": "cfe153cf5d139b66896d0f7b347b48ece130a20ebe1ad7f7cf2ea2433fca09c8",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-epay/backend/provider-linux-arm64",
+      "bytes": 5832888,
+      "sha256": "486141e7148e0dc2271bf5c248a3396a9f4fb8fd2d0a0e7829b6190b9e9f4a7c",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-epay/backend/provider-windows-amd64.exe",
+      "bytes": 6377472,
+      "sha256": "2d5bf3e28ff404069489071947e75bd0fa2c2e92e2b4f71e7487413a8f1ce168",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "windows",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-epay/backend/provider-windows-arm64.exe",
+      "bytes": 5825536,
+      "sha256": "686889f19dd047f9f95ff652d7dd05b8a11a44003fcb77ef8ddba299b66fb3cd",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "windows",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-wechat-native.yingce-plugin",
+      "bytes": 17801970,
+      "sha256": "059a24e6a80105efa0a0c5a42615ea350283168e6adc163ea3216c30af385924",
+      "kind": "payment_bundle",
+      "zip_entry_count": 10,
+      "zip_crc_verified": true
+    },
+    {
+      "path": "plugin-packages/official-payment-wechat-native/backend/provider",
+      "bytes": 6234296,
+      "sha256": "514dcf233561743f15c03b0fd944afedadec4edc64bfc0e94f219e684bfe94d2",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-wechat-native/backend/provider-darwin-amd64",
+      "bytes": 6352544,
+      "sha256": "fb22c0e2d652d5800430e0dbd8042e7a4ab8ec89082dd0d1b31805cd3461a6ae",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "darwin",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-wechat-native/backend/provider-darwin-arm64",
+      "bytes": 5931442,
+      "sha256": "d25cb01cd9b17a2dc94565fe1b3ca2badc969a337a4deda41537ba06b19b69b9",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "darwin",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-wechat-native/backend/provider-linux-amd64",
+      "bytes": 6234296,
+      "sha256": "514dcf233561743f15c03b0fd944afedadec4edc64bfc0e94f219e684bfe94d2",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-wechat-native/backend/provider-linux-arm64",
+      "bytes": 5832888,
+      "sha256": "4da955b25ae2136c9c10da4244776863d7167303003cecd89a44aff6bec7a9ff",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-wechat-native/backend/provider-windows-amd64.exe",
+      "bytes": 6392832,
+      "sha256": "1106ba0a221375ce3d7574c6d93a2c703aea83ffc4b19de508572c8805904a82",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "windows",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-wechat-native/backend/provider-windows-arm64.exe",
+      "bytes": 5836800,
+      "sha256": "72bf43a656c4335e24250b4b9b287934b8653364b9f1cc27345b11ee98756ace",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "windows",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-xunhupay.yingce-plugin",
+      "bytes": 17357974,
+      "sha256": "33c71cc00047e6436b3c3a2f407f9d4d8a6fe3e3254e0572748746a1ab1952d7",
+      "kind": "payment_bundle",
+      "zip_entry_count": 11,
+      "zip_crc_verified": true
+    },
+    {
+      "path": "plugin-packages/official-payment-xunhupay/backend/provider",
+      "bytes": 6045880,
+      "sha256": "16b3e0c91b19f8c62ded5fcffcc9602468d520e36f2b9c7ed51bd860c1984af4",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-xunhupay/backend/provider-darwin-amd64",
+      "bytes": 6156768,
+      "sha256": "d0d5be4b97ec35ac014a54d20edb4c716ff3b85eae83fcdcdf7f1feed8075767",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "darwin",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-xunhupay/backend/provider-darwin-arm64",
+      "bytes": 5746546,
+      "sha256": "a960c01038647a93426b09b4c8f9add828dcb8a02196ebd7944140971db05116",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "darwin",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-xunhupay/backend/provider-linux-amd64",
+      "bytes": 6045880,
+      "sha256": "16b3e0c91b19f8c62ded5fcffcc9602468d520e36f2b9c7ed51bd860c1984af4",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-xunhupay/backend/provider-linux-arm64",
+      "bytes": 5701816,
+      "sha256": "06a45a5da0cb69ece8d2041596f9f8c697499e9df4737de9413e8bf4cdefb55f",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-xunhupay/backend/provider-windows-amd64.exe",
+      "bytes": 6191104,
+      "sha256": "abef1c4ff7b3d1f7f3586670d32ffb36d58e2f42b4c6ec6ca4cdc6b825bb4416",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "windows",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-xunhupay/backend/provider-windows-arm64.exe",
+      "bytes": 5656064,
+      "sha256": "d251eddb70970aaa949b756e3b27d43c2ef41a650a69f962559b34f386d08223",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "windows",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-zhifufm.yingce-plugin",
+      "bytes": 17330318,
+      "sha256": "8a25dc7c2f2ae38b8f9ca79a36953b8c3950c36843b6eb3dc156a320ebadbed8",
+      "kind": "payment_bundle",
+      "zip_entry_count": 11,
+      "zip_crc_verified": true
+    },
+    {
+      "path": "plugin-packages/official-payment-zhifufm/backend/provider",
+      "bytes": 6037688,
+      "sha256": "2ff0da0031059a4434cea033cdbb3bd2fd95a088ef314adca32c50937beba491",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-zhifufm/backend/provider-darwin-amd64",
+      "bytes": 6136080,
+      "sha256": "251a5178d0aba6f8bed051cef6350c0c179886be5a522e2a40ec056e8b9888f6",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "darwin",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-zhifufm/backend/provider-darwin-arm64",
+      "bytes": 5746338,
+      "sha256": "956b75929489fe565eece9ec4d25a298dbfca915e07d9fe4d65460eaacf5f32b",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "darwin",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-zhifufm/backend/provider-linux-amd64",
+      "bytes": 6037688,
+      "sha256": "2ff0da0031059a4434cea033cdbb3bd2fd95a088ef314adca32c50937beba491",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-zhifufm/backend/provider-linux-arm64",
+      "bytes": 5701816,
+      "sha256": "b517c770c587af2e70bcadb3dace70dab24a77a3bec9b4562dee7c139f657848",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "linux",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-zhifufm/backend/provider-windows-amd64.exe",
+      "bytes": 6175232,
+      "sha256": "8b4bb9cbc1dc185d6673a004ba23589446eef752bcaea7c2de443e5176176972",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "windows",
+      "goarch": "amd64",
+      "cgo_enabled": "0"
+    },
+    {
+      "path": "plugin-packages/official-payment-zhifufm/backend/provider-windows-arm64.exe",
+      "bytes": 5641216,
+      "sha256": "54bec3e3bcfa4a8bac3c5a2558810c54db0357c419dd94c0d3a557e0e73eb5e7",
+      "kind": "payment_payload",
+      "go_version": "go1.25.14",
+      "goos": "windows",
+      "goarch": "arm64",
+      "cgo_enabled": "0"
+    }
+  ],
+  "evidence_logs": [
+    {
+      "file": "source-only-rebuild-logs/app-tests.jsonl",
+      "bytes": 10894,
+      "sha256": "784c90190d5e2f101ad53a369d945b523705e835602a3a4ee1c1888a9acb2cb1"
+    },
+    {
+      "file": "source-only-rebuild-logs/go-mod-verify.log",
+      "bytes": 63,
+      "sha256": "dd75b6fa1b6c4983beddba3e4840d63fc6cafa4af0a4db1105b19fc560f5dc20"
+    },
+    {
+      "file": "source-only-rebuild-logs/host-build-final.log",
+      "bytes": 42,
+      "sha256": "1bfffdc3597b7cfc1db745c4f8b0b6502fd4b32b067fcc04e62d65ccdc2b4ae1"
+    },
+    {
+      "file": "source-only-rebuild-logs/host-build.log",
+      "bytes": 44,
+      "sha256": "23648907607dbb25aa98de55f80079a3af4c8b34c40248181a8acaa8fff19e38"
+    },
+    {
+      "file": "source-only-rebuild-logs/host-buildinfo.log",
+      "bytes": 6590,
+      "sha256": "81b64fe1da46467c9a4d0611dba6e2891e96d8021a74bde631f967797859184c"
+    },
+    {
+      "file": "source-only-rebuild-logs/host-file.log",
+      "bytes": 208,
+      "sha256": "56da05f57cd5086dfcfff156790d1fe464874a0b585adb3a9bfe4a85149d78cf"
+    },
+    {
+      "file": "source-only-rebuild-logs/initial-tree.json",
+      "bytes": 747788,
+      "sha256": "b59b9a102b9bc0b19544d07cf84c72e26e2e7354fec11c08a6f7238cf7d5bb2b"
+    },
+    {
+      "file": "source-only-rebuild-logs/payment-build-attempt1.log",
+      "bytes": 189,
+      "sha256": "fb2b8bcdd5b4a625bd6ab9fe852db69aefb63866c9ca550374e9ab0c5985b586"
+    },
+    {
+      "file": "source-only-rebuild-logs/payment-build-normal-sumdb.log",
+      "bytes": 101,
+      "sha256": "771544ada0d230e02410f1368ed3863cd7b2ae397e91036c612022fc22976ba7"
+    },
+    {
+      "file": "source-only-rebuild-logs/payment-build.log",
+      "bytes": 102,
+      "sha256": "60abc4410f946324220eeb82b0c4d0ff998fa9d61ba177a9828735d8f3b83f20"
+    },
+    {
+      "file": "source-only-rebuild-logs/payment-tests.jsonl",
+      "bytes": 20582,
+      "sha256": "c57bd80016ce7cf78f1539faa2b72f5148d55232ce97bcb9d847b98efd7696b4"
+    },
+    {
+      "file": "source-only-rebuild-logs/protocol-tests.jsonl",
+      "bytes": 13149,
+      "sha256": "1d110901deb70bb44d9e81690419cea3dcbfef22c143f1ae54e10c6c184bf108"
+    },
+    {
+      "file": "source-only-rebuild-logs/verify-payment-all-final.log",
+      "bytes": 42,
+      "sha256": "4207c0eeda36273b098091b048f6304d5489a82e92b208bbb589ffd479c2a7f2"
+    },
+    {
+      "file": "source-only-rebuild-logs/verify-payment-all.log",
+      "bytes": 42,
+      "sha256": "66230297ac259017d3c823871543b5dff521df130e0b91325f2fd74c9860e08f"
+    }
+  ],
+  "not_run": [
+    "full backend suite",
+    "frontend or Agent dependency installation/build",
+    "whole product/V1 acceptance",
+    "native Windows/macOS/arm64 execution",
+    "native Windows host build/runtime",
+    "external payment/model/provider calls",
+    "deployment",
+    "GitHub push"
+  ],
+  "windows_limit": "Payment binaries cross-compile for Windows with CGO=0, but default host SQLite requires CGO; CGO=0 Windows host build is not a runnable SQLite release. WSL2 x86-64 uses Linux host build. Single-platform override clears other payloads and changes canonical provider.",
+  "delivery_note": "Verification tree contains regenerated binaries and is not itself the source-only ZIP staging tree. Package the original retained paths only plus selected evidence. This report does not assert Library/chat attachment delivery."
+}

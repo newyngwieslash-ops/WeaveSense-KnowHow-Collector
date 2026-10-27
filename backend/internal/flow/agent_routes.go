@@ -33,6 +33,10 @@ func RegisterAgentRoutes(api gin.IRouter, db *gorm.DB, engine EngineCaller, user
 	loadConv := func(c *gin.Context, u *model.User) (model.FlowAgentConversation, SubjectScope, bool) {
 		conv, ss, err := convs.Get(u.ID, c.Param("id"))
 		if err != nil {
+			if errors.Is(err, ErrVideoProjectionUnavailable) {
+				videoReply(c, 503, "video_projection_quarantined")
+				return conv, ss, false
+			}
 			reply(c, http.StatusNotFound, nil, "conversation not found")
 			return conv, ss, false
 		}
@@ -64,6 +68,10 @@ func RegisterAgentRoutes(api gin.IRouter, db *gorm.DB, engine EngineCaller, user
 		}
 		list, err := convs.List(u.ID, limit, before)
 		if err != nil {
+			if errors.Is(err, ErrVideoProjectionUnavailable) {
+				videoReply(c, 503, "video_projection_quarantined")
+				return
+			}
 			reply(c, http.StatusInternalServerError, nil, "list failed")
 			return
 		}
@@ -258,6 +266,8 @@ func RegisterAgentRoutes(api gin.IRouter, db *gorm.DB, engine EngineCaller, user
 
 func toolErrStatus(err error) int {
 	switch {
+	case errors.Is(err, ErrVideoProjectionUnavailable):
+		return http.StatusServiceUnavailable
 	case errors.Is(err, ErrNotFound), errors.Is(err, ErrForbidden):
 		return http.StatusNotFound
 	case errors.Is(err, ErrToolPermission):

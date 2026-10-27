@@ -42,6 +42,10 @@ func RegisterCanvasConversationRoutes(api gin.IRouter, db *gorm.DB, user UserFun
 		if !ok {
 			return
 		}
+		if err := ensureCanvasVideoProjection(db, uid, cid); err != nil {
+			videoReply(c, 503, "video_projection_quarantined")
+			return
+		}
 		var row model.FlowCanvasConversationDoc
 		err := db.First(&row, "user_id = ? AND canvas_id = ?", uid, cid).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -61,6 +65,10 @@ func RegisterCanvasConversationRoutes(api gin.IRouter, db *gorm.DB, user UserFun
 		if !ok {
 			return
 		}
+		if err := ensureCanvasVideoProjection(db, uid, cid); err != nil {
+			videoReply(c, 503, "video_projection_quarantined")
+			return
+		}
 		var body struct {
 			BaseVersion int64           `json:"baseVersion"`
 			Document    json.RawMessage `json:"document"`
@@ -73,6 +81,12 @@ func RegisterCanvasConversationRoutes(api gin.IRouter, db *gorm.DB, user UserFun
 			reply(c, http.StatusRequestEntityTooLarge, nil, "document too large")
 			return
 		}
+		clean, cleanErr := sanitizeVideoCanvasHistory(db, uid, cid, body.Document)
+		if cleanErr != nil {
+			videoReply(c, 503, "video_projection_quarantined")
+			return
+		}
+		body.Document = clean
 		now := time.Now()
 		var version int64
 		err := db.Transaction(func(tx *gorm.DB) error {

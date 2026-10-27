@@ -1,0 +1,630 @@
+{
+  "schema_version": 1,
+  "scope": "Go host gateway, native skills and budget integration evidence; not production acceptance",
+  "updated_at": "2026-10-26T17:35:00Z",
+  "baseline": "514c70f666cb04e3e72cbfb967fac74d9f350747",
+  "global_boundaries": [
+    "No live platform credentials or paid model calls used. All provider outputs in Go tests are explicitly local synthetic fixtures.",
+    "No commit, push, production deployment or pilot performed by this lane. P2 remains unstarted.",
+    "Loom owns jobs, artifacts, knowledge, release snapshots and governance. Go reuses existing identity, ModelTasks, Billing, usage, run pins and outboxes; no parallel Go business job database."
+  ],
+  "test_runs": [
+    {
+      "command": "FLOW_VIDEO_CROSSLAYER_TEST=1 FLOW_VIDEO_RELEASE_BUILD_TEST=1 go test -p 2 ./internal/flow ./cmd/migrate-sqlite-postgres ./cmd/video-skill-release -count=1",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-host-native-final.log",
+      "result": "PASS: flow86.180s migration0.029s releaseCLI0.008s; all host Flow tests including actual Loom/Python cross-layer, host-only restore and native cache revocation, two-version isolated compiled release lifecycle",
+      "mode": "real components with explicitly synthetic source/model/release-authority fixtures; no paid inference, production deployment or pilot"
+    },
+    {
+      "command": "FLOW_VIDEO_RELEASE_BUILD_TEST=1 go test -p 2 ./internal/flow -run TestVideoRelease -count=1 -v",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-release-build.log",
+      "result": "PASS21.543s: real CLI exports two immutable versions into temporary source copy; actual compiled test executable loads both, emits actual executable-SHA receipts, CAS install/upgrade/rollback, unchanged old-run pin and current-revocation denial",
+      "mode": "actual Go source compilation/running embedded registry and HTTP handlers, synthetic Loom authority responses; not full real Loom lifecycle or production deployment"
+    },
+    {
+      "command": "go test -p 2 ./internal/flow -run 'Test(Video(Lawful|MediaRange|ReleaseFrozen|ReleaseArchive)|IndustryPackExport)' -count=1",
+      "cwd": "backend",
+      "result": "PASS0.219s: scoped streaming upload, single Range/media headers, query workspace selector with current user membership and revocation denial, immutable release validation/export",
+      "mode": "actual host handlers and local HTTP fixture; no original platform media authorization or quality claim"
+    },
+    {
+      "command": "FLOW_VIDEO_CROSSLAYER_TEST=1 go test -p 2 ./internal/flow ./cmd/migrate-sqlite-postgres -count=1",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-gateway-final-projection.log",
+      "result": "PASS: flow57.869s, migration0.019s; includes actual old-host-only SQLite restore, genesis/checkpoint guard, Canvas history barrier and all existing cross-layer cases",
+      "mode": "real Go/Loom/Python components with synthetic source/model fixtures; before later native Agent opaque-session audit follow-up"
+    },
+    {
+      "command": "FLOW_VIDEO_CROSSLAYER_TEST=1 go test ./internal/flow -run '^TestVideoQAHostOnlySQLiteRestoreReconcilesAuthoritativeTombstones$' -count=1 -v",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-host-only-restore-current.log",
+      "result": "independent QA PASS: real pre-erasure VACUUM INTO SQLite snapshot, unchanged live Loom deletion journal, restore only host DB, unknown feed503/no private content, current feed purges derived projections, RSS/user text/cost audit preserved",
+      "mode": "actual host database backup/restore and production Go/Loom HTTP, not production backup-policy acceptance"
+    },
+    {
+      "command": "FLOW_VIDEO_CROSSLAYER_TEST=1 go test -p 2 ./internal/flow ./cmd/migrate-sqlite-postgres -count=1",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-flow-final-crosslayer.log",
+      "result": "PASS: flow 51.496s, migration 0.020s; before latest cost-admission/embedding additions",
+      "mode": "real SDK HTTP, real Loom/PGlite, local provider fixtures"
+    },
+    {
+      "command": "FLOW_VIDEO_CROSSLAYER_TEST=1 go test -p 2 ./internal/flow -run 'TestVideoKnowledgeSnapshot|TestVideoReadyActual|TestVideoErase' -count=1 -v",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-video-snapshot-erase.log",
+      "result": "3 passed, 6.351s",
+      "mode": "real native registry callback and Loom snapshot/outbox; explicit synthetic acquisition"
+    },
+    {
+      "command": "go test -p 2 ./internal/flow -run 'TestVideoEmbedding|TestVideoUsage|TestVideoModel' -count=1 -v",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-video-budget-embedding2.log",
+      "result": "PASS: 3 tests, 0.553s; unknown holds preserve frozen Note and cannot be settled as free",
+      "mode": "local HTTP provider and real existing Billing database; no paid calls"
+    },
+    {
+      "command": "FLOW_VIDEO_CROSSLAYER_TEST=1 go test -p 2 ./internal/flow ./cmd/migrate-sqlite-postgres -count=1",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-flow-budget-embedding-all.log",
+      "result": "PASS: flow 50.950s, migration 0.023s; includes budget and embedding gateway additions",
+      "mode": "real SDK/Loom cross-layer and local provider fixtures"
+    },
+    {
+      "command": "FLOW_VIDEO_CROSSLAYER_TEST=1 go test -p 2 ./internal/flow -run TestVideoEmbeddingRealLoomStage -count=1 -v",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-embedding-real-crosslayer.log",
+      "result": "PASS: 3.28s; real Loom embedding stage, async host task, HTTP embeddings, billed receipt, existing vector table and atomic ready",
+      "mode": "real components; local synthetic embedding provider, fixture-bound actual host parent reservation, no platform/paid model quality acceptance"
+    },
+    {
+      "command": "FLOW_VIDEO_CROSSLAYER_TEST=1 go test -p 2 ./internal/flow -run 'TestVideoErase|TestVideoEmbeddingRealLoom' -count=1 -v",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-gateway-latest-focused.log",
+      "result": "PASS: 4.333s; real journal initialization, two-process Python worker receipt recovery, Go usage billing, Loom embedding ready; two scoped host erasure/race tests",
+      "mode": "real components with explicitly synthetic ASR/OCR/model outputs; two usage receipts, no repeated compute after lost successful settlement reply"
+    },
+    {
+      "command": "FLOW_VIDEO_CROSSLAYER_TEST=1 FLOW_VIDEO_CONTROL_BENCHMARK=1 VIDEO_QA_CONTROL_REPORT=/tmp/knowhow-control-benchmark.json go test ./internal/flow -run '^TestVideoQACrossLanguageGateway$' -count=1 -v",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-control-benchmark.log",
+      "result": "PASS: 30 requests, concurrency10, errors0; start p95 249.136ms, status 155.642ms, cancel 206.450ms",
+      "mode": "synthetic control plane only; raw hardware/config/timings/RSS snapshot at docs/video-ingestion/evidence/gateway-control-benchmark.json"
+    },
+    {
+      "command": "go test -p 2 ./...",
+      "cwd": "backend",
+      "log": "/tmp/knowhow-backend-all-tests.log",
+      "result": "earlier full backend: flow passed; two preexisting missing migration-list entries fixed and regression passed; five unrelated runtime tests blocked then by missing undici dependency",
+      "mode": "backend regression"
+    }
+  ],
+  "real_host_evidence": [
+    "Independent QA: /tmp/knowhow-host-snapshot-qa.log actual compiled host cookie login/native install/conversation load/Loom snapshot/Go native registry callback; op_73fcb7527be21528f77ce599, vj_fc5611a1ae9087b572ddf562. Not browser/model quality."
+  ],
+  "real_platform_evidence": [],
+  "pilot_evidence": [],
+  "deployment_evidence": [],
+  "additional_code_paths": [
+    "backend/cmd/migrate-sqlite-postgres/main.go",
+    "industry-packs/video-knowledge-core/",
+    "services/loom-engine/validation/video-knowledge/gateway-loom-harness.ts",
+    "services/loom-engine/validation/video-knowledge/gateway-embedding-harness.ts",
+    "services/loom-engine/validation/video-knowledge/gateway-usage-harness.py"
+  ],
+  "tasks": [
+    {
+      "id": "QA-002",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/cmd/video-skill-release/main.go",
+        "backend/internal/flow/video_release.go",
+        "backend/internal/flow/video_release_package.go",
+        "backend/internal/flow/video_release_runtime.go",
+        "backend/internal/flow/video_release_build_test.go",
+        "backend/internal/flow/video_skills.go",
+        "docs/video-ingestion/NATIVE_RELEASE.md"
+      ],
+      "verification": [
+        "TestVideoReleaseIsolatedBuildAndRunningRegistry",
+        "TestVideoReleaseCanonicalHashMatchesJavaScript",
+        "TestVideoReleaseArchivePreservesVersionsAndRejectsOverrides",
+        "TestIndustryPackExport"
+      ],
+      "remaining_acceptance": [
+        "源码准备、真正编译后运行实例确认、两版历史加载、CAS安装回滚、旧run保持和当前撤权拒绝已通过隔离合成链。完整真实Loom候选到Go运行实例链由独立QA待验证；实际CI运行、生产部署与生产回滚审批未执行。"
+      ]
+    },
+    {
+      "id": "IF-001",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/mcp.go",
+        "backend/internal/flow/skills.go",
+        "backend/internal/flow/video_mcp.go"
+      ],
+      "verification": [
+        "TestVideoQACrossLanguageGateway"
+      ],
+      "remaining_acceptance": [
+        "集成 ADR/架构归档由根任务维护；本文件不把代码基线等同整体验收。"
+      ]
+    },
+    {
+      "id": "IF-002",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_routes.go",
+        "backend/internal/flow/video_mcp.go"
+      ],
+      "verification": [
+        "TestVideoQACrossLanguageGateway"
+      ],
+      "remaining_acceptance": [
+        "真实双平台 operation/job/source/profile 历史样本仍待授权。"
+      ]
+    },
+    {
+      "id": "IF-003",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_mcp.go",
+        "backend/internal/flow/video_routes.go",
+        "backend/internal/flow/video_transport.go"
+      ],
+      "verification": [
+        "TestVideoQACrossLanguageGateway"
+      ],
+      "remaining_acceptance": [
+        "完整跨语言 manifest 合同由 Loom/worker 证据共同覆盖，不由 Go 工具 schema 单独证明。"
+      ]
+    },
+    {
+      "id": "IF-004",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/scope.go",
+        "backend/internal/flow/token.go",
+        "backend/internal/flow/client.go",
+        "backend/internal/flow/video_transport.go",
+        "backend/internal/flow/video_model.go"
+      ],
+      "verification": [
+        "TestVideoQACrossLanguageGateway",
+        "TestVideoModelBudgetUsageIdempotencyAndRevocation"
+      ],
+      "remaining_acceptance": [
+        "生产服务密钥轮换与真实撤权运维验收未运行。"
+      ]
+    },
+    {
+      "id": "IF-005",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/mcp.go",
+        "backend/internal/flow/video_mcp.go"
+      ],
+      "verification": [
+        "TestVideoQACrossLanguageGateway"
+      ],
+      "remaining_acceptance": [
+        "已运行 go-sdk v1.6.1 Streamable HTTP；生产网络时延容量未验收。"
+      ]
+    },
+    {
+      "id": "IF-006",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_mcp.go",
+        "backend/internal/flow/video_routes.go"
+      ],
+      "verification": [
+        "TestVideoQACrossLanguageGateway"
+      ],
+      "remaining_acceptance": [
+        "六个薄工具已接同一真实 Loom；实际平台采集耗时与成功率待授权样本。"
+      ]
+    },
+    {
+      "id": "IF-007",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/mcp_idem.go",
+        "backend/internal/flow/video_mcp.go"
+      ],
+      "verification": [
+        "TestA16MCPUnknownOutcomeReconciledNotRetriedBilledOnce",
+        "TestVideoQACrossLanguageGateway"
+      ],
+      "remaining_acceptance": [
+        "真实上游接单后断线故障演练未运行。"
+      ]
+    },
+    {
+      "id": "IF-008",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_transport.go",
+        "backend/internal/flow/mcp.go"
+      ],
+      "verification": [
+        "TestVideoQATrustedTransportDoesNotEnableOtherLoopback"
+      ],
+      "remaining_acceptance": [
+        "生产 TLS、DNS 地址清单与凭据轮换需要运维配置验收。"
+      ]
+    },
+    {
+      "id": "IF-009",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/mcp.go",
+        "backend/internal/flow/video_mcp.go"
+      ],
+      "verification": [
+        "TestVideoQACrossLanguageGateway"
+      ],
+      "remaining_acceptance": [
+        "真实超长视频全部分页/网关输出容量还需业务样本；超限明确失败不输出破损 JSON。"
+      ]
+    },
+    {
+      "id": "IF-010",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_routes.go",
+        "backend/internal/flow/client.go"
+      ],
+      "verification": [
+        "TestVideoQACrossLanguageGateway"
+      ],
+      "remaining_acceptance": [
+        "受信 import/fence/index 屏障属于 Loom 唯一实现；参照 Loom 和 worker 的真实组件测试，非第二套 Go 导入库。"
+      ]
+    },
+    {
+      "id": "IF-011",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/canvas_auto_run.go",
+        "backend/internal/flow/events.go"
+      ],
+      "verification": [
+        "TestVideoReadyActualLoomEventCreatesOnlyOneCanvasCommand"
+      ],
+      "remaining_acceptance": [
+        "测试证明真实 ready 聚合事件到唯一 Canvas 命令；不单独声称命令已经完成整段工作流。"
+      ]
+    },
+    {
+      "id": "IF-012",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/mcp.go",
+        "backend/internal/flow/mcp_idem.go",
+        "backend/internal/flow/tools.go",
+        "backend/internal/flow/skills.go",
+        "backend/internal/flow/video_skills.go"
+      ],
+      "verification": [
+        "TestMCPSchemaDriftBlocksUntilReapproved",
+        "TestMCPTenantIsolationRevokeAndBudget",
+        "TestVideoKnowledgeSnapshotUsesRealLoomAndNativeRegistry"
+      ],
+      "remaining_acceptance": [
+        "真实审批运维与多副本运行回归仍需验收。"
+      ]
+    },
+    {
+      "id": "IF-013",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_routes.go",
+        "backend/internal/flow/video_mcp.go",
+        "backend/internal/flow/canvas_auto_run.go"
+      ],
+      "verification": [
+        "TestVideoQACrossLanguageGateway",
+        "TestVideoReadyActualLoomEventCreatesOnlyOneCanvasCommand"
+      ],
+      "remaining_acceptance": [
+        "HTTP 宿主登录+来源/任务/Skill 夹具已由独立 QA 运行；真实平台定时连续运行未执行。"
+      ]
+    },
+    {
+      "id": "IF-014",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/citations.go",
+        "backend/internal/flow/canvas_workflow_sources.go",
+        "backend/internal/flow/video_tools.go"
+      ],
+      "verification": [
+        "TestVideoCitationTemporalProjectionAndIndependentOrigins"
+      ],
+      "remaining_acceptance": [
+        "人工标注的时间轴误差与真实业务引文准确性待验收。"
+      ]
+    },
+    {
+      "id": "IF-015",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/skills.go",
+        "backend/internal/flow/video_skills.go",
+        "backend/internal/flow/skillpacks/video-knowledge-core.json",
+        "backend/internal/flow/industry_packs_test.go"
+      ],
+      "verification": [
+        "TestVideoCoreNativeIntelligenceAndCanvasExecution",
+        "TestVideoKnowledgeSnapshotUsesRealLoomAndNativeRegistry",
+        "TestIndustryPackExport"
+      ],
+      "remaining_acceptance": [
+        "真实行业 profile/词表、行业评审与模型质量仍未提供；源码构建包不等于生产部署。"
+      ]
+    },
+    {
+      "id": "IF-026",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_skills.go",
+        "backend/internal/flow/skills.go",
+        "backend/internal/flow/industry_packs_test.go",
+        "backend/internal/flow/video_release.go",
+        "backend/internal/flow/video_release_package.go",
+        "backend/internal/flow/video_release_runtime.go",
+        "backend/cmd/video-skill-release/main.go"
+      ],
+      "verification": [
+        "TestIndustryPackExport",
+        "TestVideoCoreNativeIntelligenceAndCanvasExecution",
+        "TestVideoReleaseIsolatedBuildAndRunningRegistry",
+        "TestVideoReleaseCanonicalHashMatchesJavaScript"
+      ],
+      "remaining_acceptance": [
+        "生产 approved/exported/deployed/installed 的真实部署 receipt 与源控发布尚未执行；不能以嵌入 JSON 或测试安装冒充 deployed。"
+      ]
+    },
+    {
+      "id": "IF-028",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/canvas_workflow_skill.go",
+        "backend/internal/flow/canvas_auto_run.go",
+        "backend/internal/flow/video_ready_event_test.go",
+        "backend/internal/flow/video_skill_test.go"
+      ],
+      "verification": [
+        "TestVideoReadyActualLoomEventCreatesOnlyOneCanvasCommand",
+        "TestVideoCoreNativeIntelligenceAndCanvasExecution"
+      ],
+      "remaining_acceptance": [
+        "双平台字幕/无字幕/长视频/视觉必需授权样本、真实行业人工评审、生产端到端与试点未运行。"
+      ]
+    },
+    {
+      "id": "COL-020",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_usage.go",
+        "backend/internal/flow/video_model.go",
+        "backend/internal/flow/model_tasks.go",
+        "backend/internal/flow/usage.go"
+      ],
+      "verification": [
+        "TestVideoUsageAdmissionCumulativeCapFrozenPriceAndUnknownHold",
+        "TestVideoModelBudgetUsageIdempotencyAndRevocation",
+        "TestVideoEmbeddingRealLoomStageGatewayAndReadyBarrier"
+      ],
+      "remaining_acceptance": [
+        "真实 Python 持久适配器→宿主→Loom 授权链已验证：两个进程恢复丢失结算响应、ASR/OCR 各执行一次、累计封顶及真实宿主定价；计算输出为夹具，生产真实消耗与质量仍待验收。"
+      ]
+    },
+    {
+      "id": "COL-031",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": ["backend/internal/flow/video_qa_test.go"],
+      "verification": ["TestVideoQACrossLanguageGateway with FLOW_VIDEO_CONTROL_BENCHMARK=1", "docs/video-ingestion/evidence/gateway-control-benchmark.json"],
+      "remaining_acceptance": ["本地合成控制请求30次、每阶段并发10、p95低于3秒已测；RSS仅末尾快照，真实平台吞吐、媒体队列容量、长时压力和生产峰值资源仍未测。"]
+    },
+    {
+      "id": "COL-023",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/canvas_auto_run.go"
+      ],
+      "verification": [
+        "TestVideoReadyActualLoomEventCreatesOnlyOneCanvasCommand"
+      ],
+      "remaining_acceptance": [
+        "连续生产定时/Canvas 试点未运行。"
+      ]
+    },
+    {
+      "id": "K-013",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_model.go",
+        "backend/internal/flow/model_gateway.go"
+      ],
+      "verification": [
+        "TestVideoModelBudgetUsageIdempotencyAndRevocation",
+        "TestVideoVisionScopedFrameIntegrityAndEphemeralPayload"
+      ],
+      "remaining_acceptance": [
+        "真实付费 VLM、视觉证据人工准确率/覆盖率未运行。"
+      ]
+    },
+    {
+      "id": "K-014",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_model.go",
+        "backend/internal/flow/model_gateway.go"
+      ],
+      "verification": [
+        "TestVideoModelBudgetUsageIdempotencyAndRevocation"
+      ],
+      "remaining_acceptance": [
+        "真实行业摘要质量与多批长视频完整覆盖人工验收未运行。"
+      ]
+    },
+    {
+      "id": "K-017",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_embedding.go",
+        "backend/internal/flow/video_model.go",
+        "backend/internal/flow/model_tasks.go",
+        "backend/internal/flow/video_embedding_crosslayer_test.go",
+        "services/loom-engine/validation/video-knowledge/gateway-embedding-harness.ts"
+      ],
+      "verification": [
+        "TestVideoEmbeddingRealGatewayBillingAndMissingUsageHold",
+        "TestVideoEmbeddingRealLoomStageGatewayAndReadyBarrier"
+      ],
+      "remaining_acceptance": [
+        "预算化 embedding 的真实组件正向链与原子 ready 已通过本地 provider 夹具；真实模型向量质量、生产容量和检索质量仍待验收。"
+      ]
+    },
+    {
+      "id": "K-022",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_model.go",
+        "backend/internal/flow/model_tasks.go",
+        "backend/internal/flow/video_usage.go"
+      ],
+      "verification": [
+        "TestVideoModelBudgetUsageIdempotencyAndRevocation"
+      ],
+      "remaining_acceptance": [
+        "真实行业提炼效果、人工复核质量与准确率基线未执行。"
+      ]
+    },
+    {
+      "id": "K-024",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_tools.go",
+        "backend/internal/flow/tools.go",
+        "backend/internal/flow/video_skills.go"
+      ],
+      "verification": [
+        "TestVideoKnowledgeSnapshotUsesRealLoomAndNativeRegistry"
+      ],
+      "remaining_acceptance": [
+        "知识发布主体和撤销回归由知识域测试共同证明；无未发布静默回退。"
+      ]
+    },
+    {
+      "id": "K-025",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_retention.go",
+        "backend/internal/flow/video_retention_test.go",
+        "backend/internal/flow/video_projection.go",
+        "backend/internal/flow/video_projection_test.go",
+        "backend/internal/flow/video_host_restore_qa_test.go",
+        "backend/internal/flow/model_tasks.go"
+      ],
+      "verification": [
+        "TestVideoErasePurgesScopedModelAndToolCachesWithoutLosingUsage",
+        "TestVideoEraseDerivedPresentationsAndLateEvents",
+        "TestVideoProjectionPinsJournalGenesisAndSameSequenceHash",
+        "TestVideoQAHostOnlySQLiteRestoreReconcilesAuthoritativeTombstones"
+      ],
+      "remaining_acceptance": [
+        "删除前宿主数据库单独恢复已通过真实SQLite文件演练；独立QA另已覆盖 revoked→erased、原生CloudAgent执行/事件/Pi会话/legacy Task准确关联清理及迟到写入拒绝。未知权威feed故障关闭；用户文本/RSS/成本审计保留。已外发邮件/webhook不可撤回，生产备份策略仍需验收。"
+      ]
+    },
+    {
+      "id": "K-026",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/skills.go",
+        "backend/internal/flow/video_skills.go",
+        "backend/internal/flow/tools.go",
+        "backend/internal/flow/canvas_workflow_skill.go"
+      ],
+      "verification": [
+        "TestVideoKnowledgeSnapshotUsesRealLoomAndNativeRegistry",
+        "TestVideoCoreNativeIntelligenceAndCanvasExecution"
+      ],
+      "remaining_acceptance": [
+        "真实部署后的历史版本保留与生产撤权演练未执行。"
+      ]
+    },
+    {
+      "id": "K-028",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/video_skills.go",
+        "backend/internal/flow/skills.go",
+        "backend/internal/flow/video_release.go",
+        "backend/internal/flow/video_release_package.go",
+        "backend/internal/flow/video_release_runtime.go",
+        "backend/internal/flow/video_release_build_test.go",
+        "backend/cmd/video-skill-release/main.go"
+      ],
+      "verification": [
+        "TestIndustryPackExport",
+        "TestVideoReleaseIsolatedBuildAndRunningRegistry",
+        "TestVideoReleaseFrozenPackageAndPrivateContentExclusion",
+        "TestVideoReleaseArchivePreservesVersionsAndRejectsOverrides"
+      ],
+      "remaining_acceptance": [
+        "候选评测/批准属于知识域；真实CLI+源码编译+运行实例receipt/CAS/历史版本本地合成链已通过，完整真实Loom候选至运行实例链及生产部署仍未验收，泛用安装拒绝video-method绕过。"
+      ]
+    },
+    {
+      "id": "K-031",
+      "status": "待验收",
+      "code_state": "implemented_local_fixtures_verified",
+      "code_paths": [
+        "backend/internal/flow/usage.go",
+        "backend/internal/flow/video_usage.go",
+        "backend/internal/flow/video_model.go"
+      ],
+      "verification": [
+        "TestVideoEmbeddingRealGatewayBillingAndMissingUsageHold",
+        "TestVideoEmbeddingRealLoomStageGatewayAndReadyBarrier",
+        "TestVideoUsageAdmissionCumulativeCapFrozenPriceAndUnknownHold"
+      ],
+      "remaining_acceptance": [
+        "真实成本/质量阈值与容量基线未验收。"
+      ]
+    }
+  ]
+}

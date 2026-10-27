@@ -69,7 +69,11 @@ func TestA16MCPUnknownOutcomeReconciledNotRetriedBilledOnce(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := gw.Approve(ctx, ss.Scope, c.ID, "op", []string{"lookup"}); err != nil {
+		allowed := []string{"lookup"}
+		if reconcile != "" {
+			allowed = append(allowed, reconcile)
+		}
+		if _, err := gw.Approve(ctx, ss.Scope, c.ID, "op", allowed); err != nil {
 			t.Fatal(err)
 		}
 		return c

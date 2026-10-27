@@ -87,6 +87,10 @@ func RegisterNotifyRoutes(api gin.IRouter, db *gorm.DB, user UserFunc) {
 		}
 		out, err := ListNotificationDeliveries(reqDB(c, db), s, c.Query("status"))
 		if err != nil {
+			if errors.Is(err, ErrVideoProjectionUnavailable) {
+				videoReply(c, 503, "video_projection_quarantined")
+				return
+			}
 			reply(c, http.StatusInternalServerError, nil, "list error")
 			return
 		}

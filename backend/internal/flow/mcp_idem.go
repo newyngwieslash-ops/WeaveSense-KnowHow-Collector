@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -33,6 +32,35 @@ var (
 //
 // Credits are charged once, when a call first becomes succeeded.
 func (g MCPGateway) ExecuteKeyed(ctx context.Context, scope Scope, actorID, connID, tool string, args map[string]any, key string) (string, bool, error) {
+	ctx = withMCPDelegate(ctx, scope, Actor{Type: "user", ID: actorID})
+	conn, err := g.get(scope, connID)
+	if err != nil {
+		return "", false, err
+	}
+	if conn.Status != "approved" {
+		return "", false, ErrMCPNotApproved
+	}
+	if _, ok := g.View(conn).Approved[tool]; !ok {
+		return "", false, ErrMCPToolDenied
+	}
+	if trusted, err := g.trustedService(conn.Endpoint); err != nil {
+		return "", false, err
+	} else if trusted != nil {
+		current, err := ResolveScope(g.DB, actorID, scope.WorkspaceID)
+		if err != nil || current.TenantID != scope.TenantID || !hasScope(current.Role, "intel.mcp.use") {
+			return "", false, ErrForbidden
+		}
+		for _, definition := range videoMCPTools() {
+			if definition.name == tool && !hasScope(current.Role, definition.scope) {
+				return "", false, ErrForbidden
+			}
+		}
+		if tool == "video_job_status" || tool == "video_result_read" {
+			// Authorization and withdrawal are current facts; polling and artifact
+			// reads may not replay an old receipt after source access is revoked.
+			return g.execute(ctx, current, actorID, connID, tool, args, "")
+		}
+	}
 	if key == "" {
 		return g.Execute(ctx, scope, actorID, connID, tool, args)
 	}
@@ -92,7 +120,8 @@ func (g MCPGateway) reconcile(ctx context.Context, scope Scope, row model.FlowMC
 		return false, "", err
 	}
 	v := g.View(c)
-	if v.CostRule.ReconcileTool == "" {
+	ap, approved := v.Approved[v.CostRule.ReconcileTool]
+	if c.Status != "approved" || v.CostRule.ReconcileTool == "" || !approved {
 		return false, "", ErrMCPUnknownOutcome
 	}
 	cctx, cancel := context.WithTimeout(ctx, time.Duration(c.TimeoutMS)*time.Millisecond)
@@ -102,26 +131,37 @@ func (g MCPGateway) reconcile(ctx context.Context, scope Scope, row model.FlowMC
 		return false, "", ErrMCPUnknownOutcome
 	}
 	defer cs.Close()
+	live, err := discoverTools(cctx, cs)
+	if err != nil {
+		return false, "", ErrMCPUnknownOutcome
+	}
+	if tool, ok := live[v.CostRule.ReconcileTool]; !ok || tool.Hash != ap.Hash {
+		g.DB.Model(&c).Updates(map[string]any{"status": "needs_reapproval", "status_reason": "reconcile schema changed", "version": c.Version + 1, "updated_at": g.now()})
+		g.InvalidateCache(c.TenantID, c.ID)
+		return false, "", ErrMCPSchemaDrift
+	}
 	res, err := cs.CallTool(cctx, &mcp.CallToolParams{Name: v.CostRule.ReconcileTool, Arguments: map[string]any{"idempotency_key": row.IdemKey}})
 	if err != nil || res.IsError {
 		return false, "", ErrMCPUnknownOutcome
 	}
-	var b strings.Builder
-	for _, ct := range res.Content {
-		if t, ok := ct.(*mcp.TextContent); ok {
-			b.WriteString(t.Text)
-		}
-	}
 	var st struct {
-		Status string `json:"status"`
-		Output string `json:"output"`
+		Status string          `json:"status"`
+		Output json.RawMessage `json:"output"`
 	}
-	if json.Unmarshal([]byte(b.String()), &st) != nil {
+	if json.Unmarshal([]byte(mcpResultText(res)), &st) != nil {
 		return false, "", ErrMCPUnknownOutcome
 	}
 	switch st.Status {
 	case "succeeded":
-		out := redact(st.Output, secret)
+		out := string(st.Output)
+		var text string
+		if json.Unmarshal(st.Output, &text) == nil {
+			out = text
+		}
+		out = redact(out, secret)
+		if len([]rune(out)) > c.OutputCap {
+			return false, "", ErrMCPUnknownOutcome
+		}
 		upd := g.DB.Model(&model.FlowMCPCall{}).Where("id = ? AND status IN ('pending','reconciliation_required')", row.ID).
 			Updates(map[string]any{"status": "succeeded", "output": out, "billed": true, "updated_at": g.now()})
 		if upd.RowsAffected == 1 {

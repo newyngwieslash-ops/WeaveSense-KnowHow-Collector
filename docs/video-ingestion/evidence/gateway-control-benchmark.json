@@ -1,0 +1,70 @@
+{
+  "arch": "amd64",
+  "concurrency": 10,
+  "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+  "go_rss_bytes_after": 49254400,
+  "go_version": "go1.25.14",
+  "gomaxprocs": 2,
+  "host_db": "SQLite single connection test fixture",
+  "limits": "RSS is one end-of-workload snapshot, not peak. No platform, media, paid model, production or long-duration throughput measured.",
+  "logical_cpus": 9,
+  "loom_db": "PGlite",
+  "loom_rss_bytes_after": 813166592,
+  "measured_at": "2026-10-26T16:33:58Z",
+  "mode": "synthetic-control-only",
+  "os": "linux",
+  "phases": {
+    "cancel": {
+      "samples_ms": [
+        126.111,
+        131.913,
+        70.99,
+        169.428,
+        188.635,
+        206.45,
+        147.057,
+        44.884,
+        114.869,
+        86.007
+      ],
+      "p95_ms": 206.45,
+      "errors": []
+    },
+    "start": {
+      "samples_ms": [
+        212.556,
+        77.606,
+        171.946,
+        249.136,
+        196.158,
+        54.295,
+        140.376,
+        154.644,
+        116.536,
+        96.372
+      ],
+      "p95_ms": 249.136,
+      "errors": []
+    },
+    "status": {
+      "samples_ms": [
+        125.083,
+        67.74,
+        104.235,
+        61.332,
+        155.642,
+        97.433,
+        135.022,
+        88.888,
+        81.811,
+        48.555
+      ],
+      "p95_ms": 155.642,
+      "errors": []
+    }
+  },
+  "requests": 30,
+  "schema_version": 1,
+  "stack": "real Go MCPGateway -\u003e go-sdk HTTP -\u003e VideoMCPHandler -\u003e EngineClient -\u003e Loom HTTP -\u003e migrated PGlite",
+  "warm_schema_connection": true
+}

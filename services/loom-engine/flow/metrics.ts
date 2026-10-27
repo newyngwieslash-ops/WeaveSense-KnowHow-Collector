@@ -40,5 +40,17 @@ export async function metricsText(db: Db): Promise<string> {
       .map((r) => ({ labels: { state: r.state, reason: String(r.reason).split(":")[0].slice(0, 40) }, value: r.n })));
   gauge("flow_review_rejected_claims", "Claims rejected by the host Reviewer / citation checks in research outputs.",
     [{ value: (await q(`SELECT coalesce(sum(jsonb_array_length(output->'review'->'rejected')), 0)::int n FROM flow_research_runs WHERE jsonb_typeof(output->'review'->'rejected') = 'array'`))[0]?.n ?? 0 }]);
+  gauge("flow_video_jobs", "Durable video jobs by actual state and completion level.",
+    (await q(`SELECT state,completion_level,count(*)::int n FROM flow_video_jobs GROUP BY state,completion_level`)).map(r => ({ labels: { state: r.state, completion_level: r.completion_level }, value: r.n })));
+  gauge("flow_video_stages", "Video processing stages, independent from knowledge review status.",
+    (await q(`SELECT stage,state,count(*)::int n FROM flow_video_stages GROUP BY stage,state`)).map(r => ({ labels: { stage: r.stage, state: r.state }, value: r.n })));
+  gauge("flow_video_lease_expired", "Expired video stage leases requiring safe fenced takeover.",
+    [{ value: (await q(`SELECT count(*)::int n FROM flow_video_stages WHERE state='running' AND lease_expires_at<now()`))[0]?.n ?? 0 }]);
+  gauge("flow_video_discovery_partial", "Subscriptions retaining an unfinished page checkpoint.",
+    [{ value: (await q(`SELECT count(*)::int n FROM flow_video_discovery_checkpoints WHERE partial`))[0]?.n ?? 0 }]);
+  gauge("flow_video_cleanup_pending", "Revoked objects awaiting verified deletion receipts.",
+    [{ value: (await q(`SELECT count(*)::int n FROM flow_video_objects WHERE state='delete_pending'`))[0]?.n ?? 0 }]);
+  gauge("flow_video_provider_circuits_open", "Durable provider/account circuit breakers currently blocking new requests.",
+    [{ value: (await q(`SELECT count(*)::int n FROM flow_video_provider_health WHERE blocked_until>now()`))[0]?.n ?? 0 }]);
   return out.join("\n") + "\n";
 }

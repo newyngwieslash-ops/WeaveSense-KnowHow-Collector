@@ -1,3 +1,21 @@
+# WeaveSense-KnowHow-Collector
+
+本仓库以固定 WeaveSense-Math 宿主提交 `514c70f666cb04e3e72cbfb967fac74d9f350747` 为基础，开发垂直行业视频知识采集、可追溯证据、审核知识及原生 Skill 工作流。复用宿主身份、模型账本、Agent、知识界面与主 Flow Engine；不是独立 IKC SaaS，也不另建登录/计费系统。
+
+**状态：开发与分层验收中，尚未宣布完整 V1 或生产部署完成。** 代码/合成测试不代表真实双平台成功率、人工行业质量或持续试点已通过。
+
+- [本地开发、配置、验证与恢复手册](docs/video-ingestion/RUNBOOK.md)
+- [本轮开发版交付、实际测试与剩余条件](docs/video-ingestion/DELIVERY.md)
+- [Source-Only 精简分发的必需重建步骤](docs/video-ingestion/SOURCE_ONLY.md)
+- [原始需求与版本基线](docs/video-ingestion/BASELINE.md)
+- [全部任务执行记录](docs/video-ingestion/PROGRESS.md)
+- [跨组件合同](docs/video-ingestion/CONTRACTS.md)
+- [独立删除日志及旧备份恢复屏障](docs/video-ingestion/DELETION_JOURNAL.md)
+
+下方保留宿主原始说明与署名；其中既有产品的在线演示、功能和赞助信息不是本项目视频扩展的部署或验收证明。第三方通知与各组件许可继续适用。
+
+---
+
 <p align="center">
   <img src="web/public/logo.svg" width="88" alt="源铭振跃 logo">
 </p>

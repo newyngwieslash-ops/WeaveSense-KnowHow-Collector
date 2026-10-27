@@ -1,0 +1,1206 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-10-26T18:38:40Z",
+  "status": "passed_with_explicit_skips_and_scope_limits",
+  "terminal_confirmation": "/root/verify_knowhow_host_delivery at 2026-10-26T18:38:09Z; Loom exit 0 and Go exit 0; both 1868-file manifests unchanged",
+  "terminal_observations": {
+    "loom": {
+      "observed_by_supervisor_at_utc": "2026-10-26T18:38:09Z",
+      "postgres_cluster_stopped_at_utc": "2026-10-26T18:37:49Z"
+    },
+    "go": {
+      "observed_by_supervisor_at_utc": "2026-10-26T18:34:46Z"
+    }
+  },
+  "final_gate_blockers": [],
+  "repository": {
+    "branch": "feat/video-knowledge-v1",
+    "baseline_commit": "514c70f666cb04e3e72cbfb967fac74d9f350747",
+    "head_at_packaging": "514c70f666cb04e3e72cbfb967fac74d9f350747",
+    "uncommitted_worktree": true,
+    "source_manifest_scope": "backend/, services/, deploy/ selected implementation/config extensions; excludes web/, docs/, artifacts and generated dependencies"
+  },
+  "frozen_source": {
+    "expected_manifest_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+    "expected_files": 1868,
+    "runs": {
+      "loom": {
+        "before_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+        "after_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+        "before_file_count": 1868,
+        "after_file_count": 1868,
+        "unchanged": true,
+        "matches_expected_frozen_source": true
+      },
+      "backend": {
+        "before_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+        "after_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+        "before_file_count": 1868,
+        "after_file_count": 1868,
+        "unchanged": true,
+        "matches_expected_frozen_source": true
+      }
+    }
+  },
+  "runtime": {
+    "postgresql": "17.11, official isolated local cluster; no production database",
+    "go": "1.25.14",
+    "node": "24.22.1",
+    "python": "3.12.14",
+    "bun": "1.4.4",
+    "linux": "6.18.55 x86_64",
+    "synthetic_users_and_data_only": true
+  },
+  "reproduction": {
+    "entrypoint": "services/loom-engine/validation/video-knowledge/postgres-qa.sh",
+    "modes": [
+      "loom",
+      "backend"
+    ],
+    "environment": {
+      "PG_BIN": "<trusted PostgreSQL 17.11 bin directory>",
+      "PG_LIB_PATH": "<its sibling usr/lib/x86_64-linux-gnu>",
+      "GO_BIN_DIR": "<Go 1.25.14 go/bin>",
+      "VIDEO_QA_OUTPUT": "<fresh output directory per mode>"
+    },
+    "internal_flags": {
+      "FLOW_VIDEO_CROSSLAYER_TEST": "1",
+      "FLOW_VIDEO_RESTORE_TEST": "1",
+      "FLOW_VIDEO_RELEASE_BUILD_TEST": "1"
+    },
+    "go_command": "go test -p 2 -count=1 -v ./...",
+    "loom_command": "node --experimental-strip-types --test --test-concurrency=1 flow/*.test.ts"
+  },
+  "final_suites": {
+    "loom": {
+      "started_at_utc": "2026-10-26T18:29:25Z",
+      "tests": 203,
+      "suites": 0,
+      "pass": 203,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 500771.987332
+    },
+    "go": {
+      "started_at_utc": "2026-10-26T18:30:22Z",
+      "counting_rule": "Only column-zero --- PASS/SKIP/FAIL lines; indented child output and subtests excluded.",
+      "passed": 1949,
+      "skipped": 7,
+      "failed": 0,
+      "packages_passed": 33,
+      "packages_failed": 0,
+      "skipped_test_names": [
+        "TestClearAdminRuntimeCacheUsesRedisWhitelist (0.00s)",
+        "TestDDCatLiveImageRoundTrip (0.00s)",
+        "TestGeneratedAssetBrowserIdentity (0.00s)",
+        "TestVideoReleaseCompiledChild (0.00s)",
+        "TestVideoQALoomReleaseCompiledChild (0.00s)",
+        "TestRPCProviderRejectsIncompatibleFallbackBinary (0.00s)",
+        "TestRuntimeCoordinatorRedisLeasePreservesLongestTTL (0.00s)"
+      ]
+    },
+    "python": {
+      "tests": 46,
+      "duration_seconds": 6.319,
+      "passed": 46,
+      "skipped": 0,
+      "successful_terminal_summary": true,
+      "skip_details": []
+    },
+    "asr_system_python": {
+      "tests": 8,
+      "duration_seconds": 0.549,
+      "passed": 7,
+      "skipped": 1,
+      "successful_terminal_summary": true,
+      "skip_details": [
+        {
+          "test": "test_real_whisper_when_installed (test_server.AsrTest.test_real_whisper_when_installed)",
+          "reason": "faster-whisper not installed (image-level test)"
+        }
+      ],
+      "command": "python3 -m unittest -v test_server",
+      "cwd": "services/loom-engine/workers/asr",
+      "scope": "Separate from prior owner actual model smoke; current system interpreter lacks faster-whisper."
+    },
+    "typescript_strict_flow": {
+      "exit_code": 0,
+      "scope": "Flow only; not full frontend/browser acceptance"
+    }
+  },
+  "supporting_reproduction": {
+    "python": {
+      "cwd": "services/video-knowledge",
+      "command": "python3 -m unittest -v test_video test_gateway test_shared_contract_qa"
+    },
+    "typescript": {
+      "cwd": "services/loom-engine",
+      "command": "./node_modules/.bin/tsc -p tsconfig.flow.json --noEmit"
+    },
+    "final_host_api": {
+      "build_cwd": "backend",
+      "build_command": "go build -o <temporary-host-binary> ./cmd/server",
+      "cwd": "services/loom-engine",
+      "command": "VIDEO_QA_HOST_BINARY=<temporary-host-binary> VIDEO_QA_OUTPUT=<output>/host-api node validation/video-knowledge/host-api-qa.mjs"
+    }
+  },
+  "final_host_api": {
+    "binary_sha256": "a64a7aca74928c5ea2ad382e3339badfbfbd8ea4bb6e1b93147a408581a19610",
+    "report": {
+      "mode": "actual-Go-host-cookie-session-Vite-proxy-Loom-PGlite",
+      "checks": [
+        "fresh real host register/logout/login/cookie session, workspace resolution through Vite proxy",
+        "actual schedule pause/resume CAS, stale version rejection and unchanged cadence (not browser toggling)",
+        "actual profile CAS, signed source/job calls, idempotency/reconcile, tenant spoof rejection, foreign workspace denial, durable cancellation",
+        "real host extraction-list, correction readiness guard and scoped origin association routes",
+        "actual cookie-authenticated retention impact preview, stale graph CAS denial, partial batch per-target errors and stable replay; no physical deletion inferred",
+        "actual native JSON pack install and conversation skill load with real Loom→host registry callback, frozen knowledge snapshot and stable reload (not model output)",
+        "published knowledge search remains empty; queued raw video not promoted",
+        "actual Vite SPA route documents served; browser execution NOT claimed"
+      ],
+      "workspace_id": "ws_u_fd961f1bf4f623e98bc496f5300208d7",
+      "operation_id": "op_0c0b6f88d0861eceb27e3cb1",
+      "video_job_id": "vj_2240bd96813a6e90ed8eac2c",
+      "browser": "blocked-before-launch-by-executor-IPC-policy",
+      "not_executed": [
+        "live platform acquisition",
+        "real model quality",
+        "human industry review",
+        "seven-day pilot",
+        "deployment"
+      ]
+    },
+    "scope": "Actual fresh compiled Go host, cookie session, Vite proxy and Loom; API-only, no browser execution."
+  },
+  "focused_supporting_results": {
+    "knowhow-release-real-domain.log": {
+      "counting_rule": "Only column-zero --- PASS/SKIP/FAIL lines; indented child output and subtests excluded.",
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "packages_passed": 1,
+      "packages_failed": 0,
+      "skipped_test_names": []
+    },
+    "knowhow-typed-ttl-host-restore.log": {
+      "counting_rule": "Only column-zero --- PASS/SKIP/FAIL lines; indented child output and subtests excluded.",
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "packages_passed": 1,
+      "packages_failed": 0,
+      "skipped_test_names": []
+    },
+    "knowhow-source-expiry-host.log": {
+      "counting_rule": "Only column-zero --- PASS/SKIP/FAIL lines; indented child output and subtests excluded.",
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "packages_passed": 1,
+      "packages_failed": 0,
+      "skipped_test_names": []
+    },
+    "knowhow-native-undo-restore-recheck.log": {
+      "counting_rule": "Only column-zero --- PASS/SKIP/FAIL lines; indented child output and subtests excluded.",
+      "passed": 2,
+      "skipped": 0,
+      "failed": 0,
+      "packages_passed": 1,
+      "packages_failed": 0,
+      "skipped_test_names": []
+    }
+  },
+  "prior_local_model_smoke": {
+    "included": true,
+    "run_owner": "prior media/provider lane owner, not the final aggregate run",
+    "source_reference": "docs/video-ingestion/evidence/media-provider.json",
+    "mode": "actual pinned official tiny CPU model plus installed Tesseract, generated synthetic voice/frame data",
+    "limits": "Not platform/industry quality gold; disclosed dog-to-log ASR recognition error; nonfatal UCX VFS Unix-socket policy warning preserved; no denied IPC retry."
+  },
+  "expected_go_skip_context": {
+    "redis": {
+      "count": 2,
+      "reason": "Redis absent from final PATH; earlier real Redis 8.0.2 attempt was denied Unix IPC by executor policy; not retried"
+    },
+    "paid_ddcat": {
+      "count": 1,
+      "reason": "No real-provider authorization/budget"
+    },
+    "browser_runner": {
+      "count": 1,
+      "reason": "Browser launch separately denied executor IPC; no browser acceptance claimed"
+    },
+    "compiled_children": {
+      "count": 2,
+      "reason": "Direct child entrypoints skip outside harness; parent build tests actually execute children"
+    },
+    "platform_fallback": {
+      "count": 1,
+      "reason": "Linux-incompatible fallback; equivalent main classification test executes"
+    }
+  },
+  "shared_fixture": {
+    "repo_path": "services/loom-engine/validation/video-knowledge/shared-contract-v1.json",
+    "expected_sha256": "ecb81c128001b0cd724fa8c296bfd8e59252563d1e71e7234e5080ef2dbea7e1",
+    "recorded_sha256_matches": true
+  },
+  "intermediate_run": {
+    "directory": "final-freeze-20261026",
+    "status": "intermediate_not_final_acceptance",
+    "reason": "Source drift during the earlier aggregate run: video.ts, video.test.ts and new 0030_video_external_observation.sql; use final reruns for frozen-source verdict.",
+    "loom": {
+      "tests": 200,
+      "suites": 0,
+      "pass": 200,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 467002.231435
+    },
+    "go": {
+      "counting_rule": "Only column-zero --- PASS/SKIP/FAIL lines; indented child output and subtests excluded.",
+      "passed": 1949,
+      "skipped": 7,
+      "failed": 0,
+      "packages_passed": 33,
+      "packages_failed": 0,
+      "skipped_test_names": [
+        "TestClearAdminRuntimeCacheUsesRedisWhitelist (0.00s)",
+        "TestDDCatLiveImageRoundTrip (0.00s)",
+        "TestGeneratedAssetBrowserIdentity (0.00s)",
+        "TestVideoReleaseCompiledChild (0.00s)",
+        "TestVideoQALoomReleaseCompiledChild (0.00s)",
+        "TestRPCProviderRejectsIncompatibleFallbackBinary (0.00s)",
+        "TestRuntimeCoordinatorRedisLeasePreservesLongestTTL (0.00s)"
+      ]
+    }
+  },
+  "scope_limits": [
+    "Not 100/100 formal acceptance; seven P2 tasks remain unstarted.",
+    "No live platform acquisition, real model-quality, human industry approval, seven-day pilot or deployment acceptance.",
+    "Host-impact evidence is actual host cookie/session/Vite proxy/API-only; no executed browser UI claimed.",
+    "Earlier focused proofs are supporting evidence, not substituted for final aggregate freeze evidence."
+  ],
+  "sanitization": {
+    "version": 1,
+    "rule_order": [
+      "pem_private_key",
+      "jwt",
+      "bearer_or_basic",
+      "cookie_header",
+      "credential_assignment",
+      "url_userinfo",
+      "signed_url_query",
+      "provider_key",
+      "sql_password",
+      "local_workspace_path"
+    ],
+    "count_semantics": "Applied nonoverlapping replacements in ordered passes, not count of unique secrets. Earlier replacements may consume later matches.",
+    "synthetic_canary_allowlist": [
+      "synthetic"
+    ],
+    "policy": "All credential-shaped data redacted except explicit literal canaries. Original hashes identify raw local evidence; redacted files are not claimed to be original copies.",
+    "limitations": "Pattern-based redaction, not a proof that every possible unknown secret format is recognized. Synthetic-data provenance and human review remain required."
+  },
+  "archive": {
+    "path": "sanitized-logs.tar.gz",
+    "sha256": "6ff1741a6715a31506e917b51f6863a6405971be840531b2bdf122c852744143",
+    "bytes": 822547,
+    "members": 37,
+    "compression": "gzip mtime=0; tar file metadata normalized"
+  },
+  "missing_inputs": [],
+  "files": [
+    {
+      "source_relative_to_qa_root": "final-loom-0030/run.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/run.log",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "51c9fbda7778732d5e7bb4c5d8608cc87dc03f4dfb4e7bf0a66b969fa1532166",
+      "sanitized_sha256": "51c9fbda7778732d5e7bb4c5d8608cc87dc03f4dfb4e7bf0a66b969fa1532166",
+      "original_bytes": 2924,
+      "sanitized_bytes": 2924,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/postgres-runtime.txt",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/postgres-runtime.txt",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "167a3cea74eece5c1417d512ccd4c13a4d18d1ca412798317599f3488af2ae93",
+      "sanitized_sha256": "0a9d6777a3d762bfafd8f4dcec7d9078de639d0acb35f398dc85419a7244f314",
+      "original_bytes": 391,
+      "sanitized_bytes": 351,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 2
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": false
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/postgres-cluster.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/postgres-cluster.log",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "e47c7ee05e1e78f1ca00fe1e756a6bb95b2d20dbae3a31ee6dc37c79bac31f20",
+      "sanitized_sha256": "e47c7ee05e1e78f1ca00fe1e756a6bb95b2d20dbae3a31ee6dc37c79bac31f20",
+      "original_bytes": 2419,
+      "sanitized_bytes": 2419,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/source-loom-before.sha256",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/source-loom-before.sha256",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+      "sanitized_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+      "original_bytes": 216430,
+      "sanitized_bytes": 216430,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/source-loom-after.sha256",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/source-loom-after.sha256",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+      "sanitized_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+      "original_bytes": 216430,
+      "sanitized_bytes": 216430,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-backend-0030/run.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-backend-0030/run.log",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "ce116afd26cbe2d2d17f854be125cd3fa730c6c33bd1f766e8ed9419fa2da713",
+      "sanitized_sha256": "ce116afd26cbe2d2d17f854be125cd3fa730c6c33bd1f766e8ed9419fa2da713",
+      "original_bytes": 2183,
+      "sanitized_bytes": 2183,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-backend-0030/logs/postgres-runtime.txt",
+      "source_argument": "--qa-root",
+      "archive_member": "final-backend-0030/logs/postgres-runtime.txt",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "167a3cea74eece5c1417d512ccd4c13a4d18d1ca412798317599f3488af2ae93",
+      "sanitized_sha256": "0a9d6777a3d762bfafd8f4dcec7d9078de639d0acb35f398dc85419a7244f314",
+      "original_bytes": 391,
+      "sanitized_bytes": 351,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 2
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": false
+    },
+    {
+      "source_relative_to_qa_root": "final-backend-0030/logs/postgres-cluster.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-backend-0030/logs/postgres-cluster.log",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "68b471bc7f8db7ac2593fb3dd742586c9203242860fb2de2678a177c2dc81d30",
+      "sanitized_sha256": "68b471bc7f8db7ac2593fb3dd742586c9203242860fb2de2678a177c2dc81d30",
+      "original_bytes": 7046,
+      "sanitized_bytes": 7046,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-backend-0030/logs/source-backend-before.sha256",
+      "source_argument": "--qa-root",
+      "archive_member": "final-backend-0030/logs/source-backend-before.sha256",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+      "sanitized_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+      "original_bytes": 216430,
+      "sanitized_bytes": 216430,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-backend-0030/logs/source-backend-after.sha256",
+      "source_argument": "--qa-root",
+      "archive_member": "final-backend-0030/logs/source-backend-after.sha256",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+      "sanitized_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+      "original_bytes": 216430,
+      "sanitized_bytes": 216430,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/final-loom-postgres-loom.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/final-loom-postgres-loom.log",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "4059737ce0eb68584892a5068a4d73601f5cd2e6e25482ac2153890b32bca119",
+      "sanitized_sha256": "997cc48ca7b4524000152451621be0368db624e1af84e00fc59b03e495e78d3d",
+      "original_bytes": 22712,
+      "sanitized_bytes": 22733,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 1,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": false
+    },
+    {
+      "source_relative_to_qa_root": "final-backend-0030/logs/final-go-postgres-all.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-backend-0030/logs/final-go-postgres-all.log",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "5019a4c82418acc38e48d452c3d1498d9e6032c9a12eb6cd68b4cc9e58ed9f11",
+      "sanitized_sha256": "752d928d0a0cb754ecb4beb0333388d030e120b6c0ee5fbe0a5421574ea4c04a",
+      "original_bytes": 2386531,
+      "sanitized_bytes": 2268237,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 204,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 6088
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": false
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/python-final.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/python-final.log",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "c2d089b4a3e50c352b55bbc0e828ab6429bfc0c5db1e5873df790dc1db66c214",
+      "sanitized_sha256": "c2d089b4a3e50c352b55bbc0e828ab6429bfc0c5db1e5873df790dc1db66c214",
+      "original_bytes": 6427,
+      "sanitized_bytes": 6427,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/asr-final.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/asr-final.log",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "8ee77c1c1cb0eee1ce0f11587c984d9ac517e37d86be693608ae809a4af137d1",
+      "sanitized_sha256": "8ee77c1c1cb0eee1ce0f11587c984d9ac517e37d86be693608ae809a4af137d1",
+      "original_bytes": 953,
+      "sanitized_bytes": 953,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/runtime-versions.txt",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/runtime-versions.txt",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "4b6f13d833d1f29b96d15bbc5025ba1a85aaeab78bfe511c32195f04806d42a7",
+      "sanitized_sha256": "4b6f13d833d1f29b96d15bbc5025ba1a85aaeab78bfe511c32195f04806d42a7",
+      "original_bytes": 264,
+      "sanitized_bytes": 264,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/host-api-final.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/host-api-final.log",
+      "classification": "final_frozen_supporting_api_only",
+      "original_sha256": "4b37d7f4c4e1ef2d6e8fae21295c05d3cfdb5c0afc8d9b370c191b28b0fb9731",
+      "sanitized_sha256": "4b37d7f4c4e1ef2d6e8fae21295c05d3cfdb5c0afc8d9b370c191b28b0fb9731",
+      "original_bytes": 1406,
+      "sanitized_bytes": 1406,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/host-api/host-api-qa.json",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/host-api/host-api-qa.json",
+      "classification": "final_frozen_supporting_api_only",
+      "original_sha256": "911a39d7b68357ba1c3a7ac135c906a443fc9118f9dcc5055c075fbe076264c1",
+      "sanitized_sha256": "911a39d7b68357ba1c3a7ac135c906a443fc9118f9dcc5055c075fbe076264c1",
+      "original_bytes": 1405,
+      "sanitized_bytes": 1405,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/host-binary.sha256",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/host-binary.sha256",
+      "classification": "final_frozen_supporting_api_only",
+      "original_sha256": "849fed567ecb76f10e579821e2eb4e4cb3b1e6e78187949a64875ec66dbb5f26",
+      "sanitized_sha256": "849fed567ecb76f10e579821e2eb4e4cb3b1e6e78187949a64875ec66dbb5f26",
+      "original_bytes": 96,
+      "sanitized_bytes": 96,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-loom-0030/logs/typescript-flow-final.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-loom-0030/logs/typescript-flow-final.log",
+      "classification": "final_frozen_candidate",
+      "original_sha256": "2c62c49339d6676d7dcea413fa05a38897d526627adc52c5f3cac6c0c4fa19a9",
+      "sanitized_sha256": "2c62c49339d6676d7dcea413fa05a38897d526627adc52c5f3cac6c0c4fa19a9",
+      "original_bytes": 31,
+      "sanitized_bytes": 31,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-freeze-20261026/run.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-freeze-20261026/run.log",
+      "classification": "intermediate_source_drift_not_final_acceptance",
+      "original_sha256": "67775408a40feeed9cd7c64156063453be74fe5ecc9c583d1e83d8298ca340c3",
+      "sanitized_sha256": "67775408a40feeed9cd7c64156063453be74fe5ecc9c583d1e83d8298ca340c3",
+      "original_bytes": 4969,
+      "sanitized_bytes": 4969,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-freeze-20261026/logs/final-loom-postgres-all.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-freeze-20261026/logs/final-loom-postgres-all.log",
+      "classification": "intermediate_source_drift_not_final_acceptance",
+      "original_sha256": "7dac57fe2e0ef55587f17885b94acc65bf6a1c5e9fbd5f5b2aa507197d690a64",
+      "sanitized_sha256": "7490c8ce9d509648763bfc82e574b5d0e317a66bae23c927ea569e5202eeb6f1",
+      "original_bytes": 22392,
+      "sanitized_bytes": 22413,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 1,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": false
+    },
+    {
+      "source_relative_to_qa_root": "final-freeze-20261026/logs/final-go-postgres-all.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-freeze-20261026/logs/final-go-postgres-all.log",
+      "classification": "intermediate_source_drift_not_final_acceptance",
+      "original_sha256": "a79e077badd4d73cd06b3d34bf617a95cec6b0b6aec16f3aa06eedbe8bb7cb10",
+      "sanitized_sha256": "8b0b6a591316a1c1f1987e9acfe4c393a1a49180286c4e8fb80fefb8b1c2bc84",
+      "original_bytes": 2386535,
+      "sanitized_bytes": 2268241,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 204,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 6088
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": false
+    },
+    {
+      "source_relative_to_qa_root": "final-freeze-20261026/logs/source-all-before.sha256",
+      "source_argument": "--qa-root",
+      "archive_member": "final-freeze-20261026/logs/source-all-before.sha256",
+      "classification": "intermediate_source_drift_not_final_acceptance",
+      "original_sha256": "215d6854d25563eb28013c609726b30fd949edcd63a5fabf4c3113fe6400f1ab",
+      "sanitized_sha256": "215d6854d25563eb28013c609726b30fd949edcd63a5fabf4c3113fe6400f1ab",
+      "original_bytes": 216291,
+      "sanitized_bytes": 216291,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-freeze-20261026/logs/source-all-after.sha256",
+      "source_argument": "--qa-root",
+      "archive_member": "final-freeze-20261026/logs/source-all-after.sha256",
+      "classification": "intermediate_source_drift_not_final_acceptance",
+      "original_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+      "sanitized_sha256": "569d0fe8ebede44def1305b7cc0c9c124fdfa350cf01f0737b7395c5e20b59e1",
+      "original_bytes": 216430,
+      "sanitized_bytes": 216430,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-freeze-20261026/logs/source-all-drift.diff",
+      "source_argument": "--qa-root",
+      "archive_member": "final-freeze-20261026/logs/source-all-drift.diff",
+      "classification": "intermediate_source_drift_not_final_acceptance",
+      "original_sha256": "f7b18b96999eb8eb16a2830600bad8a02d06a0cfe5134d0fe8b74a0c44c796db",
+      "sanitized_sha256": "f7b18b96999eb8eb16a2830600bad8a02d06a0cfe5134d0fe8b74a0c44c796db",
+      "original_bytes": 2258,
+      "sanitized_bytes": 2258,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "final-freeze-20261026/logs/redis-real-denied-prior.log",
+      "source_argument": "--qa-root",
+      "archive_member": "final-freeze-20261026/logs/redis-real-denied-prior.log",
+      "classification": "intermediate_source_drift_not_final_acceptance",
+      "original_sha256": "78b36b2db249c9a93496b06fa09b8a9138c052465879aff853fe12db6e068993",
+      "sanitized_sha256": "78b36b2db249c9a93496b06fa09b8a9138c052465879aff853fe12db6e068993",
+      "original_bytes": 4491,
+      "sanitized_bytes": 4491,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "logs/knowhow-release-real-domain.log",
+      "source_argument": "--qa-root",
+      "archive_member": "logs/knowhow-release-real-domain.log",
+      "classification": "focused_earlier_supporting_evidence",
+      "original_sha256": "7d58a1f083215dad161208ee1c11124a708f409892bb7832f577e6675e0d1bd0",
+      "sanitized_sha256": "7d58a1f083215dad161208ee1c11124a708f409892bb7832f577e6675e0d1bd0",
+      "original_bytes": 4853,
+      "sanitized_bytes": 4853,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "logs/knowhow-typed-ttl-host-restore.log",
+      "source_argument": "--qa-root",
+      "archive_member": "logs/knowhow-typed-ttl-host-restore.log",
+      "classification": "focused_earlier_supporting_evidence",
+      "original_sha256": "03ce97ca87dca37c305d819d941e4ab0ebcdbfec3c71e74445157c537628d5e9",
+      "sanitized_sha256": "03ce97ca87dca37c305d819d941e4ab0ebcdbfec3c71e74445157c537628d5e9",
+      "original_bytes": 30481,
+      "sanitized_bytes": 30481,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "logs/knowhow-source-expiry-host.log",
+      "source_argument": "--qa-root",
+      "archive_member": "logs/knowhow-source-expiry-host.log",
+      "classification": "focused_earlier_supporting_evidence",
+      "original_sha256": "607cf7651d8b35a2390d5661ed53a3d875793775c7896c1b1530dc23d57a8cef",
+      "sanitized_sha256": "607cf7651d8b35a2390d5661ed53a3d875793775c7896c1b1530dc23d57a8cef",
+      "original_bytes": 29699,
+      "sanitized_bytes": 29699,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "logs/knowhow-native-undo-restore-recheck.log",
+      "source_argument": "--qa-root",
+      "archive_member": "logs/knowhow-native-undo-restore-recheck.log",
+      "classification": "focused_earlier_supporting_evidence",
+      "original_sha256": "39b117e78818dde415ae6ef35a13a45439e88deeaaf32382d38c792e815127ab",
+      "sanitized_sha256": "39b117e78818dde415ae6ef35a13a45439e88deeaaf32382d38c792e815127ab",
+      "original_bytes": 59372,
+      "sanitized_bytes": 59372,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "logs/knowhow-host-impact-api.log",
+      "source_argument": "--qa-root",
+      "archive_member": "logs/knowhow-host-impact-api.log",
+      "classification": "focused_earlier_supporting_evidence",
+      "original_sha256": "2444578a9d857f941f41d7a08e84aef423c4b17798444f2e30e7d99b3d88ff12",
+      "sanitized_sha256": "2444578a9d857f941f41d7a08e84aef423c4b17798444f2e30e7d99b3d88ff12",
+      "original_bytes": 1406,
+      "sanitized_bytes": 1406,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "logs/knowhow-visual-media-changed-repair.log",
+      "source_argument": "--qa-root",
+      "archive_member": "logs/knowhow-visual-media-changed-repair.log",
+      "classification": "focused_earlier_supporting_evidence",
+      "original_sha256": "46555f2b35a231d8ff4835fe8e2f011bb1aa98067c53442a6d7ef5b86c2f0148",
+      "sanitized_sha256": "46555f2b35a231d8ff4835fe8e2f011bb1aa98067c53442a6d7ef5b86c2f0148",
+      "original_bytes": 490,
+      "sanitized_bytes": 490,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "logs/shared-contract-final/go.log",
+      "source_argument": "--qa-root",
+      "archive_member": "logs/shared-contract-final/go.log",
+      "classification": "focused_earlier_supporting_evidence",
+      "original_sha256": "86ce3dd6e4639e73af0a53eadbe94a07455f7c2177efca05d45491829b8f64bd",
+      "sanitized_sha256": "86ce3dd6e4639e73af0a53eadbe94a07455f7c2177efca05d45491829b8f64bd",
+      "original_bytes": 1358,
+      "sanitized_bytes": 1358,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "logs/shared-contract-final/typescript.log",
+      "source_argument": "--qa-root",
+      "archive_member": "logs/shared-contract-final/typescript.log",
+      "classification": "focused_earlier_supporting_evidence",
+      "original_sha256": "62f23318a65cfb48adc585f5fa5833b7767d5ac3e81e600efc922497187e27b4",
+      "sanitized_sha256": "62f23318a65cfb48adc585f5fa5833b7767d5ac3e81e600efc922497187e27b4",
+      "original_bytes": 213,
+      "sanitized_bytes": 213,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "logs/shared-contract-final/python.log",
+      "source_argument": "--qa-root",
+      "archive_member": "logs/shared-contract-final/python.log",
+      "classification": "focused_earlier_supporting_evidence",
+      "original_sha256": "0080cd3c699ebafccd0dd806224fded3d6f8a3dcee9be3d81623dd02e0ec78db",
+      "sanitized_sha256": "0080cd3c699ebafccd0dd806224fded3d6f8a3dcee9be3d81623dd02e0ec78db",
+      "original_bytes": 628,
+      "sanitized_bytes": 628,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    },
+    {
+      "source_relative_to_qa_root": "logs/shared-contract-final/fixture.sha256",
+      "source_argument": "--qa-root",
+      "archive_member": "logs/shared-contract-final/fixture.sha256",
+      "classification": "focused_earlier_supporting_evidence",
+      "original_sha256": "87843edb04fa0b427877cc2f12dd6b3835520bb3fc10cd98e06ea2fcf2b66f91",
+      "sanitized_sha256": "fc0be01e3526ca802e7c6c17804c5ca45212d0fd47c028f9846456f1c1dd8805",
+      "original_bytes": 194,
+      "sanitized_bytes": 174,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 1
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": false
+    },
+    {
+      "source_relative_to_qa_root": null,
+      "source_argument": "--prior-local-model-log",
+      "archive_member": "prior-owner/knowhow-real-model-gap.log",
+      "classification": "prior_media_provider_owner_actual_local_cpu_smoke",
+      "original_sha256": "8a556c86603b8c0d963071d1f88ac052408b1afaffdd8dec988e6e61bc3627df",
+      "sanitized_sha256": "8a556c86603b8c0d963071d1f88ac052408b1afaffdd8dec988e6e61bc3627df",
+      "original_bytes": 2532,
+      "sanitized_bytes": 2532,
+      "redaction_counts": {
+        "pem_private_key": 0,
+        "jwt": 0,
+        "bearer_or_basic": 0,
+        "cookie_header": 0,
+        "credential_assignment": 0,
+        "url_userinfo": 0,
+        "signed_url_query": 0,
+        "provider_key": 0,
+        "sql_password": 0,
+        "local_workspace_path": 0
+      },
+      "explicit_synthetic_canaries_retained": 0,
+      "original_copied_unchanged": true
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-10-26",
+  "bilinote": {
+    "repository": "https://github.com/JefferyHcool/BiliNote",
+    "historical_commit": "90940fde4d224d0f69ad99674f4af0a1ea52d3c4",
+    "current_commit": "90940fde4d224d0f69ad99674f4af0a1ea52d3c4",
+    "describe": "v2.4.5-1-g90940fd",
+    "license": "MIT",
+    "video_reader_sha256": "e838a1c5b91fb5d6bf569a721a477aa58e9f26dcf6948ca3fb24a06e627204d5",
+    "request_chunker_sha256": "e76dfe72cb74e6317af52e50cf876a00e00bb6fdbb13919819c251308a0451d3",
+    "vendored": false,
+    "image_digest": null
+  },
+  "dtk": {
+    "repository": "https://github.com/Evil0ctal/Douyin_TikTok_Download_API",
+    "historical_commit": "3d540dbf3783449e638403b65d81c882c4a99575",
+    "current_commit": "3d540dbf3783449e638403b65d81c882c4a99575",
+    "describe": "v5.1.7-12-g3d540db",
+    "license": "Apache-2.0",
+    "downloads_source_sha256": "8cdee4887346091f643182c7e3da097126d973492ae9184700950144bfcfda1e",
+    "registry_source_sha256": "9b3e56381af87856a71fd7cd337de4f60bf5ed159239c76432947f54fdf9607d",
+    "vendored": false,
+    "image_digest": null,
+    "platform_live_tests": "not_executed_no_authorized_samples_or_provider_instance",
+    "capabilities": {
+      "bilibili_author_posts": "source_verified_not_live_verified",
+      "douyin_author_posts": "source_verified_not_live_verified",
+      "download": "source_verified_fixture_verified_not_live_verified",
+      "read_media": "source_verified_fixture_verified_not_live_verified",
+      "platform_subtitles": "not_in_normalized_contract",
+      "independent_audio": "not_in_normalized_contract",
+      "arbitrary_idempotency_key": "not_supported",
+      "cancel_remote_stopped": "not_guaranteed"
+    },
+    "authentication": {
+      "header": "X-API-Key",
+      "credential_env": "DTK_SERVICE_TOKEN",
+      "console_cookie_import": false,
+      "source": "src/dtk/api/deps.py:API_KEY_HEADER",
+      "instance_bound_scope": [
+        "DTK_TENANT_ID",
+        "DTK_WORKSPACE_ID"
+      ],
+      "credential_ref_mapping": "implemented_exact_scope_alias_to_operator_configured_instance_and_api_key_file; fixture_verified_not_live; not_platform_cookie_or_identity_pool_pin",
+      "credential_routes_file_env": "DTK_CREDENTIAL_ROUTES_FILE"
+    },
+    "selected_endpoints": [
+      {
+        "method": "POST",
+        "path": "/api/v1/parse?wait=0",
+        "body": "{url:https_platform_allowlisted_url}",
+        "capability": "resolve",
+        "auth": "platform read scope",
+        "evidence": "source + exact-header/path fixture; not real account call"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/parse?wait=0&refresh=true",
+        "body": "{url:https_platform_allowlisted_url}",
+        "capability": "explicit bounded recheck; bypass response cache and coalescing before reacquire",
+        "auth": "platform read scope",
+        "evidence": "content.py REFRESH_QUERY and operations.py refresh envelope inspected; durable pending fixture, no live account call"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/{platform}/video?aweme_id={native_id}&wait=0",
+        "capability": "native ID resolve",
+        "auth": "bilibili:read or douyin:read",
+        "evidence": "source only; not real account call"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/{platform}/user/posts?sec_user_id={author_id}&count={bounded}&cursor={cursor}&wait=0",
+        "capability": "author posts",
+        "auth": "bilibili:read or douyin:read",
+        "evidence": "source + async-task fixture; not real account call"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/tasks/{task_id}",
+        "capability": "poll accepted task",
+        "auth": "API key + task ownership/access",
+        "evidence": "source + pending fixture"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/downloads",
+        "body": "{platform,content_id,part,skip_existing:!asset.reacquire}",
+        "capability": "download submit",
+        "auth": "media:write plus source platform access",
+        "evidence": "source + deterministic adapter fixture; no healthy DTK instance run"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/downloads/{download_id}",
+        "capability": "read download receipt",
+        "auth": "media:read",
+        "evidence": "source + fixture"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/downloads/{download_id}/files/{name}",
+        "capability": "stream actual media bytes",
+        "auth": "media:read",
+        "evidence": "source; actual worker HTTP media streaming tested separately, not real DTK acceptance"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/v1/downloads/{download_id}",
+        "capability": "request cancellation, not proof of remote stop",
+        "auth": "media:write",
+        "evidence": "source only; not remote stop/deletion proof"
+      }
+    ]
+  },
+  "processor_image": {
+    "base_tag": "python:3.12-slim",
+    "base_index_digest": "sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704",
+    "linux_amd64_digest": "sha256:e8a38829209aea82774882e5157e1f7c3e8c8393ff53a697b3580896e57f345c",
+    "registry_verified": true,
+    "built_image_digest": null,
+    "build_status": "not_executed"
+  }
+}

@@ -34,7 +34,20 @@ func RegisterRoutes(api gin.IRouter, db *gorm.DB, cfg Config, user UserFunc) {
 			reply(c, http.StatusUnauthorized, nil, "unauthorized")
 			return Scope{}, nil, false
 		}
-		s, err := ResolveScope(db, u.ID, c.GetHeader("X-Workspace-Id"))
+		workspaceID := c.GetHeader("X-Workspace-Id")
+		// Native media elements cannot send a custom workspace header. This is
+		// only a selector, never authority: ResolveScope still checks the fresh
+		// signed-in user's active tenant/workspace membership on every Range.
+		if c.Request.Method == http.MethodGet && strings.HasSuffix(c.FullPath(), "/video/jobs/:id/media/:object_id") {
+			if selected := c.Query("workspace_id"); selected != "" {
+				if workspaceID != "" && workspaceID != selected {
+					reply(c, 400, nil, "conflicting workspace selector")
+					return Scope{}, nil, false
+				}
+				workspaceID = selected
+			}
+		}
+		s, err := ResolveScope(db, u.ID, workspaceID)
 		if err != nil {
 			if errors.Is(err, ErrForbidden) {
 				reply(c, http.StatusNotFound, nil, "workspace not found")
@@ -168,6 +181,8 @@ func RegisterRoutes(api gin.IRouter, db *gorm.DB, cfg Config, user UserFunc) {
 	g.GET("/reports/:id", proxy(http.MethodGet, "/v1/reports/:id"))
 	g.GET("/brief-schedules", proxy(http.MethodGet, "/v1/brief-schedules"))
 	registerContractRoutes(g, proxy, proxyWith, proxyCommand)
+	registerVideoRoutes(g, db, client, cfg, scoped)
+	registerVideoMCPRoute(api, db, cfg, client)
 	registerGaps9Routes(g, db, client, cfg, scoped)
 	registerCanvasHandoffRoutes(g, db, scoped)
 	g.GET("/skills", func(c *gin.Context) {
@@ -177,7 +192,7 @@ func RegisterRoutes(api gin.IRouter, db *gorm.DB, cfg Config, user UserFunc) {
 		if !ok {
 			return
 		}
-		ps, err := SkillPacks()
+		ps, err := skillPacksForScope(s)
 		installed, err2 := ListInstalledSkills(db, s)
 		if err != nil || err2 != nil {
 			reply(c, http.StatusInternalServerError, nil, "skills error")
@@ -206,7 +221,7 @@ func RegisterRoutes(api gin.IRouter, db *gorm.DB, cfg Config, user UserFunc) {
 			return
 		}
 		var out []model.FlowSkillInstall
-		ps, _ := SkillPacks()
+		ps, _ := skillPacksForScope(s)
 		for _, p := range ps {
 			for _, sk := range p.Skills {
 				if (in.PackID != "" && p.ID == in.PackID) || (in.PackID == "" && sk.ID == in.SkillID) {
@@ -235,6 +250,10 @@ func RegisterRoutes(api gin.IRouter, db *gorm.DB, cfg Config, user UserFunc) {
 		var rows []NotificationView
 		err := TenantTx(db, s.TenantID, func(tx *gorm.DB) (e error) { rows, e = ListNotificationsForUser(tx, s, u.ID); return })
 		if err != nil {
+			if errors.Is(err, ErrVideoProjectionUnavailable) {
+				videoReply(c, 503, "video_projection_quarantined")
+				return
+			}
 			reply(c, http.StatusInternalServerError, nil, "list error")
 			return
 		}

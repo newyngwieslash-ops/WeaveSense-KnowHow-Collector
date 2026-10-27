@@ -79,7 +79,10 @@ def ocr(body, store, runner=run_tesseract) -> dict:
     data = read_object(store, body["object_key"])
     if not data.startswith(IMAGE_MAGIC):
         raise OcrError("unsupported", 415)
-    text = runner(data)[:200_000]
+    # Legacy callers receive either the complete result or an explicit failure.
+    text = runner(data)
+    if len(text.encode("utf-8")) > 1024 * 1024:
+        raise OcrError("output_too_large", 413)
     return {"object_key": body["object_key"], "text": text, "pages": 1, "sha256": hashlib.sha256(data).hexdigest()}
 
 

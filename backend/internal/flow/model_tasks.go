@@ -119,6 +119,14 @@ func (m ModelTasks) Get(id string) (model.FlowModelTask, error) {
 
 func (m ModelTasks) set(id string, fields map[string]any) {
 	fields["updated_at"] = m.now()
+	// An erase event may race an in-flight paid call. Preserve financial outcome
+	// while never allowing its late response to repopulate erased material.
+	if value, ok := fields["result"]; ok {
+		fields["result"] = gorm.Expr("CASE WHEN last_error = ? THEN '' ELSE ? END", videoContentErased, value)
+	}
+	if value, ok := fields["last_error"]; ok {
+		fields["last_error"] = gorm.Expr("CASE WHEN last_error = ? THEN ? ELSE ? END", videoContentErased, videoContentErased, value)
+	}
 	m.DB.Model(&model.FlowModelTask{}).Where("id = ?", id).Updates(fields)
 }
 
@@ -180,12 +188,27 @@ func (m ModelTasks) RunTask(ctx context.Context, id string) (bool, error) {
 		}
 		return true, err
 	}
-	text, cost, cerr := m.GW.Complete(cctx, rq.System, rq.User, rq.MaxTokens)
+	videoCtx, videoErr := m.prepareVideoModel(cctx, t)
+	var text string
+	var cost int64
+	cerr := videoErr
+	if cerr == nil {
+		if t.Purpose == "video_embedding" {
+			gw, ok := m.GW.(*OpenAICompatGateway)
+			if !ok {
+				cerr = ErrModelNotInSnapshot
+			} else {
+				text, cost, cerr = gw.EmbedVideo(videoCtx, []byte(rq.User))
+			}
+		} else {
+			text, cost, cerr = m.GW.Complete(videoCtx, rq.System, rq.User, rq.MaxTokens)
+		}
+	}
 	cancel()
 	b := m.billing()
 	switch {
 	case cerr == nil:
-		if canvasManagedTask(t) && (cost < 0 || cost > rsv.ReservedMicro) {
+		if (canvasManagedTask(t) || videoModelTask(t)) && (cost < 0 || cost > rsv.ReservedMicro) {
 			_ = b.MarkUnknown(t.ReservationID, "model:"+t.IdemKey, "gateway cost exceeds admitted budget")
 			m.set(id, map[string]any{"status": StatusReconciliation, "lease_until": nil, "last_error": "gateway cost exceeds admitted budget"})
 			return true, ErrBudgetInsufficient
@@ -280,6 +303,18 @@ func (m ModelTasks) Reconcile(ctx context.Context, minAge time.Duration) (int, e
 	for _, t := range rows {
 		rate := m.Status.MicroPer1KTok
 		managed := canvasManagedTask(t)
+		video := videoModelTask(t)
+		if video {
+			var meta videoModelContext
+			gw, ok := m.GW.(*OpenAICompatGateway)
+			if !ok || json.Unmarshal([]byte(t.Context), &meta) != nil || meta.StatusURLHash != hashJSON(m.Status.URL) || meta.RouteHash != videoGatewayRouteHash(gw, t.Purpose) {
+				continue
+			}
+			rate = gw.MicroPer1KTok
+			if t.Purpose == "video_embedding" {
+				rate = gw.EmbeddingMicroPer1KTok
+			}
+		}
 		if managed {
 			var err error
 			rate, err = m.canvasReconcileRate(t)
@@ -294,7 +329,7 @@ func (m ModelTasks) Reconcile(ctx context.Context, minAge time.Duration) (int, e
 		switch st.Status {
 		case "succeeded":
 			cost := st.TotalTokens * rate / 1000
-			if managed {
+			if managed || video {
 				cost, err = canvasTokenCost(st.TotalTokens, rate)
 				if err != nil {
 					continue
@@ -310,6 +345,13 @@ func (m ModelTasks) Reconcile(ctx context.Context, minAge time.Duration) (int, e
 			if _, err := b.Settle(t.ReservationID, cost); err != nil {
 				return n, err
 			}
+			if video {
+				var meta videoModelContext
+				_ = json.Unmarshal([]byte(t.Context), &meta)
+				if _, err := DefaultUsageRecorder.Record(m.DB, UsageInput{TenantID: t.TenantID, WorkspaceID: meta.WorkspaceID, UsageType: UsageLLMTotalTokens, Quantity: st.TotalTokens, CostMicro: cost, SubjectRef: "model_task:" + t.ID, IdemKey: "model:" + t.IdemKey + ":reconciled", ReservationID: t.ReservationID}, m.now()); err != nil {
+					return n, err
+				}
+			}
 			if managed && ValidateCanvasWorkflowPayload(st.Content) != nil {
 				m.set(t.ID, map[string]any{"status": "failed", "result": "", "cost_micro": cost, "last_error": "model output rejected by persistence policy"})
 			} else {
@@ -317,6 +359,14 @@ func (m ModelTasks) Reconcile(ctx context.Context, minAge time.Duration) (int, e
 			}
 			n++
 		case "not_found", "failed":
+			if video {
+				if _, err := m.prepareVideoModel(ctx, t); err != nil {
+					_, _ = b.Release(t.ReservationID)
+					m.set(t.ID, map[string]any{"status": "failed", "lease_until": nil, "last_error": "video dispatch permission unavailable after known-not-processed outcome"})
+					n++
+					continue
+				}
+			}
 			if managed {
 				// The frozen status endpoint proved this call produced no billable
 				// outcome. Re-dispatch permission is a separate current check: a
@@ -456,6 +506,9 @@ type SynthesisContext struct {
 func ModelTaskOperation(db *gorm.DB, tenantID, id string) (map[string]any, error) {
 	var t model.FlowModelTask
 	if err := db.First(&t, "id = ? AND tenant_id = ?", id, tenantID).Error; err != nil {
+		return nil, ErrNotFound
+	}
+	if videoModelTask(t) {
 		return nil, ErrNotFound
 	}
 	op := map[string]any{"id": t.ID, "kind": "model_task", "purpose": t.Purpose, "status": t.Status, "attempts": t.Attempts}

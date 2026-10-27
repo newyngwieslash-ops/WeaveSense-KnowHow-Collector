@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "scope": "Parent-executed Bun runtime validation on the existing frontend dependency tree; independent local archive/log hash review only by inventory agent.",
+  "declared_package_manager": "bun@1.3.9",
+  "source": {
+    "registry": "https://registry.npmjs.org",
+    "package": "@oven/bun-linux-x64",
+    "version": "1.3.9",
+    "official_registry_download_reported_by_parent": true,
+    "pack_metadata": {
+      "path": "bun-declared/pack.json",
+      "bytes": 712,
+      "sha256": "4542461c13019898c49666c760041fbe323208b1340237f9ea7e257b6b7745e5"
+    },
+    "registry_signature_or_attestation_verified": false
+  },
+  "archive": {
+    "path": "bun-declared/oven-bun-linux-x64-1.3.9.tgz",
+    "bytes": 39649485,
+    "sha256": "13d7d1a65a92e221912821f0342acc2c6077909a84fcb262cf9262dc9ac7b7b9",
+    "computed_integrity": "sha512-oQyAW3+ugulvXTZ+XYeUMmNPR94sJeMokfHQoKwPvVwhVkgRuMhcLGV2ZesHCADVu30Oz2MFXbgdC8x4/o9dRg==",
+    "recorded_npm_integrity": "sha512-oQyAW3+ugulvXTZ+XYeUMmNPR94sJeMokfHQoKwPvVwhVkgRuMhcLGV2ZesHCADVu30Oz2MFXbgdC8x4/o9dRg==",
+    "sha512_matches_npm_integrity": true
+  },
+  "binary": {
+    "path": "bun-declared/package/bin/bun",
+    "bytes": 102367640,
+    "sha256": "d8be80879a4aae10bf8dfd842ee99e69dd8effd832b2f83b026aa2c8c50cbb3c",
+    "matches_package_archive_member_sha256": true,
+    "version_command_reported_by_parent": "1.3.9",
+    "version_also_observed_in_test_log": "1.3.9"
+  },
+  "frontend_inputs": [
+    {
+      "path": "web/package.json",
+      "bytes": 5757,
+      "sha256": "05338b0a2920278ecc0056d1ca5b530c746cb028df8a9e5edd4fff0d81304987"
+    },
+    {
+      "path": "web/bun.lock",
+      "bytes": 706498,
+      "sha256": "7c4ad853b968ab5321ab2b9e9b00b441f169bfcf3290443c9181431c678272c7"
+    }
+  ],
+  "dependency_installation": {
+    "prior_locked_install_runtime": "1.4.4",
+    "fresh_install_with_1_3_9": false,
+    "existing_tree_reused": true,
+    "installed_name_version_lock_match": "1908 observed package records match name/version entries in web/bun.lock; not whole-tree byte attestation"
+  },
+  "runtime_validations": [
+    {
+      "version": "1.3.9",
+      "tests": {
+        "status": "passed",
+        "test_count": 2530,
+        "test_files": 333,
+        "assertions": 19439,
+        "failures": 0,
+        "seconds": 20.46,
+        "log": {
+          "path": ".local/validation/video-ui/bun-declared-1.3.9-tests.log",
+          "bytes": 281619,
+          "sha256": "bc6ece49f79d24d9e122f6387800db742e46693eabcb23ac6ec8d6f9e0180b82"
+        }
+      },
+      "production_build": {
+        "status": "passed",
+        "seconds": 6.3,
+        "command_in_log": "tsc --noEmit && vite build",
+        "log": {
+          "path": ".local/validation/video-ui/bun-declared-1.3.9-build.log",
+          "bytes": 263680,
+          "sha256": "5a2cc2b00131a3bdbe5f701c9f2a5a0ae650d1e6597dafdbe22e44ef1f25a583"
+        },
+        "warnings": [
+          "Some production chunks exceed 500 kB after minification"
+        ]
+      }
+    },
+    {
+      "version": "1.4.4",
+      "tests": {
+        "status": "passed",
+        "test_count": 2530,
+        "test_files": 333,
+        "assertions": 19439,
+        "failures": 0,
+        "seconds": 19.89,
+        "log": {
+          "path": ".local/validation/video-ui/web-all-tests-col024-final.log",
+          "bytes": 281569,
+          "sha256": "c095d72f319bcc10aca90433c901fc1ea799f05172441f17da0aa784d229034c"
+        }
+      },
+      "production_build": {
+        "status": "passed",
+        "seconds": 7.04,
+        "command_in_log": "tsc --noEmit && vite build",
+        "log": {
+          "path": ".local/validation/video-ui/build-col024-final.log",
+          "bytes": 263680,
+          "sha256": "90d642137f20947cb2130e35b55897ed792287a4c7659d931c95dfeb33697ab7"
+        },
+        "warnings": [
+          "Some production chunks exceed 500 kB after minification"
+        ]
+      }
+    }
+  ],
+  "remaining_limits": [
+    "No fresh Bun 1.3.9 dependency installation was performed.",
+    "Tests/build are local working-tree checks, not a Docker build or production deployment.",
+    "Archive hash matching is not publisher signature verification or license clearance.",
+    "Production bundle-size warnings remain visible."
+  ],
+  "latest_source_note": "Logs refreshed after COL-024 external-status UI closure; both runtimes execute 2530 tests on the existing lock-matched tree. No fresh Bun1.3.9 dependency install."
+}

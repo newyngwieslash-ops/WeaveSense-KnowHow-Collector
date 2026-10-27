@@ -113,15 +113,28 @@ export function ocrClient(opts: { endpoint?: string; token?: string; enabled?: b
     let data: any; try { data = JSON.parse(text); } catch { throw new EnrichmentError("ocr_invalid_response"); }
     if (!res.ok) throw new EnrichmentError(["unsupported", "busy", "timeout", "not_found"].includes(data?.error) ? `ocr_${data.error === "not_found" ? "unsupported" : data.error}` : "ocr_unavailable");
     if (data?.object_key !== objectKey || typeof data.text !== "string" || !Number.isInteger(data.pages) || data.pages < 0) throw new EnrichmentError("ocr_invalid_response");
-    return { text: data.text.slice(0, 200_000), pages: data.pages, digest: typeof data.sha256 === "string" ? data.sha256 : createHash("sha256").update(data.text).digest("hex") };
+    return { text: data.text, pages: data.pages, digest: typeof data.sha256 === "string" ? data.sha256 : createHash("sha256").update(data.text).digest("hex") };
   };
 }
 
 /** PRD §6.4 ASR: speech-to-text of a stored audio/video attachment by the asr worker (compose profile "asr"). */
-export type AsrResult = { text: string; seconds: number; language: string; digest: string };
+export type AsrSegment = { text: string; start: number; end: number };
+export type AsrPart = { object_key: string; sha256: string; bytes: number; segment_count: number };
+export type AsrResult = { text: string; seconds: number; language: string; digest: string; segments?: AsrSegment[]; parts?: AsrPart[]; complete?: boolean; status?: "ok" | "no_speech" };
 export type AsrClient = (objectKey: string, scope: { tenant_id: string; workspace_id: string }, language?: string) => Promise<AsrResult>;
 
-export function asrClient(opts: { endpoint?: string; token?: string; enabled?: boolean; fetchImpl?: typeof fetch; timeoutMs?: number } = {}): AsrClient {
+async function boundedWorkerJson(res: Response, maximum: number): Promise<{ data: any; raw: Uint8Array }> {
+  if (!res.body) throw new EnrichmentError("asr_invalid_response");
+  const reader = res.body.getReader(); const chunks: Uint8Array[] = []; let size = 0;
+  try {
+    for (;;) { const item = await reader.read(); if (item.done) break; size += item.value.byteLength; if (size > maximum) throw new EnrichmentError("asr_output_too_large"); chunks.push(item.value); }
+    const raw = Buffer.concat(chunks);
+    try { return { data: JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(raw)), raw }; }
+    catch { throw new EnrichmentError("asr_invalid_response"); }
+  } finally { await reader.cancel().catch(() => {}); }
+}
+
+export function asrClient(opts: { endpoint?: string; token?: string; enabled?: boolean; fetchImpl?: typeof fetch; timeoutMs?: number; onPart?: (segments: AsrSegment[], part: AsrPart) => Promise<void> } = {}): AsrClient {
   return async (objectKey, scope, language) => {
     const enabled = opts.enabled ?? process.env.ASR_ENABLED === "true";
     const token = opts.token ?? process.env.ASR_SERVICE_TOKEN ?? "";
@@ -129,18 +142,40 @@ export function asrClient(opts: { endpoint?: string; token?: string; enabled?: b
     if (!enabled) throw new EnrichmentError("asr_disabled");
     let endpoint: URL;
     try { endpoint = new URL(raw); } catch { throw new EnrichmentError("asr_unavailable"); }
-    if (!token || !["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.pathname !== "/") throw new EnrichmentError("asr_unavailable");
+    if (!token || !["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.pathname !== "/" || endpoint.search || endpoint.hash) throw new EnrichmentError("asr_unavailable");
     let res: Response;
     try {
       res = await (opts.fetchImpl ?? fetch)(new URL("/v1/asr", endpoint), { method: "POST", redirect: "error", signal: AbortSignal.timeout(opts.timeoutMs ?? 900_000),
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({ object_key: objectKey, tenant_id: scope.tenant_id, workspace_id: scope.workspace_id, ...(language ? { language } : {}) }) });
+        body: JSON.stringify({ object_key: objectKey, tenant_id: scope.tenant_id, workspace_id: scope.workspace_id, output_format: "manifest", ...(language ? { language } : {}) }) });
     } catch (e: any) { throw new EnrichmentError(e?.name === "TimeoutError" ? "asr_timeout" : "asr_unavailable"); }
-    const text = await res.text();
-    if (text.length > 4 * MAX_BYTES) throw new EnrichmentError("asr_output_too_large");
-    let data: any; try { data = JSON.parse(text); } catch { throw new EnrichmentError("asr_invalid_response"); }
+    const { data } = await boundedWorkerJson(res, 4 * MAX_BYTES);
     if (!res.ok) throw new EnrichmentError(["unsupported", "busy", "timeout", "not_found", "too_long", "too_large"].includes(data?.error) ? `asr_${["not_found", "too_long", "too_large"].includes(data.error) ? "unsupported" : data.error}` : "asr_unavailable");
-    if (data?.object_key !== objectKey || typeof data.text !== "string" || !Number.isInteger(data.seconds) || data.seconds < 0) throw new EnrichmentError("asr_invalid_response");
-    return { text: data.text.slice(0, 400_000), seconds: data.seconds, language: String(data.language ?? ""), digest: typeof data.sha256 === "string" ? data.sha256 : createHash("sha256").update(data.text).digest("hex") };
+    if (data?.object_key !== objectKey || !Number.isInteger(data.seconds) || data.seconds < 0) throw new EnrichmentError("asr_invalid_response");
+    const validSegments = (segments: any): segments is AsrSegment[] => Array.isArray(segments) && segments.every(s => typeof s?.text === "string" && Number.isFinite(s.start) && Number.isFinite(s.end) && s.start >= 0 && s.end >= s.start && s.end <= data.seconds + 1);
+    if (data.output_format === "manifest") {
+      if (data.complete !== true || !Array.isArray(data.parts) || !Number.isInteger(data.segment_count) || data.parts.length > 10000) throw new EnrichmentError("asr_invalid_response");
+      const segments: AsrSegment[] = []; const texts: string[] = []; let count = 0;
+      const textDigest = createHash("sha256"); let first = true;
+      const prefix = objectKey.slice(0, objectKey.lastIndexOf("/") + 1) + "asr-parts/";
+      const videoPrefix = objectKey.match(/^(tenants\/[^/]+\/workspaces\/[^/]+\/video\/[A-Za-z0-9_-]{1,100})\/[a-f0-9]{64}\/[A-Za-z0-9_.-]+$/)?.[1];
+      for (const part of data.parts as AsrPart[]) {
+        const expectedKey = videoPrefix ? `${videoPrefix}/${part.sha256}/asr-part.json` : prefix + part.sha256 + ".json";
+        if (part.object_key !== expectedKey || part.object_key.includes("..") || !/^[a-f0-9]{64}$/.test(part.sha256) || !Number.isInteger(part.bytes) || part.bytes > 256 * 1024 + 32 || !Number.isInteger(part.segment_count)) throw new EnrichmentError("asr_invalid_response");
+        const page = await (opts.fetchImpl ?? fetch)(new URL("/v1/asr/parts", endpoint), { method: "POST", redirect: "error", signal: AbortSignal.timeout(opts.timeoutMs ?? 30_000), headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ object_key: part.object_key, ...scope }) });
+        const result = await boundedWorkerJson(page, 256 * 1024 + 32);
+        if (!page.ok || result.raw.byteLength !== part.bytes || createHash("sha256").update(result.raw).digest("hex") !== part.sha256 || !validSegments(result.data.segments) || result.data.segments.length !== part.segment_count) throw new EnrichmentError("asr_invalid_response");
+        count += result.data.segments.length;
+        for (const segment of result.data.segments) { textDigest.update((first ? "" : " ") + segment.text); first = false; }
+        if (opts.onPart) await opts.onPart(result.data.segments, part);
+        else { segments.push(...result.data.segments); texts.push(...result.data.segments.map((s: AsrSegment) => s.text)); }
+      }
+      if (count !== data.segment_count || textDigest.digest("hex") !== data.text_sha256) throw new EnrichmentError("asr_invalid_response");
+      return { text: opts.onPart ? "" : texts.join(" "), seconds: data.seconds, language: String(data.language ?? ""), digest: data.sha256, segments: opts.onPart ? undefined : segments, parts: data.parts, complete: true, status: data.status };
+    }
+    // Older workers are accepted only when they explicitly provide all returned
+    // segments. New workers reject oversized legacy inline results rather than slice.
+    if (typeof data.text !== "string" || !validSegments(data.segments) || data.complete !== true || data.segment_count !== data.segments.length || data.segments.map((s: AsrSegment) => s.text).join(" ").trim() !== data.text) throw new EnrichmentError("asr_invalid_response");
+    return { text: data.text, seconds: data.seconds, language: String(data.language ?? ""), digest: typeof data.sha256 === "string" ? data.sha256 : createHash("sha256").update(data.text).digest("hex"), segments: data.segments, complete: data.complete, status: data.status };
   };
 }

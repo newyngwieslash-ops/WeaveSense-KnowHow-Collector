@@ -21,12 +21,18 @@ func (r *Repository) Task(id string) (*model.Task, error) {
 	if err := r.db.First(&task, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
+	if err := r.checkVideoTaskProjection(task.UserID, id); err != nil {
+		return nil, err
+	}
 	return &task, nil
 }
 
 func (r *Repository) TaskForUser(userID string, id string) (*model.Task, error) {
 	var task model.Task
 	if err := r.db.First(&task, "id = ? AND user_id = ?", id, userID).Error; err != nil {
+		return nil, err
+	}
+	if err := r.checkVideoTaskProjection(userID, id); err != nil {
 		return nil, err
 	}
 	return &task, nil
@@ -94,6 +100,9 @@ func (r *Repository) ClaimNextTask(owner string, leaseDuration time.Duration) (*
 		return tx.First(&task, "id = ?", task.ID).Error
 	})
 	if err != nil || task.ID == "" {
+		return nil, err
+	}
+	if err := r.checkVideoTaskProjection(task.UserID, task.ID); err != nil {
 		return nil, err
 	}
 	return &task, nil
@@ -212,7 +221,14 @@ func (r *Repository) SaveTaskCompletion(task *model.Task, expected model.TaskSta
 // Registration and terminal success commit together; a failed asset write leaves
 // the task recoverable and never exposes a false success to the canvas.
 func (r *Repository) SaveTaskCompletionWithRegistration(task *model.Task, expected model.TaskStatus, results []model.Result, register func(*Repository) error) error {
+	if err := r.checkVideoTaskProjection(task.UserID, task.ID); err != nil {
+		return err
+	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		tx = tx.Set(videoProjectionLocalKey, true).Session(&gorm.Session{})
+		if err := New(tx).checkVideoTaskProjection(task.UserID, task.ID); err != nil {
+			return err
+		}
 		updated := taskLeaseWriter(tx.Model(&model.Task{}), task.LeaseOwner).
 			Where("id = ? AND status = ?", task.ID, expected).
 			Select("*").Omit("id", "created_at").Updates(task)
@@ -384,6 +400,15 @@ func (r *Repository) Tasks(userID string, limit int, projectID string, activeOnl
 		query = query.Where("status IN ?", []model.TaskStatus{model.TaskStatusQueued, model.TaskStatusRunning})
 	}
 	err := query.Order("created_at desc").Limit(limit).Find(&tasks).Error
+	if err == nil {
+		allowed := tasks[:0]
+		for _, task := range tasks {
+			if r.checkVideoTaskProjection(userID, task.ID) == nil {
+				allowed = append(allowed, task)
+			}
+		}
+		tasks = allowed
+	}
 	return tasks, err
 }
 
@@ -397,6 +422,9 @@ func (r *Repository) SuccessfulWorkflowTasksForProject(userID string, projectID 
 }
 
 func (r *Repository) TaskLogs(userID string, taskID string) ([]model.TaskLog, error) {
+	if err := r.checkVideoTaskProjection(userID, taskID); err != nil {
+		return nil, err
+	}
 	var logs []model.TaskLog
 	err := r.db.Order("created_at asc").Find(&logs, "user_id = ? AND task_id = ?", userID, taskID).Error
 	return logs, err

@@ -263,7 +263,10 @@ func (t Tools) canvasSkillAuthorize(req CanvasWorkflowSkillRequest) (Skill, erro
 		return Skill{}, ErrSkillNotFound
 	}
 	// A run pin alone is not permission: removal or replacement revokes this approval.
-	if installed.Version != req.ApprovedSkill.Version || installed.Hash != req.ApprovedSkill.Hash {
+	// A governed video version already frozen by this run stays selected after
+	// a workspace upgrade/rollback; current deployment/evidence checks still run.
+	pinned, isPinnedVideo := FindSkill(req.ApprovedSkill.ID, req.ApprovedSkill.Version)
+	if (installed.Version != req.ApprovedSkill.Version || installed.Hash != req.ApprovedSkill.Hash) && !(isPinnedVideo && videoMethodSkill(pinned) && pinned.Hash == req.ApprovedSkill.Hash) {
 		return Skill{}, ErrSkillNotFound
 	}
 	var parent model.FlowBudgetReservation

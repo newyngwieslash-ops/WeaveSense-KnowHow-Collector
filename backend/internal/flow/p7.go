@@ -275,6 +275,9 @@ type NotificationView struct {
 }
 
 func ListNotificationsForUser(db *gorm.DB, scope Scope, userID string) ([]NotificationView, error) {
+	if err := ensureNotificationVideoProjection(db, scope); err != nil {
+		return nil, err
+	}
 	var rows []model.FlowNotification
 	if err := db.Where("tenant_id = ? AND workspace_id = ?", scope.TenantID, scope.WorkspaceID).Order("created_at DESC").Limit(100).Find(&rows).Error; err != nil {
 		return nil, err
@@ -414,6 +417,8 @@ func MirrorCanvasConversations(db *gorm.DB, userID, canvasID string, convs []Can
 			return err
 		} else if row.UserID != userID {
 			continue
+		} else if strings.Contains(row.EvidenceScope, `"_video_content_erased":true`) {
+			continue // stale sidebar content cannot restore a redacted conversation
 		} else {
 			if row.ExternalID == "" {
 				// Rows mirrored before v59 matched by position: backfill ids.
@@ -568,6 +573,9 @@ func SyncConversationToCanvas(db *gorm.DB, convID string) error {
 				c["deletedIds"] = ids
 			}
 			c["messages"] = kept
+			if strings.Contains(conv.EvidenceScope, `"_video_content_erased":true`) {
+				c["title"] = conv.Title
+			}
 			c["updatedAt"] = now
 		}
 		if !found {

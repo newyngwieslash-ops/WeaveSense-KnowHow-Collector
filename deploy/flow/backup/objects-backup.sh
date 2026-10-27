@@ -3,11 +3,14 @@
 # Mirrors each bucket to <out-dir>/<bucket>/ and writes <out-dir>/objects.manifest
 # (sha256 + relative path of every object) for restore verification.
 set -euo pipefail
+source "$(dirname "$0")/video-journal.sh"
 alias="$1"; out="$2"; shift 2
 mkdir -p "$out"
+if video_journal_required; then video_journal_cli checkpoint "$out/objects.video-journal.json" >/dev/null; fi
 for b in "$@"; do
   mkdir -p "$out/$b"
   mc mirror --quiet --overwrite "$alias/$b" "$out/$b" >/dev/null
 done
 ( cd "$out" && find "$@" -type f -print0 | sort -z | xargs -0 -r sha256sum ) > "$out/objects.manifest"
+if video_journal_required; then video_journal_cli checkpoint "$out/objects.video-journal.json" >/dev/null; fi
 echo "objects: $(wc -l < "$out/objects.manifest") files -> $out"

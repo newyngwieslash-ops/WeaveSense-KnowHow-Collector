@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "purpose": "R25/K025 video-aware database/object backup and offline restore with the same Loom journal protocol",
+  "dockerfile": "deploy/flow/backup/Dockerfile.video",
+  "context": ".",
+  "context_allowlist": "deploy/flow/backup/Dockerfile.video.dockerignore",
+  "target": "video-backup",
+  "required_verified_build_args": {
+    "NODE_IMAGE": "Official Node 22 Bookworm or Bookworm slim tag plus verified sha256 digest; no unpinned default",
+    "POSTGRES_IMAGE": "Official PostgreSQL 17 Bookworm tag plus verified sha256 digest; no unpinned default",
+    "MC_IMAGE": "Reviewed minio/mc, quay.io/minio/mc, or existing bitnamilegacy/minio-client tag plus verified sha256 digest; no unpinned default"
+  },
+  "node_dependency_lock": "services/loom-engine/package-lock.json",
+  "node_install": "npm ci --omit=dev --ignore-scripts",
+  "entrypoint": ["/bin/bash", "/b/daily.sh"],
+  "journal_cli": "/app/flow/video-journal-cli.ts",
+  "offline_restore": "/b/video-restore.sh DUMP EMPTY_DATABASE_URL OBJECT_SNAPSHOT MC_ALIAS",
+  "backup_journal_mount": "read-only independent volume; checkpoint/verify perform no journal writes and refuse active/uncertain writers",
+  "restore_journal_mount": "read-write, same latest independently retained volume; all journal clients stopped",
+  "required_runtime_env": ["VIDEO_DELETION_JOURNAL_DIR", "VIDEO_DELETION_JOURNAL_ID", "VIDEO_DELETION_JOURNAL_KEY", "BACKUP_VIDEO_JOURNAL_REQUIRED=true"],
+  "offline_ack_env": "VIDEO_JOURNAL_OFFLINE_ACK=ALL_JOURNAL_CLIENTS_STOPPED",
+  "generated_image_evidence": "/usr/local/share/video-backup/build-evidence.txt",
+  "build_status": "not_run_in_this_workspace",
+  "resolved_image_digests": null,
+  "production_deployment_status": "not_authorized_or_performed"
+}

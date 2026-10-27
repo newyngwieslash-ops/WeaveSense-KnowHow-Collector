@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { pgliteDb, migrate, type Db } from "./db.ts";
 import { Engine, HttpError, type FeedItem } from "./engine.ts";
@@ -12,9 +12,12 @@ const FEED = "https://example.com/feed.xml";
 const KEY = "k".repeat(32);
 let feed: FeedItem[] = [];
 const fetcher = async () => feed;
+const fixtureDatabases: Db[] = [];
+afterEach(async () => { for (const db of fixtureDatabases.splice(0)) await db.close(); });
 
 async function setup() {
   const db: Db = await pgliteDb();
+  fixtureDatabases.push(db);
   await migrate(db);
   let now = new Date("2026-10-13T00:00:00Z");
   const eng = new Engine(db, fetcher, () => now);

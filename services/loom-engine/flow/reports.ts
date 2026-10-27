@@ -6,12 +6,20 @@ import type { ExecutionContext } from "./auth.ts";
 import { BUILTIN_TERM_GROUPS, termPattern } from "./terms.ts";
 import { verifySnippet, renderReport, snippetHash } from "./gaps9.ts";
 import { reportEvidenceClaims, reportPayloadHash, validateReportEvidence } from "./report-payload.ts";
+import { videoAccess } from "./video-access.ts";
 
 type Scope = Pick<ExecutionContext, "tenant_id" | "workspace_id">;
 export const MAX_RESEARCH_CHILDREN = 3;
 export const RESEARCH_BUDGET = Object.freeze({ max_documents: 8, max_quote_chars: 400, max_claims: 8 });
 export const CLAIM_KINDS = ["source_statement", "cross_source_verified", "model_inference"] as const;
 const json = (v: any) => (typeof v === "string" ? JSON.parse(v) : v);
+const RESEARCH_HAS_VIDEO = `EXISTS(SELECT 1 FROM flow_documents vd WHERE vd.tenant_id=r.tenant_id AND vd.workspace_id=r.workspace_id AND vd.video_asset_id IS NOT NULL AND
+  (r.evidence_scope->'document_ids' ? vd.id OR r.evidence_scope->'source_ids' ? vd.source_id OR EXISTS(SELECT 1 FROM jsonb_path_query(coalesce(r.output,'{}'), '$.**.document_id') ref WHERE ref #>> '{}' = vd.id)))`;
+const REPORT_HAS_VIDEO = `EXISTS(SELECT 1 FROM flow_claims vc,jsonb_array_elements(vc.citations) ref,flow_documents vd
+  WHERE vc.tenant_id=r.tenant_id AND vc.report_id=r.id AND vd.tenant_id=r.tenant_id AND vd.workspace_id=r.workspace_id AND vd.id=ref->>'document_id' AND vd.video_asset_id IS NOT NULL)`;
+const UNAVAILABLE_VIDEO = `(vd.video_revoked_at IS NOT NULL OR vd.video_text_access_expires_at<=now() OR vd.video_text_access_expires_at IS NULL AND EXISTS(SELECT 1 FROM flow_video_jobs pj WHERE pj.tenant_id=vd.tenant_id AND pj.workspace_id=vd.workspace_id AND pj.document_id=vd.id) OR EXISTS(SELECT 1 FROM flow_sources vs WHERE vs.tenant_id=vd.tenant_id AND vs.workspace_id=vd.workspace_id AND vs.id=vd.source_id AND (vs.status='revoked' OR (vs.config->>'authorization_expires_at')::timestamptz<=now())))`;
+const REPORT_EXPIRED_VIDEO = REPORT_HAS_VIDEO.replace("vd.video_asset_id IS NOT NULL)", `vd.video_asset_id IS NOT NULL AND ${UNAVAILABLE_VIDEO})`);
+const RESEARCH_EXPIRED_VIDEO = RESEARCH_HAS_VIDEO.replace("vd.video_asset_id IS NOT NULL AND", `vd.video_asset_id IS NOT NULL AND ${UNAVAILABLE_VIDEO} AND`);
 
 export { parseCron, checkTimezone, nextCron } from "./cron.ts";
 import { nextCron, checkTimezone } from "./cron.ts";
@@ -25,18 +33,33 @@ export class Reports {
   summarize?: (input: any) => Promise<{ body: string; claims: any[] } | { pending: true; task_id?: string } | null>;
   constructor(e: Engine) { this.e = e; }
   private get db() { return this.e.db; }
+  private async videoProvenance(s: Scope, documentIds: string[], q: Q = this.db) {
+    const ids = (await q.query(`SELECT id FROM flow_documents WHERE tenant_id=$1 AND workspace_id=$2 AND id=ANY($3::text[]) AND video_asset_id IS NOT NULL ORDER BY id`, [s.tenant_id, s.workspace_id, [...new Set(documentIds)]])).rows.map(x => x.id);
+    return { video_derived: ids.length > 0, document_ids: ids };
+  }
 
   /** Resolves evidence ids visible to the caller with revision/chunk/truncation facts (citation validation input). */
   async resolveEvidence(s: Scope, ids: string[], q?: Q) {
     const r = await (q ?? this.db).query(`SELECT e.id AS evidence_id, e.document_id, e.revision, e.char_start, e.char_end, e.quote, d.source_id, d.current_revision, d.title,
-          c.chunk_index, c.char_end AS chunk_end, e.snippet_hash, e.url, d.url AS doc_url, rv.title || E'\n\n' || rv.body AS rev_text
+          c.chunk_index, c.char_end AS chunk_end, e.snippet_hash, e.url, d.url AS doc_url, rv.title || E'\n\n' || rv.body AS rev_text,
+          t.start_ms,t.end_ms,t.frame_ref,t.alignment_method,t.media_sha256,coalesce(t.material_type,rv.material_type) AS material_type,coalesce(a.origin_cluster,t.media_sha256,a.id) AS origin_cluster,a.availability,
+          EXISTS(SELECT 1 FROM flow_video_origin_candidates oc WHERE oc.tenant_id=d.tenant_id AND oc.workspace_id=d.workspace_id AND oc.state='pending' AND a.id IN (oc.left_asset_id,oc.right_asset_id)) AS origin_pending
         FROM flow_evidence e JOIN flow_documents d ON d.id=e.document_id AND d.tenant_id=e.tenant_id
+        JOIN flow_sources src ON src.tenant_id=d.tenant_id AND src.workspace_id=d.workspace_id AND src.id=d.source_id
         LEFT JOIN flow_document_revisions rv ON rv.document_id=e.document_id AND rv.revision=e.revision AND rv.tenant_id=e.tenant_id
+        LEFT JOIN flow_video_temporal_evidence t ON t.tenant_id=e.tenant_id AND t.workspace_id=e.workspace_id AND t.evidence_id=e.id
+        LEFT JOIN flow_video_assets a ON a.tenant_id=d.tenant_id AND a.workspace_id=d.workspace_id AND a.id=d.video_asset_id
         LEFT JOIN LATERAL (SELECT chunk_index, char_end FROM flow_document_chunks k WHERE k.document_id=e.document_id AND k.revision=e.revision
             AND k.char_start <= e.char_start ORDER BY k.char_start DESC LIMIT 1) c ON true
-        WHERE e.tenant_id=$1 AND e.workspace_id=$2 AND e.id = ANY($3::text[])`, [s.tenant_id, s.workspace_id, [...new Set(ids ?? [])].slice(0, 200)]);
+        WHERE e.tenant_id=$1 AND e.workspace_id=$2 AND e.id = ANY($3::text[]) AND d.video_revoked_at IS NULL AND ($4::boolean OR d.video_asset_id IS NULL)
+        AND (d.video_text_access_expires_at>now() OR d.video_text_access_expires_at IS NULL AND NOT EXISTS(SELECT 1 FROM flow_video_jobs pj WHERE pj.tenant_id=d.tenant_id AND pj.workspace_id=d.workspace_id AND pj.document_id=d.id)) AND (rv.video_text_access_expires_at IS NULL OR rv.video_text_access_expires_at>now()) AND (e.video_expires_at IS NULL OR e.video_expires_at>now())
+        AND (d.video_asset_id IS NULL OR (a.revoked_at IS NULL AND src.status<>'revoked' AND (src.config->>'authorization_expires_at' IS NULL OR (src.config->>'authorization_expires_at')::timestamptz>now())))
+        AND NOT EXISTS(SELECT 1 FROM flow_video_deletion_tombstones t WHERE t.tenant_id=d.tenant_id AND t.workspace_id=d.workspace_id AND t.document_id=d.id)`, [s.tenant_id, s.workspace_id, [...new Set(ids ?? [])].slice(0, 200), videoAccess(this.e)]);
     return r.rows.map((x: any) => ({ evidence_id: x.evidence_id, document_id: x.document_id, source_id: x.source_id, title: x.title, revision: x.revision,
       current_revision: x.current_revision, chunk_index: x.chunk_index ?? 0, char_start: x.char_start, char_end: x.char_end, quote: x.quote,
+      start_ms: x.start_ms == null ? null : Number(x.start_ms), end_ms: x.end_ms == null ? null : Number(x.end_ms), frame_ref: x.frame_ref ?? null,
+      alignment_method: x.alignment_method ?? "unknown", media_sha256: x.media_sha256 ?? null, material_type: x.material_type,
+      origin_cluster: x.origin_cluster ?? null, origin_pending: x.origin_pending, offset_unit: "utf16", availability: x.availability ?? null,
       truncated: (x.chunk_end != null && x.char_end > x.chunk_end) || x.quote.length < x.char_end - x.char_start,
       // §7.3: snippet hash and URL are re-verified on every resolve (tampered quote / moved document fail).
       snippet_hash: x.snippet_hash, url: x.url ?? "", ...verifySnippet(x),
@@ -88,7 +111,8 @@ export class Reports {
         await q.query(`INSERT INTO flow_claims (id, tenant_id, report_id, idx, text, kind, citations) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
           [newId("clm_"), s.tenant_id, id, i, String(c.text), c.kind, JSON.stringify(cites)]);
       }
-      await this.e.emit(q, s, id, id, "report.completed", { report_id: id, title: String(o.title).slice(0, 300), kind: hooks.brief ? "brief" : "report", claims: claims.length });
+      const provenance = await this.videoProvenance(s, [...known.values()].map(x => x.document_id), q);
+      await this.e.emit(q, s, id, id, "report.completed", { report_id: id, title: String(o.title).slice(0, 300), kind: hooks.brief ? "brief" : "report", claims: claims.length, ...provenance });
       return { report_id: id, replayed: false };
     };
     return hooks.q ? run(hooks.q) : this.db.tx(run);
@@ -105,7 +129,7 @@ export class Reports {
   async listReports(s: Scope) {
     return (await this.db.query(`SELECT r.id, r.kind, r.title, r.coverage, r.brief_schedule_id, r.scheduled_at, r.created_at,
         (SELECT count(*)::int FROM flow_claims c WHERE c.report_id=r.id) AS claims
-        FROM flow_reports r WHERE r.tenant_id=$1 AND r.workspace_id=$2 ORDER BY r.created_at DESC LIMIT 200`, [s.tenant_id, s.workspace_id])).rows
+        FROM flow_reports r WHERE r.tenant_id=$1 AND r.workspace_id=$2 AND r.video_revoked_at IS NULL AND NOT ${REPORT_EXPIRED_VIDEO} AND ($3::boolean OR NOT ${REPORT_HAS_VIDEO}) ORDER BY r.created_at DESC LIMIT 200`, [s.tenant_id, s.workspace_id, videoAccess(this.e)])).rows
       .map((r: any) => ({ ...r, coverage: json(r.coverage) }));
   }
 
@@ -118,7 +142,7 @@ export class Reports {
 
   /** Report detail. Citations resolve against the cited (original) revision, so later document updates don't change old reports. */
   async getReport(s: Scope, id: string) {
-    const r = (await this.db.query(`SELECT * FROM flow_reports WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [s.tenant_id, s.workspace_id, id])).rows[0];
+    const r = (await this.db.query(`SELECT r.* FROM flow_reports r WHERE r.tenant_id=$1 AND r.workspace_id=$2 AND r.id=$3 AND r.video_revoked_at IS NULL AND NOT ${REPORT_EXPIRED_VIDEO} AND ($4::boolean OR NOT ${REPORT_HAS_VIDEO})`, [s.tenant_id, s.workspace_id, id, videoAccess(this.e)])).rows[0];
     if (!r) throw new HttpError(404, "report not found");
     const claims = (await this.db.query(`SELECT idx, text, kind, citations FROM flow_claims WHERE report_id=$1 AND tenant_id=$2 ORDER BY idx`, [id, s.tenant_id])).rows;
     for (const c of claims as any[]) {
@@ -161,9 +185,9 @@ export class Reports {
       .filter((r: any) => r.status === "failed" || r.status === "retry_wait").map((r: any) => ({ source_id: r.source_id, error: r.error, status: r.status })) : [];
     const revised = picked.filter((h) => h.revision > 1).map((h) => ({ document_id: h.document_id, revision: h.revision,
       note: "document changed after first collection; earlier revision may conflict" }));
-    const coverage = { documents_considered: hits.length, documents_used: picked.length, truncated: hits.length > picked.length || picked.some((h) => String(h.snippet ?? "").length >= 300),
+    const coverage: Record<string, any> = { documents_considered: hits.length, documents_used: picked.length, truncated: hits.length > picked.length || picked.some((h) => String(h.snippet ?? "").length >= 300),
       source_failures: failed, conflicting_evidence: revised, budget: RESEARCH_BUDGET };
-    return { claims: claims.map(({ source_id, ...c }) => c), evidence_ids: evidence, coverage };
+    return { claims: claims.map(({ source_id, ...c }) => c), evidence_ids: evidence, coverage, ...await this.videoProvenance(s, picked.map(h => h.document_id), db) };
   }
 
   /**
@@ -190,7 +214,8 @@ export class Reports {
       else if (c.kind !== "model_inference" && !cites.length) reason = "claim has no citation";
       else if (c.kind === "source_statement" && supportRatio(c.text, cites.map((k: any) => k.e.quote)) < 0.5) reason = "claim not supported by cited evidence";
       else if (c.kind === "cross_source_verified") {
-        if (new Set(cites.map((k: any) => k.e.source_id)).size < 2) reason = "cross_source_verified needs evidence from ≥2 sources";
+        if (cites.some((k: any) => k.e.origin_pending)) reason = "origin independence review pending";
+        else if (new Set(cites.map((k: any) => k.e.origin_cluster ?? k.e.source_id)).size < 2) reason = "cross_source_verified needs evidence from ≥2 independent origins";
         else if (cites.some((k: any) => supportRatio(c.text, [k.e.quote]) === 0)) reason = "a cited source does not support the claim";
       }
       if (reason) { rejected.push({ idx, text: String(c.text ?? "").slice(0, 300), kind: c.kind, reason }); continue; }
@@ -241,7 +266,7 @@ export class Reports {
           const k = g.terms[0]; if (!termHits.has(k)) termHits.set(k, new Set()); termHits.get(k)!.add(it.evidence_id);
         }
       }
-      for (const w of new Set((it.quote.toLowerCase().match(/[a-z][a-z0-9-]{3,}/g) ?? []))) {
+      for (const w of new Set<string>(String(it.quote).toLowerCase().match(/[a-z][a-z0-9-]{3,}/g) ?? [])) {
         if (!termHits.has(w)) termHits.set(w, new Set()); termHits.get(w)!.add(it.evidence_id);
       }
     }
@@ -263,7 +288,7 @@ export class Reports {
 
   /** §11 REST: research run status (no model calls). */
   async getResearch(s: Scope, id: string) {
-    const r = (await this.db.query(`SELECT * FROM flow_research_runs WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [s.tenant_id, s.workspace_id, id])).rows[0];
+    const r = (await this.db.query(`SELECT r.* FROM flow_research_runs r WHERE r.tenant_id=$1 AND r.workspace_id=$2 AND r.id=$3 AND r.video_revoked_at IS NULL AND NOT ${RESEARCH_EXPIRED_VIDEO} AND ($4::boolean OR NOT ${RESEARCH_HAS_VIDEO})`, [s.tenant_id, s.workspace_id, id, videoAccess(this.e)])).rows[0];
     if (!r) throw new HttpError(404, "research run not found");
     return { ...r, output: r.output == null ? null : json(r.output), skill: json(r.skill), evidence_scope: json(r.evidence_scope), budget: json(r.budget) };
   }
@@ -285,7 +310,7 @@ export class Reports {
     if (!key) throw new HttpError(400, "X-Idempotency-Key required");
     if (!o.parent_run_id || !String(o.question ?? "").trim()) throw new HttpError(400, "parent_run_id and question required");
     const prior = (await this.db.query(`SELECT * FROM flow_research_runs WHERE tenant_id=$1 AND idempotency_key=$2`, [s.tenant_id, key])).rows[0];
-    if (prior) return { ...prior, output: json(prior.output), replayed: true };
+    if (prior) return { ...await this.getResearch(s, prior.id), replayed: true };
     const scope = o.evidence_scope ?? {};
     const id = await this.db.tx(async (q) => {
       if ((await q.query(`SELECT 1 FROM flow_research_runs WHERE id=$1`, [o.parent_run_id])).rows.length) throw new HttpError(400, "research runs cannot start nested research (single depth)");
@@ -313,7 +338,8 @@ export class Reports {
         const u = await this.db.query(`UPDATE flow_research_runs SET status='succeeded', output=$2, finished_at=now() WHERE id=$1 AND status='running'`, [id, JSON.stringify(out)]);
         if (!affected(u)) return { id, status: "cancelled", replayed: false };
         await this.db.tx((q) => this.e.emit(q, s, `research:${id}`, id, "research.completed", { research_run_id: id, parent_run_id: o.parent_run_id, status: "succeeded",
-          title: `research completed: ${String(o.question).slice(0, 120)}`, evidence: Array.isArray((out as any)?.evidence) ? (out as any).evidence.length : undefined }));
+          title: `research completed: ${String(o.question).slice(0, 120)}`, evidence: Array.isArray((out as any)?.evidence) ? (out as any).evidence.length : undefined,
+          video_derived: out.video_derived, document_ids: out.document_ids }));
         return { id, status: "succeeded", output: out, replayed: false };
       } catch (err: any) {
         const f = await this.db.query(`UPDATE flow_research_runs SET status='failed', error=$2, finished_at=now() WHERE id=$1 AND status='running'`, [id, String(err?.message ?? err).slice(0, 500)]);

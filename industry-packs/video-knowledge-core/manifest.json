@@ -1,0 +1,29 @@
+{
+  "evaluation_set": "evals/evidence-cases.jsonl",
+  "id": "video-knowledge-core",
+  "kind": "base",
+  "mcp_requirements": [],
+  "name": "Video knowledge evidence organizer",
+  "note": "generated from the embedded pack; edit the source and regenerate (see industry_packs_test.go)",
+  "optional_connectors": [
+    "bilibili",
+    "douyin"
+  ],
+  "required_tools": [
+    "intel_search_knowledge",
+    "intel_research_video_materials",
+    "intel_read_document",
+    "intel_compare_evidence",
+    "intel_save_report"
+  ],
+  "skills": [
+    {
+      "hash": "07cee10fa307c0b500ec9d5010c49ef54ee44f12ed061a6d7dae81e9003b2340",
+      "id": "video-knowledge-core",
+      "output_schema": "schemas/video-knowledge-core.json",
+      "version": "1.0.0"
+    }
+  ],
+  "source": "backend/internal/flow/skillpacks/video-knowledge-core.json",
+  "version": "1.0.0"
+}

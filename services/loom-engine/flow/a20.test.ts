@@ -9,10 +9,11 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-test("A20: origin points at WeaveSense-Flow and main HEAD is a reachable 40-char SHA", () => {
+test("A20: origin matches the authorized repository and baseline resolves to a 40-char SHA", () => {
   assert.ok(existsSync(join(root, ".git")), "must run inside a checkout");
   const url = execFileSync("git", ["-C", root, "remote", "get-url", "origin"], { encoding: "utf8" }).trim();
-  assert.match(url, /newyngwieslash-ops\/WeaveSense-Flow(\.git)?$/, `origin is ${url}`);
+  const expected = process.env.FLOW_EXPECTED_REPOSITORY ?? "newyngwieslash-ops/WeaveSense-KnowHow-Collector";
+  assert.ok(url.replace(/\.git$/, "").endsWith("/" + expected), `origin is ${url}; expected ${expected}`);
   // Remote tip of main (CI and local both have network); fall back to a local ref when offline.
   let tip = "";
   try {

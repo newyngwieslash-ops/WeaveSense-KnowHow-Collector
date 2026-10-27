@@ -1,13 +1,11 @@
 package flow
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"sort"
 	"sync"
 	"time"
 
@@ -19,15 +17,16 @@ import (
 
 // Skill is a versioned analysis method: steps, references and an output schema.
 type Skill struct {
-	ID           string          `json:"id"`
-	Version      string          `json:"version"`
-	Name         string          `json:"name"`
-	Method       string          `json:"method"`
-	Steps        []string        `json:"steps"`
-	References   []string        `json:"references"`
-	OutputSchema json.RawMessage `json:"output_schema"`
-	Hash         string          `json:"hash"`
-	PackID       string          `json:"pack_id"`
+	ID                string                  `json:"id"`
+	Version           string                  `json:"version"`
+	Name              string                  `json:"name"`
+	Method            string                  `json:"method"`
+	Steps             []string                `json:"steps"`
+	References        []string                `json:"references"`
+	OutputSchema      json.RawMessage         `json:"output_schema"`
+	Hash              string                  `json:"hash"`
+	PackID            string                  `json:"pack_id"`
+	KnowledgeSnapshot *VideoKnowledgeSnapshot `json:"knowledge_snapshot,omitempty"`
 }
 
 // SkillPack bundles skills; industry packs also carry source templates,
@@ -40,12 +39,13 @@ type SkillPack struct {
 	RequiredTools []string `json:"required_tools,omitempty"`
 	OptionalConns []string `json:"optional_connectors,omitempty"`
 	// MCPRequirements names MCP servers the pack needs; empty means none.
-	MCPRequirements []string        `json:"mcp_requirements"`
-	Skills          []Skill         `json:"skills"`
-	SourceTemplates json.RawMessage `json:"source_templates,omitempty"`
-	Glossary        json.RawMessage `json:"glossary,omitempty"`
-	ReportSchema    json.RawMessage `json:"report_schema,omitempty"`
-	EvalSamples     json.RawMessage `json:"eval_samples,omitempty"`
+	MCPRequirements []string              `json:"mcp_requirements"`
+	Skills          []Skill               `json:"skills"`
+	SourceTemplates json.RawMessage       `json:"source_templates,omitempty"`
+	Glossary        json.RawMessage       `json:"glossary,omitempty"`
+	ReportSchema    json.RawMessage       `json:"report_schema,omitempty"`
+	EvalSamples     json.RawMessage       `json:"eval_samples,omitempty"`
+	Release         *VideoReleaseManifest `json:"release,omitempty"`
 }
 
 // SkillRef is the frozen identity recorded on research runs and reports.
@@ -55,7 +55,7 @@ type SkillRef struct {
 	Hash    string `json:"hash"`
 }
 
-//go:embed skillpacks/*.json
+//go:embed skillpacks
 var skillFS embed.FS
 
 var (
@@ -68,6 +68,7 @@ var ErrSkillNotFound = errors.New("flow: skill not found or not installed")
 
 func skillHash(s Skill) string {
 	s.Hash, s.PackID = "", ""
+	s.KnowledgeSnapshot = nil
 	raw, _ := json.Marshal(s)
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
@@ -76,30 +77,7 @@ func skillHash(s Skill) string {
 // SkillPacks returns the embedded packs with each skill's content hash.
 func SkillPacks() ([]SkillPack, error) {
 	packsOnce.Do(func() {
-		entries, err := skillFS.ReadDir("skillpacks")
-		if err != nil {
-			packsErr = err
-			return
-		}
-		for _, e := range entries {
-			raw, err := skillFS.ReadFile("skillpacks/" + e.Name())
-			if err != nil {
-				packsErr = err
-				return
-			}
-			raw = bytes.ReplaceAll(raw, []byte("\r\n"), []byte("\n"))
-			var p SkillPack
-			if err := json.Unmarshal(raw, &p); err != nil {
-				packsErr = err
-				return
-			}
-			for i := range p.Skills {
-				p.Skills[i].PackID = p.ID
-				p.Skills[i].Hash = skillHash(p.Skills[i])
-			}
-			packs = append(packs, p)
-		}
-		sort.Slice(packs, func(i, j int) bool { return packs[i].ID < packs[j].ID })
+		packs, packsErr = loadSkillPacksFS(skillFS)
 	})
 	return packs, packsErr
 }
@@ -111,7 +89,7 @@ func FindSkill(id, version string) (Skill, bool) {
 	found := false
 	for _, p := range ps {
 		for _, s := range p.Skills {
-			if s.ID == id && (version == "" || s.Version == version) && (!found || s.Version > best.Version) {
+			if s.ID == id && (version == "" || s.Version == version) && (!found || (p.Kind == "video-method" && videoVersionNewer(s.Version, best.Version)) || (p.Kind != "video-method" && s.Version > best.Version)) {
 				best, found = s, true
 			}
 		}
@@ -125,6 +103,19 @@ func InstallSkill(db *gorm.DB, scope Scope, userID, id, version string) (model.F
 	if !ok {
 		return model.FlowSkillInstall{}, ErrSkillNotFound
 	}
+	if governedVideoSkill(s) {
+		return model.FlowSkillInstall{}, errors.New("flow: video method installation requires the candidate install endpoint and a deployment receipt")
+	}
+	if err := videoSkillToolsAvailable(db, scope, s); err != nil {
+		return model.FlowSkillInstall{}, err
+	}
+	if err := checkRuntimeVideoSkill(scope, s); err != nil {
+		return model.FlowSkillInstall{}, err
+	}
+	return installSkillPin(db, scope, userID, s)
+}
+
+func installSkillPin(db *gorm.DB, scope Scope, userID string, s Skill) (model.FlowSkillInstall, error) {
 	row := model.FlowSkillInstall{ID: NewID("sk_"), TenantID: scope.TenantID, WorkspaceID: scope.WorkspaceID, SkillID: s.ID,
 		Version: s.Version, Hash: s.Hash, PackID: s.PackID, InstalledBy: userID, UpdatedAt: time.Now().UTC()}
 	err := db.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "tenant_id"}, {Name: "workspace_id"}, {Name: "skill_id"}},
@@ -132,6 +123,9 @@ func InstallSkill(db *gorm.DB, scope Scope, userID, id, version string) (model.F
 	if err != nil {
 		return row, err
 	}
+	// On conflict the database keeps the original primary key; do not let
+	// GORM add the just-generated (unused) ID to this canonical pin lookup.
+	row = model.FlowSkillInstall{}
 	err = db.First(&row, "tenant_id = ? AND workspace_id = ? AND skill_id = ?", scope.TenantID, scope.WorkspaceID, s.ID).Error
 	return row, err
 }
@@ -153,7 +147,13 @@ func LoadSkillForRun(db *gorm.DB, scope Scope, runID, id string) (Skill, error) 
 			if !ok || s.Hash != pin.Hash {
 				return Skill{}, errors.New("flow: pinned skill version is no longer available")
 			}
-			return s, nil
+			if err := checkRuntimeVideoSkill(scope, s); err != nil {
+				return Skill{}, err
+			}
+			if err := videoSkillToolsAvailable(db, scope, s); err != nil {
+				return Skill{}, err
+			}
+			return withVideoKnowledgeSnapshot(scope, runID, s)
 		}
 	}
 	var inst model.FlowSkillInstall
@@ -163,6 +163,9 @@ func LoadSkillForRun(db *gorm.DB, scope Scope, runID, id string) (Skill, error) 
 	s, ok := FindSkill(id, inst.Version)
 	if !ok || s.Hash != inst.Hash {
 		return Skill{}, ErrSkillNotFound
+	}
+	if err := checkRuntimeVideoSkill(scope, s); err != nil {
+		return Skill{}, err
 	}
 	if runID != "" {
 		db.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.FlowSkillRunPin{RunID: runID, SkillID: id, TenantID: scope.TenantID, Version: s.Version, Hash: s.Hash, CreatedAt: time.Now().UTC()})

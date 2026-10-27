@@ -1,0 +1,140 @@
+name: Video knowledge integration
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "services/loom-engine/flow/**"
+      - "services/loom-engine/workers/**"
+      - "services/video-knowledge/**"
+      - "services/loom-engine/validation/video-knowledge/**"
+      - "deploy/flow/**"
+      - "docker-compose.video.yml"
+      - "web/**"
+      - "docs/video-ingestion/**"
+      - "scripts/*video*"
+      - ".github/workflows/video-knowledge.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: video-knowledge-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/video-task-ledger.py check
+      - run: python -m pip install PyYAML==6.0.3
+      - run: python -m unittest discover -s scripts -p 'test_video*.py' -v
+      # Formal release acceptance is intentionally not inferred from this job.
+  flow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.22.1"
+          cache: npm
+          cache-dependency-path: services/loom-engine/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg tesseract-ocr
+      - run: python -m pip install -r services/video-knowledge/requirements.txt
+      - run: npm ci --ignore-scripts
+        working-directory: services/loom-engine
+      - run: npx tsc --noEmit -p tsconfig.flow.json
+        working-directory: services/loom-engine
+      - run: node --experimental-strip-types --test --test-concurrency=1 flow/*.test.ts
+        working-directory: services/loom-engine
+  media:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg tesseract-ocr
+      - run: python -m pip install -r services/video-knowledge/requirements.txt
+      - run: python -m unittest discover -s services/video-knowledge -p 'test_*.py' -v
+      - name: Verify the separate host ASR dependency profile
+        run: |
+          python -m venv .local/ci-asr
+          .local/ci-asr/bin/python -m pip install -r services/loom-engine/workers/asr/requirements.txt
+          .local/ci-asr/bin/python -m unittest discover -s services/loom-engine/workers/asr -p 'test_*.py' -v
+  host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      FLOW_VIDEO_CROSSLAYER_TEST: "1"
+      FLOW_VIDEO_RELEASE_BUILD_TEST: "1"
+      GOMAXPROCS: "2"
+      CANVAS_TEST_POSTGRES_DSN: postgres://postgres:synthetic@127.0.0.1:5432/canvas_test?sslmode=disable
+      FLOW_TEST_PG_RLS_DSN: postgres://flow_app:synthetic@127.0.0.1:5432/rls_test?sslmode=disable
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: synthetic
+          POSTGRES_DB: canvas_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.14"
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.22.1"
+      - run: sudo apt-get update && sudo apt-get install -y redis-server postgresql-client
+      - name: Create isolated non-superuser RLS database
+        run: |
+          psql "postgres://postgres:synthetic@127.0.0.1:5432/postgres" -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE flow_app LOGIN PASSWORD 'synthetic' NOSUPERUSER NOBYPASSRLS CREATEDB" \
+            -c "CREATE DATABASE rls_test OWNER flow_app"
+      - run: npm ci --ignore-scripts
+        working-directory: services/loom-engine
+      - run: npm ci --omit=dev --ignore-scripts
+        working-directory: backend/agent-runtime/pi
+      - name: Host suites including actual Go to Loom cross-layer calls
+        working-directory: backend
+        run: |
+          set -o pipefail
+          go test -p 2 -json -timeout=20m ./... | tee "$RUNNER_TEMP/video-host-tests.jsonl"
+          python3 ../.github/scripts/check-dependency-tests.py "$RUNNER_TEMP/video-host-tests.jsonl"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-host-test-evidence
+          path: ${{ runner.temp }}/video-host-tests.jsonl
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun test
+      - run: bun run build

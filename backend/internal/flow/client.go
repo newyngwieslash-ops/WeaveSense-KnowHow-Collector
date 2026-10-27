@@ -3,6 +3,7 @@ package flow
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -49,8 +50,29 @@ type EngineClient struct {
 }
 
 func (e EngineClient) Do(ctx context.Context, scope Scope, actor Actor, method, path, idemKey string, body []byte) (int, []byte, error) {
+	scopes := ScopesForRole(scope.Role)
+	jobID := ""
+	if actor.Type == "service_principal" && actor.ID == "video-skill-reader" && path == "/v1/video/skill-candidates/check-pin" {
+		scopes = []string{"intel.knowledge.read"}
+	}
+	if actor.Type == "service_principal" && actor.ID == "video-skill-reader" && path == "/v1/knowledge/snapshots" {
+		scopes = []string{"intel.knowledge.read"}
+		var pin struct {
+			RunID string `json:"run_id"`
+		}
+		if json.Unmarshal(body, &pin) != nil || pin.RunID == "" {
+			return 0, nil, ErrInvalid
+		}
+		jobID = pin.RunID
+	}
+	if actor.Type == "service_principal" && actor.ID == "video-skill-installer" && strings.HasPrefix(path, "/v1/video/skill-candidates/") && strings.HasSuffix(path, "/receipts") {
+		scopes = []string{"intel.skills.install"}
+	}
+	if actor.Type == "service_principal" && actor.ID == "video-skill-deployer" && strings.HasPrefix(path, "/v1/video/skill-candidates/") && (strings.HasSuffix(path, "/deployment-check") || strings.HasSuffix(path, "/receipts")) {
+		scopes = []string{"intel.skills.deploy"}
+	}
 	tok, err := Sign(e.Cfg.SigningKey, ExecutionContext{Issuer: e.Cfg.Issuer, Audience: e.Cfg.Audience,
-		TenantID: scope.TenantID, WorkspaceID: scope.WorkspaceID, Actor: actor, Scopes: ScopesForRole(scope.Role),
+		TenantID: scope.TenantID, WorkspaceID: scope.WorkspaceID, Actor: actor, Scopes: scopes, JobID: jobID,
 		CapabilitySnapshotID: capabilityFromCtx(ctx), PolicyVersion: "policy_v1"}, time.Now(), e.Cfg.TTL)
 	if err != nil {
 		return 0, nil, err
@@ -68,6 +90,9 @@ func (e EngineClient) Do(ctx context.Context, scope Scope, actor Actor, method, 
 	if hc == nil {
 		hc = &http.Client{Timeout: 15 * time.Second}
 	}
+	copyClient := *hc
+	copyClient.CheckRedirect = func(*http.Request, []*http.Request) error { return ErrEgressBlocked }
+	hc = &copyClient
 	resp, err := hc.Do(req)
 	if err != nil {
 		return 0, nil, fmt.Errorf("loom engine: %w", err)
@@ -104,4 +129,3 @@ func (e EngineClient) DoStream(ctx context.Context, scope Scope, actor Actor, me
 	}
 	return resp, nil
 }
-

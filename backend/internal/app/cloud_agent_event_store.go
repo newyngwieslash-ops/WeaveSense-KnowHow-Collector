@@ -36,6 +36,9 @@ const (
 // 事件表里没有该运行的行时（升级前的旧检查点把事件放在 state_json 里），退回内存窗口，
 // 保证老运行仍可读。
 func (s *Service) cloudAgentRunEventsForView(userID string, run *model.CloudAgentExecution, state *cloudAgentRuntime, sinceSeq, limit int) []CloudAgentEvent {
+	if err := s.repo.CheckVideoRunProjection(userID, run.ID); err != nil {
+		return nil
+	}
 	if sinceSeq > 0 {
 		pageLimit := cloudAgentRunEventDeltaLimit
 		if limit > 0 && limit < pageLimit {

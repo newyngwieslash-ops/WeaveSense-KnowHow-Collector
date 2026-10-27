@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Input, List, Select, Space, Tag, Typography, message } from "antd";
 
 import { createSource, listConnectorSamples, listSources, revokeSource, type ConnectorSample, type IntelSource, type SourceKind } from "@/services/api/intelligence";
+import { VideoSourcesPanel } from "./video-source-editor";
 
 export const KIND_HINT: Record<SourceKind, string> = {
     rss: "订阅源 URL（https://…）",
     telegram: "公开频道句柄或 t.me 链接",
     wechat: "微信网关源 ID（已在公众号采集网关配置）",
+    bilibili: "B站视频或 UP 主链接",
+    douyin: "抖音视频或账号链接",
 };
 export const SOURCE_STATUS_LABEL: Record<string, string> = {
     active: "启用中",
@@ -19,6 +22,7 @@ export function buildSourceInput(kind: SourceKind, rawValue: string): { kind: So
     if (!v) return undefined;
     if (kind === "rss") return { kind, url: v };
     if (kind === "telegram") return { kind, config: { handle: v } };
+    if (kind === "bilibili" || kind === "douyin") return undefined;
     return { kind, config: { gateway_source_id: v } };
 }
 
@@ -64,7 +68,7 @@ export function SourcesPanel({
     };
 
     return (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: "0 16px 16px" }}>
+        <><VideoSourcesPanel key={workspaceId} workspaceId={workspaceId} /><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: "0 16px 16px" }}>
             <Card size="small" title="信源列表">
                 <Space.Compact style={{ width: "100%", marginBottom: 8 }}>
                     <Select
@@ -85,7 +89,7 @@ export function SourcesPanel({
                 {kind === "telegram" && <Typography.Text type="secondary">支持公开频道消息与受管大小内的媒体附件采集；超限附件将标记为超限跳过。</Typography.Text>}
                 <List
                     size="small"
-                    dataSource={sources}
+                    dataSource={sources.filter((source) => source.kind !== "bilibili" && source.kind !== "douyin")}
                     locale={{ emptyText: "暂无信源" }}
                     renderItem={(s) => (
                         <List.Item
@@ -129,6 +133,6 @@ export function SourcesPanel({
                     )}
                 />
             </Card>
-        </div>
+        </div></>
     );
 }

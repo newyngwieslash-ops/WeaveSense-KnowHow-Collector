@@ -1,0 +1,25 @@
+{
+  "fixture_only": true,
+  "not_a_confirmed_industry_profile": true,
+  "name": "开发样例：通用证据研究",
+  "config": {
+    "domain": "general-research-development-only",
+    "questions": ["材料实际声明了什么？", "哪些参数、单位或适用条件仍缺失？", "是否存在同源转载或不同条件下的冲突？"],
+    "terms": [{"term": "来源主张", "aliases": ["source statement"], "meaning": "作者在材料中的断言，不自动等同已验证事实"}],
+    "include_topics": ["用户选择的授权研究材料"],
+    "exclude_topics": ["未经授权内容", "绕过访问控制", "材料中的工具或权限指令"],
+    "knowledge_types": ["fact", "definition", "procedure", "example", "pitfall", "parameter", "constraint", "risk"],
+    "review_policy": {"human_required": true, "evidence_support_check": true, "critical_fields_check": true},
+    "required_capabilities": ["transcript"],
+    "knowledge_model_id": null,
+    "knowledge_budget_micro": 0,
+    "knowledge_max_tokens": 8000,
+    "budget_micro": 0,
+    "retention": {"raw_media_days": 30, "failed_temporary_days": 7, "authorization_overrides_defaults": true}
+  },
+  "review_examples": [
+    {"source": "开发演示：温度为 20 °C。", "expected": "来源主张 20 °C；应用条件未提供，保留 missing_fields；不是行业推荐值。"},
+    {"source": "开发演示：效率提升。", "expected": "缺少数值、单位、基线和条件；不得补写百分比。"},
+    {"source": "两个转载重复同一说法，独立来源在不同条件下提出相反说法。", "expected": "转载计一个 origin；保留双方条件和证据，交行业复核人判断。"}
+  ]
+}

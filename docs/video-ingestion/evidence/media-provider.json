@@ -1,0 +1,434 @@
+{
+  "schema_version": 1,
+  "scope": "Media/provider lane implementation evidence, not V1 production acceptance",
+  "updated_at": "2026-10-26T17:41:00Z",
+  "independent_audit_gap_work": {
+    "status": "implemented_and_focused_regression_verified_not_v1_accepted",
+    "tasks": ["COL-020", "COL-029", "COL-030", "COL-002", "COL-007", "COL-021", "K-004", "K-013", "K-015", "K-025", "K-031"],
+    "findings": ["G01", "G02", "G04", "G06", "G07", "G09", "G10", "G12", "G13", "G14"],
+    "code_paths": ["services/video-knowledge/core.py", "services/video-knowledge/dtk.py", "services/video-knowledge/media.py", "services/video-knowledge/runtime.py", "services/video-knowledge/server.py", "services/video-knowledge/synthesis.py"],
+    "changes": [
+      "Recheck persists refresh=true parse task before skip_existing=false download; same pending task only polled, unknown never blindly resubmitted. Title/description included in metadata version; actual input hash remains revision authority.",
+      "Scoped durable object write/upload inventory and deletion receipts; exact authorized failed-temp sweep checks generation, scheduling lease AND actual flock. Unknown remote object write or ASR output cannot produce false final erasure receipt.",
+      "Free-byte/free-ratio watermarks before and during spooling/FFmpeg; per-execution scratch ceiling; bounded FFmpeg output spool. Loom, not worker, owns cumulative daily resource reservations.",
+      "Signed lawful-input streaming upload with length/SHA/MIME/FFprobe validation, receipt recovery and erased-job tombstone. User-supplied subtitles explicitly not platform-authenticated.",
+      "Typed visual metadata parts max100 records/256KiB with raw frame/OCR distinct from derived model observations/inferences, actual provenance, temporal/unaligned relations and narrow unreviewed numeric-disagreement candidates preserving both primary texts.",
+      "Registered scoped objects support hash-verified MIME/ETag/single Range streaming; missing404, tamper422, invalid range416.",
+      "Measured duration/bytes/cumulative execution seconds/quanta/cache hits/observed scratch peak, no fabricated quality metrics.",
+      "Operator read-only alias-to-instance/API-key-file resolver enforces exact tenant/workspace reference and freezes nonsecret route identity. No secret in business payload or logs.",
+      "Bounded single-HTTPS share URL extraction plus actual async DTK parse identity; provider normalization provenance retained. Python object boundary aligned to TS80/120 and wrong manifest schema rejected."
+    ],
+    "remaining": [
+      "Peer-owned host/UI/retention/daily-admission integration requires final cross-language aggregate regression; focused worker pass is not acceptance.",
+      "Processing cache identity is proven only for local subtitle-only execution; media returns null until linked FFmpeg and remote model dependencies are authenticated/pinned. No guessed fixed release identity.",
+      "General semantic cross-modal conflict detection is not claimed; numeric candidates require human review and bounded parser coverage is disclosed.",
+      "G16 provider-owned DTK copies/backups remain pending authoritative external deletion receipts; cancellation is not physical erasure. No real platform or paid model claim."
+    ]
+  },
+  "global_boundaries": [
+    "No real platform credentials/cookies, paid model inference, production deployment, upstream write or commit.",
+    "Source inspection, deterministic fixture tests, actual generated-media/model smoke and real-platform acceptance are separate evidence classes.",
+    "Worker SQLite is operational only; no Loom business writes or forged evidence IDs. Official model files and upstream clones remain outside repository."
+  ],
+  "test_runs": [
+    {
+      "command": "python -m unittest -q test_video.py test_gateway.py test_shared_contract_qa.py",
+      "cwd": "services/video-knowledge",
+      "log": "/tmp/knowhow-media-gap-tests.log",
+      "result": "45 passed, 0 failed (42 worker tests plus 3 independent shared corpus tests)",
+      "mode": "actual generated FFmpeg + production signed HTTP upload/range + SQLite/flock/disk guards; DTK/model/account data deterministic fixtures only"
+    },
+    {
+      "command": "PYTHONPATH=../runtime/asr-site python services/video-knowledge/local_model_smoke.py --model-dir ../runtime/models/faster-whisper-tiny --out ../runtime/local-model-smoke-gap.json",
+      "cwd": ".",
+      "log": "/tmp/knowhow-real-model-gap.log",
+      "result": "passed after bounded FFmpeg spool changes; silence empty, generated voice still dog-to-log, OCR actual text; 4 frames, 3 OCR invocations and 1 measured OCR cache hit",
+      "mode": "actual official pinned local tiny model and installed Tesseract on generated lawful synthetic data, not platform/domain gold"
+    },
+    {
+      "command": "python -m unittest -v test_video.py test_gateway.py",
+      "cwd": "services/video-knowledge",
+      "log": "/tmp/knowhow-media-tests-final.log",
+      "result": "32 passed, 0 failed",
+      "mode": "deterministic contracts plus actual FFmpeg on generated media"
+    },
+    {
+      "command": "python -m unittest -v test_server.py",
+      "cwd": "services/loom-engine/workers/asr",
+      "log": "/tmp/knowhow-asr-final.log",
+      "result": "7 passed, 1 explicit optional real-model test skipped in default Python environment",
+      "mode": "worker fixture and actual local HTTP protocol; real model separately verified"
+    },
+    {
+      "command": "python -m unittest -v test_server.py",
+      "cwd": "services/loom-engine/workers/ocr",
+      "result": "4 passed",
+      "mode": "includes actual installed Tesseract on generated text image"
+    },
+    {
+      "command": "node --experimental-strip-types --test flow/enrichment.test.ts flow/video-enrichment.test.ts",
+      "cwd": "services/loom-engine",
+      "log": "/tmp/knowhow-enrichment-final.log",
+      "result": "7 passed, 0 failed",
+      "mode": "host existing enrichment regression plus bounded manifest fixtures"
+    },
+    {
+      "command": "PYTHONPATH=../runtime/asr-site python services/video-knowledge/local_model_smoke.py --model-dir ../runtime/models/faster-whisper-tiny --out ../runtime/local-model-smoke-final.json",
+      "cwd": ".",
+      "result": "passed; silence empty; generated voice and OCR processed, dog recognized as log",
+      "mode": "actual local CPU faster-whisper and Tesseract; in-process transport; not platform/industry gold"
+    },
+    {
+      "command": "python -m compileall -q . ../loom-engine/workers/asr ../loom-engine/workers/ocr",
+      "cwd": "services/video-knowledge",
+      "result": "passed",
+      "mode": "syntax"
+    },
+    {
+      "command": "node --experimental-strip-types --test --test-name-pattern='QA cross-language media' flow/video-qa.test.ts",
+      "cwd": "services/loom-engine",
+      "log": "/tmp/knowhow-media-final-crosslanguage.log",
+      "result": "1 passed, 0 failed; real signed Python HTTP/SQLite/FFmpeg to Loom ready, exact object cleanup, execution erasure receipt and post-erasure410",
+      "mode": "production components with explicitly deterministic acquisition/ASR fixtures; rerun after final worker erasure guards"
+    },
+    {
+      "test": "TestVideoEmbeddingRealLoomStageGatewayAndReadyBarrier",
+      "run_owner": "gateway/skills agent; result log inspected locally",
+      "log": "/tmp/knowhow-embedding-worker-budget-crosslayer.log",
+      "result": "passed in 3.49s; actual Python Gateway.local/Tasks restarted across two processes against real Go host and current Loom process fence; ASR/OCR fixture compute each once, host-priced2200 micro, over-cap quantum rejected before invoke",
+      "code_paths": ["services/loom-engine/validation/video-knowledge/gateway-usage-harness.py", "backend/internal/flow/video_embedding_crosslayer_test.go"],
+      "mode": "real local HTTP/SQLite/Billing components; synthetic inference and prices, no paid/external inference"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "COL-001",
+      "title": "锁定宿主与DTK版本、建立真实能力基线",
+      "status": "待验收",
+      "code_paths": [
+        "docs/video-ingestion/upstream-media-lock.json",
+        "services/video-knowledge/dtk.py",
+        "services/video-knowledge/NOTICE"
+      ],
+      "verification": [
+        "Pinned upstream source inspection: BiliNote 90940fde and DTK 3d540dbf are current checked-out HEAD as well as requested historical revisions; source hashes recorded. No upstream scripts executed."
+      ],
+      "remaining_acceptance": [
+        "Healthy deployed DTK instance, real authorized Bilibili/Douyin samples and image digest remain unavailable."
+      ],
+      "original_acceptance": [
+        "基线文档每个现有能力有文件/符号/固定提交引用。",
+        "fixture、文档声明、源码实现、实测结果分别标注；未实测的下载成功率及性能不写成事实。"
+      ]
+    },
+    {
+      "id": "FND-004",
+      "title": "锁定依赖和开源通知",
+      "status": "待验收",
+      "code_paths": [
+        "docs/video-ingestion/upstream-media-lock.json",
+        "docs/video-ingestion/evidence/local-model-dependencies.json",
+        "services/video-knowledge/NOTICE",
+        "services/video-knowledge/Dockerfile",
+        "services/loom-engine/workers/asr/Dockerfile",
+        "services/loom-engine/workers/asr/model-lock.tiny.json"
+      ],
+      "verification": [
+        "Official Python registry base index and linux/amd64 digest verified; Docker build not run.",
+        "Official tiny weights revision and SHA-256 verified; actual local CPU smoke passed.",
+        "ctranslate2 4.5.0 executable-stack policy rejection respected; 4.8.4 RW-stack wheel tested without relaxing policy."
+      ],
+      "remaining_acceptance": [
+        "Full built-image SBOM and transitive license audit, immutable FFmpeg/system package locks, and Docker image build/digest remain pending.",
+        "Legacy ASR compose requires explicit migration to a read-only offline model+lock mount; small model not tested."
+      ],
+      "original_acceptance": [
+        "最终打包依赖逐项可追溯；不把根LICENSE当作所有依赖的许可；不追随未验证的main。"
+      ]
+    },
+    {
+      "id": "K-001",
+      "title": "冻结知识处理复用边界与processing profiles",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/media.py",
+        "services/video-knowledge/README.md"
+      ],
+      "verification": [
+        "test_mode_controls_real_processing_and_optional_failure: audio skips all frames; visual_required blocks contradictory profiles; optional OCR failure does not block required vision."
+      ],
+      "remaining_acceptance": [
+        "Industry selection, real authorized workload limits, quality/performance calibration and release acceptance remain pending."
+      ],
+      "original_acceptance": [
+        "所有需求可映射到复用或新增模块；不新增BiliNote主RAG/账号系统",
+        "每个profile声明required/optional branch、范围、语言和超限行为；性能阈值标为建议基线"
+      ]
+    },
+    {
+      "id": "COL-006",
+      "title": "实现受信DTK内部REST适配器",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/core.py",
+        "services/video-knowledge/dtk.py",
+        "services/video-knowledge/runtime.py"
+      ],
+      "verification": [
+        "test_dtk_auth_header_matches_locked_source: X-API-Key, not Bearer; fixed deployment origin, exact parse route.",
+        "test_dtk_pending_never_resubmits_download; test_dtk_unknown_outcome_never_retried; test_dtk_discovery_pending_preserves_handle.",
+        "test_explicit_terminal_download_retry_preserves_part_and_polls_only; test_lost_terminal_download_retry_response_is_not_repeated. Locked upstream /downloads/retry drops part in reconstructed DownloadRequest, so worker explicit retry uses exact frozen platform/native/part only after freshly proved terminal failure."
+      ],
+      "remaining_acceptance": [
+        "Real platform account calls and rate-limit/cookie lifecycle not verified; scoped alias-to-instance/API-key-file mapping implemented and fixture-tested, not platform identity-pool pinning.",
+        "DTK normalized API lacks subtitles/independent audio; cannot advertise those capabilities.",
+        "DTK cancellation does not prove remote stop; remote copies/retention need provider policy."
+      ],
+      "original_acceptance": [
+        "DTK健康实例能完成fixture契约调用；schema不匹配返回provider_contract_changed。",
+        "任意127.0.0.1/metadata/其他内网地址无法经用户输入成为目标。",
+        "通用MCP私网访问防护回归测试仍通过。"
+      ]
+    },
+    {
+      "id": "K-003",
+      "title": "定义并校验不可变artifact manifest",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/core.py",
+        "services/video-knowledge/media.py",
+        "services/video-knowledge/runtime.py",
+        "services/video-knowledge/server.py"
+      ],
+      "verification": [
+        "test_scope_auth_and_hash_rejects_forgery; test_durable_idempotency_recovery_and_conflict; test_http_auth_cross_scope_and_large_streamed_object (real9MiB response).",
+        "test_subtitles_only_never_claim_media_or_knowledge_ready checks normalized parent hash, null media hash and no evidence IDs.",
+        "Independent production Python HTTP → TS provider → Loom ready and erasure integration owned by QA; see QA evidence, not substituted with worker unit assertions."
+      ],
+      "remaining_acceptance": [
+        "Full release acceptance across all host/UI branches belongs to aggregate QA; no deployment claim.",
+        "Unacknowledged object-write or worker-response loss can leave unregistered objects; scoped age-based orphan reconciliation is a deployment operational requirement."
+      ],
+      "original_acceptance": [
+        "MCP摘要不携带无限转录/图片；完整对象可按manifest读取",
+        "对象hash错误、scope不符、缺必填来源、伪造完成范围均拒绝",
+        "同manifest内容有稳定hash；同id不同payload返回冲突"
+      ]
+    },
+    {
+      "id": "K-004",
+      "title": "实现字幕来源选择与标准化",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/media.py",
+        "services/video-knowledge/runtime.py"
+      ],
+      "verification": [
+        "test_invalid_subtitles_and_language includes manual-before-automatic candidate selection and invalid-track fallback; test_subtitles_only_never_claim_media_or_knowledge_ready."
+      ],
+      "remaining_acceptance": [
+        "Provider subtitle acquisition unsupported in pinned DTK; only actual supplied subtitle objects normalized. No real subtitle-platform acceptance."
+      ],
+      "original_acceptance": [
+        "人工有效字幕优先；自动字幕与ASR来源不会混淆",
+        "非法/越界时间、空字幕、语言不适用有明确结果，不用简介补正文",
+        "原始字幕和canonical文本可追溯且规范化具版本"
+      ]
+    },
+    {
+      "id": "K-005",
+      "title": "无字幕场景复用宿主ASR并区分失败类型",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/server.py",
+        "services/video-knowledge/media.py",
+        "services/loom-engine/workers/asr/server.py"
+      ],
+      "verification": [
+        "Actual pinned local Whisper on generated 2s silence returns empty text and zero segments, not fabricated speech.",
+        "Actual generated voice plus Tesseract smoke passed, with disclosed dog→log recognition error; manifest adapter hashes/counts verified."
+      ],
+      "remaining_acceptance": [
+        "Local tiny smoke is not Chinese/industry accuracy, platform download or production throughput acceptance.",
+        "True synchronous local-worker outcome unknown has no upstream task-status/output proof; hold/manual reconciliation required, never blind rerun. Final worker physical-erasure receipt also remains blocked while local compute is processing/unknown; logical host revocation remains immediate."
+      ],
+      "original_acceptance": [
+        "有合格字幕不重复ASR；缺字幕按profile使用宿主ASR",
+        "鉴权失败不伪装为无字幕；空语音得到可解释状态",
+        "所有处理结果绑定媒体hash与实际engine/model"
+      ]
+    },
+    {
+      "id": "K-006",
+      "title": "保留完整ASR segments并移除静默截断",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/workers/asr/server.py",
+        "services/loom-engine/flow/enrichment.ts",
+        "services/loom-engine/flow/video-enrichment.test.ts"
+      ],
+      "verification": [
+        "Python test_long_output_manifest_keeps_tail_and_all_segments retains2101 segments/>400000 chars and rejects oversize legacy inline.",
+        "Node ASR manifest preserves2101 segments/>400000 chars, streaming callback, tamper/foreign/incomplete legacy refusal.",
+        "Python actual HTTP /v1/asr/parts response matches stored canonical bytes/hash; no serialization mismatch."
+      ],
+      "remaining_acceptance": [
+        "Deterministic tail-integrity acceptance demonstrated; release regression/build and real long-video throughput remain pending."
+      ],
+      "original_acceptance": [
+        "2100 segments和400001字符样例不丢尾部，或按明确支持范围拒绝",
+        "客户端不再丢弃segments；count/hash/正文一致",
+        "旧inline输出超过上限返回明确截断/对象引用状态，不能仅200成功"
+      ]
+    },
+    {
+      "id": "K-007",
+      "title": "长视频分段拼接与可恢复产物处理",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/media.py",
+        "services/video-knowledge/runtime.py",
+        "services/video-knowledge/synthesis.py"
+      ],
+      "verification": [
+        "test_real_ffmpeg_chunk_resume_only_failed_chunk_recomputed; test_expired_owner_and_cancel_cannot_commit; test_retry_preserves_checkpoint_and_refreshes_fence.",
+        "Local metering tests enforce admission before compute, no compute after budget denial, same-receipt settlement retry, no rerun of unknown local outcome. Actual gateway-agent crosslayer test additionally verifies lost successful-settlement response and process restart against real host billed rows without duplicate compute.",
+        "Processed vs speech vs unknown intervals disclosed; no claim that ASR gaps are silence."
+      ],
+      "remaining_acceptance": [
+        "Real long authorized video, pressure/restart chaos and performance baseline not run.",
+        "Unknown local compute cannot safely resume without authoritative output/not-processed receipt; host billing status alone is insufficient.",
+        "Whole final manifests over1.5MiB fail explicitly; artifact receipts are paged, not dropped."
+      ],
+      "original_acceptance": [
+        "中途失败重启后仅处理失效段且不会重复计入已确认产物",
+        "全局时间连续映射，首尾内容无静默遗漏",
+        "静音区间单独标记；processed coverage不等于speech coverage",
+        "超范围或预算耗尽返回partial/limit_exceeded，ready门禁阻断"
+      ]
+    },
+    {
+      "id": "K-010",
+      "title": "隔离BiliNote抽帧处理工作目录",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/media.py",
+        "services/video-knowledge/runtime.py"
+      ],
+      "verification": [
+        "test_real_ffmpeg_short_tail_grid_and_isolated_directories uses generated real media and separate directories; deleting one frame leaves the other job intact."
+      ],
+      "remaining_acceptance": [
+        "Multi-process production pressure/cancellation deployment not exercised."
+      ],
+      "original_acceptance": [
+        "并发处理两个视频帧、网格和OCR不混淆",
+        "取消或清理一个任务不删除另一任务文件",
+        "临时路径不被外部内容自由指定"
+      ]
+    },
+    {
+      "id": "K-011",
+      "title": "抽帧策略、尾组保留与视觉覆盖披露",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/media.py"
+      ],
+      "verification": [
+        "test_real_scene_change_and_actual_frame_timestamps tests real black→white scene transition at1000ms.",
+        "Actual generated5.105s media samples decoded video PTS0,2000,4000,5000ms; frame grid tail preserved."
+      ],
+      "remaining_acceptance": [
+        "Domain frame sampling quality/maximum budget tuning not calibrated on authorized real samples."
+      ],
+      "original_acceptance": [
+        "短视频与不足一组尾帧有可追溯输出，不因网格不足静默跳过",
+        "达到帧预算时明确采样范围，不能声称全视频逐帧分析",
+        "每帧timestamp/hash/来源媒体一致，策略参数标建议基线待校准"
+      ]
+    },
+    {
+      "id": "K-012",
+      "title": "复用宿主OCR并保存帧级文字证据",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/media.py",
+        "services/loom-engine/workers/ocr/server.py",
+        "services/loom-engine/flow/enrichment.ts"
+      ],
+      "verification": [
+        "Actual Tesseract5.5.0 reads WEAVE TEST42 from generated frames; frame/time/media provenance preserved.",
+        "Node OCR output200001 characters not silently sliced; worker explicit1MiB UTF8 refusal.",
+        "Required/optional branch test exercises OCR unavailable handling; per-frame hashes cache results."
+      ],
+      "remaining_acceptance": [
+        "Real Chinese/domain diagrams/equations quality not verified; OCR text is not semantic validation."
+      ],
+      "original_acceptance": [
+        "OCR文字绑定frame_id/time/media hash；错误帧可单独重跑",
+        "超字符/尺寸上限明确返回而非静默切片",
+        "普通OCR结果不标为已验证公式/图表语义"
+      ]
+    },
+    {
+      "id": "K-013",
+      "title": "VLM视觉观察与推断分类型输出",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/media.py",
+        "services/video-knowledge/synthesis.py"
+      ],
+      "verification": [
+        "test_vlm_fabricated_frame_reference_is_rejected; test_pending_poll_and_fence_rebind_reuse_same_host_key.",
+        "Only host model route is called; observation/inference differentiated, unreviewed, actual input frame IDs enforced. No live VLM called."
+      ],
+      "remaining_acceptance": [
+        "No actual remote VLM inference, paid model call or domain review; host route tests are synthetic and are separately owned by gateway agent."
+      ],
+      "original_acceptance": [
+        "每项观察引用实际输入frame_id，幻造帧引用拒绝",
+        "OCR原文、直接视觉观察与模型推断具有不同类型和审阅标记",
+        "模型不支持图像时明确降级/失败，不返回假多模态成功"
+      ]
+    },
+    {
+      "id": "K-014",
+      "title": "抽取BiliNote分段总结能力并接宿主网关",
+      "status": "待验收",
+      "code_paths": [
+        "services/video-knowledge/synthesis.py",
+        "services/video-knowledge/media.py"
+      ],
+      "verification": [
+        "test_hierarchical_summary_accounts_for_every_input; test_oversized_input_refused_without_silent_summary_loss.",
+        "Model output exact input_ids consumption, hierarchy, derived_summary/unreviewed preserved. No BiliNote global credentials/Chroma/UI/scheduler."
+      ],
+      "remaining_acceptance": [
+        "No actual host-model summary quality run or domain human review; synthetic consumption protocol alone is not content quality acceptance."
+      ],
+      "original_acceptance": [
+        "每个required输入segment/frame在消费清单可见，遗漏会阻断完整成功",
+        "摘要仅进入derived结果，不混为原作者原话",
+        "无BiliNote全局凭据、进程内主队列、Chroma和未使用PDF依赖"
+      ]
+    }
+  ],
+  "supporting_tasks": [
+    {
+      "id": "K-025",
+      "code_paths": [
+        "services/video-knowledge/core.py",
+        "services/video-knowledge/runtime.py",
+        "services/video-knowledge/server.py"
+      ],
+      "verification": [
+        "test_object_cleanup_is_scoped_hashed_and_idempotent",
+        "test_artifact_receipts_are_bounded_and_paged",
+        "test_erasure_scrubs_worker_cache_but_preserves_tombstone; post-erasure signed read410 without reauthorization"
+      ],
+      "remaining_acceptance": [
+        "SQLite live cache and registered object cleanup are not a guarantee of provider-side DTK/backup deletion; those policies require separate deployment acceptance."
+      ]
+    }
+  ]
+}

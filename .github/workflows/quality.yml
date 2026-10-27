@@ -1,0 +1,263 @@
+name: Quality checks
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# 同一个 PR 连续推送时取消旧的检查，只保留最新提交；被发布流程调用（workflow_call）时
+# 每次运行使用独立分组，绝不互相取消，避免中间提交的镜像发布被跳过。
+concurrency:
+  group: quality-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-latest
+    # go test 自身有 20 分钟超时；这里兜底防止依赖服务卡死时占用 Runner 数小时。
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    # 后端有 5 个用例默认会静默跳过：3 个需要 CANVAS_TEST_POSTGRES_DSN（PostgreSQL 迁移、
+    # 素材字节修复、画布版本历史），2 个用 exec.LookPath("redis-server") 自起临时实例
+    # （Redis 租约、缓存白名单）。只跑 go test ./... 而不备齐这两样，这些路径永远不会被执行。
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: canvas_test
+          POSTGRES_DB: canvas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      CANVAS_TEST_POSTGRES_DSN: postgres://postgres:canvas_test@127.0.0.1:5432/canvas_test?sslmode=disable
+      # 平台侧 RLS 测试必须用非超级用户（超级用户会绕过 RLS）。
+      FLOW_TEST_PG_RLS_DSN: postgres://flow_app:flow_app_pw@127.0.0.1:5432/rls_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: npm
+          cache-dependency-path: backend/agent-runtime/pi/package-lock.json
+      - name: Install Pi Agent runtime dependencies
+        working-directory: backend/agent-runtime/pi
+        run: npm ci --omit=dev --ignore-scripts
+      - name: Install redis-server for integration tests
+        # 用例自己拉起临时 redis-server（unix socket），所以需要的是可执行文件而不是 redis 服务。
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq redis-server
+          sudo systemctl stop redis-server || true
+      - name: Create non-superuser app role (platform RLS tests)
+        run: |
+          psql "postgres://postgres:canvas_test@127.0.0.1:5432/postgres" -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE flow_app LOGIN PASSWORD 'flow_app_pw' NOSUPERUSER NOBYPASSRLS CREATEDB" \
+            -c "CREATE DATABASE rls_test OWNER flow_app"
+      - name: Check formatting
+        shell: bash
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            printf '%s\n' "$unformatted"
+            echo "::error::Go files require gofmt. Run gofmt -w on the files listed above."
+            exit 1
+          fi
+      - name: Run Go tests
+        shell: bash
+        run: |
+          set -o pipefail
+          # internal/app 约 1000 个用例串行执行，是后端检查的关键路径（本地约 2–3 分钟）。
+          # 此前每个用例构造 Service 时都会完整解压 85MB 官方插件包（约 4 秒/次，累计 7 分钟以上），
+          # 现已改为只读清单 + 进程内缓存；若该包耗时再次明显上涨，先查 newPluginRuntime。
+          go test -json -timeout=20m ./... | tee "$RUNNER_TEMP/go-tests.jsonl"
+      - name: Ensure dependency-backed tests were not skipped
+        shell: bash
+        run: |
+          python3 ../.github/scripts/test_check_dependency_tests.py
+          python3 ../.github/scripts/check-dependency-tests.py "$RUNNER_TEMP/go-tests.jsonl"
+      - name: Upload Go test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-test-timings
+          path: ${{ runner.temp }}/go-tests.jsonl
+          if-no-files-found: ignore
+
+  loom-engine:
+    name: Loom Engine flow tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: services/loom-engine
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: flow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      FLOW_TEST_PG_ADMIN_URL: postgres://postgres:flow_test@127.0.0.1:5432/postgres
+      FLOW_TEST_PG_APP_ROLE: flow_app:flow_app_pw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: npm
+          cache-dependency-path: services/loom-engine/package-lock.json
+      - name: Install PostgreSQL 17 client (pg_dump must match the server major)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Create non-superuser app role (RLS tests)
+        run: psql "$FLOW_TEST_PG_ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE flow_app LOGIN PASSWORD 'flow_app_pw' NOSUPERUSER NOBYPASSRLS CREATEDB"
+      - run: npm ci --ignore-scripts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install video cross-language fixture dependencies
+        run: |
+          sudo apt-get install -y -qq ffmpeg tesseract-ocr
+          python3 -m pip install -r ../video-knowledge/requirements.txt
+      - name: Run flow tests (PGlite + real PostgreSQL 17)
+        run: node --experimental-strip-types --test --test-concurrency=1 flow/*.test.ts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python worker tests (Telethon media keys, OCR incl. real tesseract, ASR)
+        run: |
+          sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-eng
+          python3 -m pip install -q -r workers/telethon/requirements.txt -r workers/ocr/requirements.txt pillow
+          (cd workers/telethon && python3 -m unittest test_history)
+          (cd workers/ocr && python3 -m unittest -v test_server 2>&1 | tee /tmp/ocr.log) && ! grep -q "skipped 'tesseract" /tmp/ocr.log
+          (cd workers/asr && python3 -m unittest -v test_server)
+
+  object-restore:
+    name: Object storage restore (A18)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: MinIO backup/restore round trip
+        env:
+          MINIO_ROOT_USER: ci-minio
+          MINIO_ROOT_PASSWORD: ci-minio-secret-123
+        run: |
+          docker network create a18
+          docker run -d --name minio --network a18 --user 0:0 -e MINIO_ROOT_USER -e MINIO_ROOT_PASSWORD \
+            cgr.dev/chainguard/minio:latest server /data
+          for i in $(seq 1 30); do docker run --rm --network a18 curlimages/curl:8.10.1 -sf http://minio:9000/minio/health/live && break; sleep 2; done || true
+          docker logs minio | tail -20
+          docker run --rm --network a18 -e MINIO_ROOT_USER -e MINIO_ROOT_PASSWORD \
+            -v "$PWD/deploy/flow/backup:/b:ro" --entrypoint /bin/bash bitnamilegacy/minio-client:2025.7.21 /b/objects-test.sh
+      - name: Daily backup schedule + retention (§14)
+        run: |
+          docker run -d --name pgbk --network a18 -e POSTGRES_PASSWORD=ci postgres:17-alpine
+          for i in $(seq 1 30); do docker exec pgbk pg_isready -U postgres && break; sleep 2; done
+          sleep 2
+          docker exec pgbk psql -U postgres -qc "CREATE DATABASE restore_t"
+          docker run --rm --network a18 -v "$PWD/deploy/flow/backup:/b:ro" \
+            -e DATABASE_URL=postgres://postgres:ci@pgbk/postgres -e RESTORE_URL=postgres://postgres:ci@pgbk/restore_t \
+            --entrypoint /bin/bash postgres:17-alpine /b/daily-test.sh
+      - name: Validate alert rules (promtool)
+        run: |
+          docker run --rm -v "$PWD/deploy/flow/monitoring:/m:ro" -w /m --entrypoint promtool prom/prometheus:v3.5.0 check rules alerts.yml
+          docker run --rm -v "$PWD/deploy/flow/monitoring:/m:ro" -w /m --entrypoint promtool prom/prometheus:v3.5.0 test rules alerts.test.yml
+
+  payment-plugins:
+    name: Payment plugin artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify canonical payment packages
+        env:
+          PAYMENT_PLUGIN_SMOKE_TEST: "1"
+        run: sh plugin-packages/verify-payment-packages.sh --all linux amd64
+      # 发布时 backend/Dockerfile 会在两种架构的原生 Runner 上执行 smoke。
+      # PR 仍独立验证双架构，不能因没有发布任务而遗漏 ARM64 验收。
+      - uses: docker/setup-qemu-action@v3
+        if: github.event_name == 'pull_request'
+      - uses: docker/setup-buildx-action@v3
+        if: github.event_name == 'pull_request'
+      - name: Build and execute payment packages for every image platform
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          target: payment-package-smoke
+          file: backend/Dockerfile
+          cache-from: type=gha,scope=payment-smoke
+          cache-to: type=gha,mode=max,scope=payment-smoke
+
+  web:
+    name: Web checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+      - name: Reject leftover package manager lockfiles
+        working-directory: ${{ github.workspace }}
+        run: |
+          leftover=0
+          for file in web/pnpm-lock.yaml web/package-lock.json web/yarn.lock; do
+            if [ -f "$file" ]; then
+              echo "forbidden lockfile: $file"
+              leftover=1
+            fi
+          done
+          if [ "$leftover" -ne 0 ]; then
+            echo "web installs from bun.lock only"
+            exit 1
+          fi
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Check formatting
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bun scripts/check-changed-formatting.mjs
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Lint retired Ant Design APIs
+        run: bun run lint
+      - name: Run tests
+        run: bun run test
+      # ubuntu-latest 预装 google-chrome；脚本的解析顺序已覆盖该路径，
+      # 因此不引入第三方 setup action，也不需要任何 secret。
+      - name: Previs P0 Chrome E2E
+        run: |
+          google-chrome --version || chromium --version
+          bun run test:previs:e2e

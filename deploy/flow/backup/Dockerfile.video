@@ -1,0 +1,50 @@
+# Build context: repository root. All three images MUST be operator-verified digest pins.
+# Example argument SHAPES (not usable pins): node:22-bookworm-slim@sha256:<verified-64-hex>.
+ARG NODE_IMAGE
+ARG POSTGRES_IMAGE
+ARG MC_IMAGE
+
+FROM ${NODE_IMAGE} AS dependencies
+ARG NODE_IMAGE
+RUN printf '%s' "$NODE_IMAGE" | grep -Eq '^(docker.io/library/)?node:22(\.[0-9]+){0,2}-bookworm(-slim)?@sha256:[a-f0-9]{64}$'
+WORKDIR /app
+COPY services/loom-engine/package.json services/loom-engine/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+
+FROM ${MC_IMAGE} AS minio-client
+ARG MC_IMAGE
+USER 0
+RUN printf '%s' "$MC_IMAGE" | grep -Eq '^((docker.io/)?minio/mc|quay.io/minio/mc|(docker.io/)?bitnamilegacy/minio-client):[^@]+@sha256:[a-f0-9]{64}$' \
+    && mkdir -p /mc-export && cp "$(command -v mc)" /mc-export/mc && test -x /mc-export/mc
+
+FROM ${POSTGRES_IMAGE} AS video-backup
+ARG NODE_IMAGE
+ARG POSTGRES_IMAGE
+ARG MC_IMAGE
+RUN printf '%s' "$POSTGRES_IMAGE" | grep -Eq '^(docker.io/library/)?postgres:17(\.[0-9]+){0,2}-bookworm@sha256:[a-f0-9]{64}$' \
+    && apt-get update && apt-get install -y --no-install-recommends libstdc++6 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=dependencies /usr/local/bin/node /usr/local/bin/node
+COPY --from=dependencies /app/node_modules /app/node_modules
+COPY --from=minio-client /mc-export/mc /usr/local/bin/mc
+WORKDIR /app
+COPY services/loom-engine/package.json services/loom-engine/package-lock.json ./
+COPY services/loom-engine/flow ./flow
+COPY services/loom-engine/src ./src
+COPY services/loom-engine/scripts ./scripts
+COPY deploy/flow/backup /b
+ENV VIDEO_JOURNAL_CLI=/app/flow/video-journal-cli.ts
+RUN chmod +x /b/*.sh \
+    && node --version | grep -Eq '^v22\.' \
+    && pg_dump --version | grep -Eq 'PostgreSQL\) 17\.' \
+    && pg_restore --version && psql --version && mc --version \
+    && for script in /b/*.sh; do bash -n "$script" || exit; done \
+    && node --experimental-strip-types --input-type=module -e "await import('./flow/video-journal.ts'); await import('./flow/engine.ts'); await import('./flow/video-knowledge.ts')" \
+    && mkdir -p /usr/local/share/video-backup \
+    && printf 'node_image=%s\npostgres_image=%s\nmc_image=%s\n' "$NODE_IMAGE" "$POSTGRES_IMAGE" "$MC_IMAGE" > /usr/local/share/video-backup/build-evidence.txt \
+    && node --version >> /usr/local/share/video-backup/build-evidence.txt \
+    && pg_dump --version >> /usr/local/share/video-backup/build-evidence.txt \
+    && mc --version >> /usr/local/share/video-backup/build-evidence.txt \
+    && sha256sum /usr/local/bin/node /usr/local/bin/mc package-lock.json >> /usr/local/share/video-backup/build-evidence.txt \
+    && dpkg-query -W >> /usr/local/share/video-backup/build-evidence.txt
+ENTRYPOINT ["/bin/bash", "/b/daily.sh"]

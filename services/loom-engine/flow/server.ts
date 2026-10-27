@@ -7,10 +7,17 @@ import { Engine, HttpError } from "./engine.ts";
 import { Reports } from "./reports.ts";
 import { withTenant } from "./db.ts";
 import { downloadMedia, downloadRawResponse, listDerivedJobs, getAnalysis } from "./gaps9.ts";
+import { videoKnowledgeRoutes } from "./video-knowledge-routes.ts";
+import { assertVideoRetentionJournal } from "./video-journal.ts";
+import { withVideoAccess } from "./video-access.ts";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { videoMetrics } from "./video-metrics.ts";
 
 export interface ServerConfig {
   signingKey: string;
   audience: string;
+  issuer?: string;
   /** Platform Model Gateway hook so a pushed brief wake-up can complete the window here. */
   summarize?: Reports["summarize"];
 }
@@ -52,6 +59,7 @@ function monitorBody(body: any, authorization?: { key: string; ctx: ExecutionCon
 }
 
 export function handler(engine: Engine, cfg: ServerConfig) {
+  const knowledgeRoute = videoKnowledgeRoutes(engine);
   const rp = new Reports(engine);
   rp.summarize = cfg.summarize;
   return async (req: IncomingMessage, res: ServerResponse) => {
@@ -67,10 +75,21 @@ export function handler(engine: Engine, cfg: ServerConfig) {
       }
       const auth = req.headers.authorization ?? "";
       const ctx: ExecutionContext = verify(cfg.signingKey, auth.replace(/^Bearer /, ""), cfg.audience);
+      if (cfg.issuer && ctx.iss !== cfg.issuer) throw new AuthError("invalid issuer");
       // Postgres RLS second layer: every query of this request runs with app.tenant_id = token tenant.
-      return await withTenant(ctx.tenant_id, () => route(req, res, url, ctx));
+      return await withTenant(ctx.tenant_id, async () => {
+        let videoAllowed = true;
+        try { await assertVideoRetentionJournal(engine, { tenant_id: ctx.tenant_id, workspace_id: ctx.workspace_id }); }
+        catch (e: any) {
+          if (typeof e.reason !== "string" || !e.reason.startsWith("video_journal_")) throw e;
+          videoAllowed = false;
+          if (/^\/v1\/(video|knowledge)(\/|$)/.test(url.pathname)) throw e;
+        }
+        return withVideoAccess(engine, videoAllowed, () => route(req, res, url, ctx));
+      });
     } catch (e: any) {
       if (e instanceof AuthError || e instanceof HttpError) return send(res, e.status, null, e.message, (e as any).reason);
+      if ([409, 503].includes(e.status) && typeof e.reason === "string" && e.reason.startsWith("video_journal_")) return send(res, e.status, null, "video material quarantined until deletion history is verified", e.reason);
       console.error("[loom-engine]", e);
       return send(res, 500, null, "internal error");
     }
@@ -79,12 +98,64 @@ export function handler(engine: Engine, cfg: ServerConfig) {
     {
       const p = url.pathname, m = req.method;
       let mm: RegExpMatchArray | null;
+      const knowledgeResult = await knowledgeRoute(m, url, ctx, () => readJson(req), String(req.headers["x-idempotency-key"] ?? ""));
+      if (knowledgeResult) return send(res, knowledgeResult.status, knowledgeResult.data);
+      const videoKey = () => String(req.headers["x-idempotency-key"] ?? "");
+      const serviceJob = (id: string, scope: string) => {
+        requireScope(ctx, scope);
+        if (ctx.actor.type !== "service_principal" || ctx.job_id !== id) throw Object.assign(new HttpError(403, "SCOPE_DENIED"), { reason: "SCOPE_DENIED" });
+      };
+      if (p === "/v1/video/profiles" && m === "GET") { requireScope(ctx, "intel.video.read"); return send(res, 200, await engine.video.listProfiles(ctx, url.searchParams.get("id") ?? undefined, url.searchParams.get("cursor") ?? undefined, Number(url.searchParams.get("limit")) || 100)); }
+      if (p === "/v1/video/metrics" && m === "GET") { requireScope(ctx, "intel.video.read"); return send(res, 200, await videoMetrics(engine, ctx, { from: url.searchParams.get("from") ?? undefined, to: url.searchParams.get("to") ?? undefined, profile_id: url.searchParams.get("profile_id") ?? undefined })); }
+      if (p === "/v1/video/profiles" && m === "POST") { requireScope(ctx, "intel.profiles.write"); return send(res, 201, await engine.video.saveProfile(ctx, await readJson(req))); }
+      if (p === "/v1/video/discover" && m === "POST") { requireScope(ctx, "intel.video.read"); return send(res, 202, await engine.video.discover(ctx, videoKey(), await readJson(req))); }
+      if (m === "GET" && (mm = p.match(/^\/v1\/video\/discover\/([\w-]+)$/))) { requireScope(ctx, "intel.video.read"); return send(res, 200, await engine.video.discoveryResult(ctx, mm[1], url.searchParams.get("cursor") ?? "0", Number(url.searchParams.get("limit")) || 50)); }
+      if (m === "POST" && (mm = p.match(/^\/v1\/video\/sources\/([\w-]+)\/backfill$/))) { requireScope(ctx, "intel.video.process"); const b = await readJson(req); return send(res, 202, await engine.video.discover(ctx, videoKey(), { ...b, source_id: mm[1], window: { from: b.from, to: b.to } }, true)); }
+      if (p === "/v1/video/jobs" && m === "POST") { requireScope(ctx, "intel.video.process"); return send(res, 202, await engine.video.start(ctx, videoKey(), await readJson(req))); }
+      if (p === "/v1/video/jobs" && m === "GET") { requireScope(ctx, "intel.video.read"); return send(res, 200, await engine.video.list(ctx, url.searchParams.get("cursor") ?? undefined, Number(url.searchParams.get("limit")) || 50, url.searchParams.get("state") ?? undefined)); }
+      if (p === "/v1/video/jobs/reconcile" && m === "POST") { requireScope(ctx, "intel.video.process"); return send(res, 200, await engine.video.reconcile(ctx, await readJson(req))); }
+      if (m === "PUT" && (mm = p.match(/^\/v1\/video\/jobs\/([\w-]+)\/input$/))) {
+        requireScope(ctx, "intel.video.process");
+        if (ctx.job_id !== mm[1]) throw Object.assign(new HttpError(403, "SCOPE_DENIED"), { reason: "SCOPE_DENIED" });
+        return send(res, 200, await engine.video.uploadInput(ctx, mm[1], req, Number(req.headers["content-length"]), String(req.headers["content-type"] ?? "")));
+      }
+      if (m === "GET" && (mm = p.match(/^\/v1\/video\/jobs\/([\w-]+)\/media\/([a-f0-9]{32})$/))) {
+        requireScope(ctx, "intel.video.read");
+        const media = await engine.video.mediaObject(ctx, mm[1], mm[2], req.headers.range);
+        const headers: Record<string, string> = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+        for (const name of ["content-type", "content-length", "content-range", "etag", "accept-ranges"]) { const value = media.headers.get(name); if (value) headers[name] = value; }
+        res.writeHead(media.status, headers);
+        try { await pipeline(Readable.fromWeb(media.body as any), res); } catch { res.destroy(); }
+        return;
+      }
+      if ((mm = p.match(/^\/v1\/video\/jobs\/([\w-]+)(?:\/(cancel|retry|repair|reconcile|import|artifacts|result|model-authorization|corrections))?$/))) {
+        const id = mm[1], action = mm[2];
+        if (m === "GET" && !action) { requireScope(ctx, "intel.video.read"); return send(res, 200, await engine.video.get(ctx, id)); }
+        if (m === "GET" && action === "model-authorization") { serviceJob(id, "intel.video.model"); return send(res, 200, await engine.video.modelAuthorization(ctx, id,
+          { stage_attempt: Number(url.searchParams.get("stage_attempt")), fencing_token: Number(url.searchParams.get("fencing_token")) }, url.searchParams.get("purpose") ?? "video_vision")); }
+        if (m === "GET" && (action === "artifacts" || action === "result")) { requireScope(ctx, "intel.video.read"); return send(res, 200, await engine.video.artifacts(ctx, id, url.searchParams.get("cursor") ?? "0", Number(url.searchParams.get("limit")) || 50, url.searchParams.get("kind") ?? "evidence", Number(url.searchParams.get("text_offset")) || 0, Number(url.searchParams.get("conflict_offset")) || 0, url.searchParams.get("text_field") ?? "text")); }
+        if (m === "POST" && action === "import") { serviceJob(id, "intel.video.import"); return send(res, 200, await engine.video.importManifest(ctx, id, await readJson(req))); }
+        if (m === "POST" && action === "cancel") { requireScope(ctx, "intel.video.process"); return send(res, 200, await engine.video.cancel(ctx, id, (await readJson(req)).reason)); }
+        if (m === "POST" && action === "retry") { requireScope(ctx, "intel.video.process"); return send(res, 200, await engine.video.retry(ctx, id)); }
+        if (m === "POST" && action === "repair") { requireScope(ctx, "intel.video.process"); return send(res, 202, await engine.video.repair(ctx, id, videoKey())); }
+        if (m === "POST" && action === "reconcile") { requireScope(ctx, "intel.video.process"); return send(res, 200, await engine.video.reconcile(ctx, { video_job_id: id })); }
+        if (m === "POST" && action === "corrections") { requireScope(ctx, "intel.knowledge.review"); return send(res, 201, await engine.video.correct(ctx, id, videoKey(), await readJson(req))); }
+      }
+      if (m === "GET" && (mm = p.match(/^\/v1\/video\/jobs\/([\w-]+)\/artifacts\/raw$/))) {
+        serviceJob(mm[1], "intel.video.model");
+        const obj = await engine.video.rawObject(ctx, mm[1], url.searchParams.get("object_key") ?? "",
+          { stage_attempt: Number(url.searchParams.get("stage_attempt")), fencing_token: Number(url.searchParams.get("fencing_token")) });
+        res.writeHead(200, { "content-type": obj.content_type, "content-length": obj.bytes.byteLength, "x-content-sha256": obj.sha256, "cache-control": "no-store" }); return res.end(obj.bytes);
+      }
       if (m === "GET" && p === "/v1/sources") { requireScope(ctx, "intel.sources.read"); return send(res, 200, await engine.listSources(ctx)); }
       if (m === "POST" && p === "/v1/sources") { requireScope(ctx, "intel.sources.write"); return send(res, 201, await engine.createSource(ctx, await readJson(req))); }
       if (m === "GET" && p === "/v1/schedules") { requireScope(ctx, "intel.sources.read"); return send(res, 200, await engine.listSchedules(ctx)); }
       if (m === "POST" && p === "/v1/schedules") {
         requireScope(ctx, "intel.schedules.write");
         return send(res, 201, await engine.createSchedule(ctx, `${ctx.actor.type}:${ctx.actor.id}`, ctx.policy_version, await readJson(req)));
+      }
+      if (m === "PATCH" && (mm = p.match(/^\/v1\/schedules\/([\w-]+)$/))) {
+        requireScope(ctx, "intel.schedules.write"); return send(res, 200, await engine.setScheduleEnabled(ctx, mm[1], await readJson(req)));
       }
       if (m === "GET" && p === "/v1/collection-runs") {
         requireScope(ctx, "intel.sources.read");

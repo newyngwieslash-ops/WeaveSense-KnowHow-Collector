@@ -19,12 +19,14 @@ const MonitorCanvasRunCommand = "canvas.run"
 // MonitorCanvasEventPayload is the recurring-canvas slice of Loom's
 // collection.completed event payload.
 type MonitorCanvasEventPayload struct {
-	MonitorID     string          `json:"monitor_id"`
-	MonitorVersio int64           `json:"monitor_version"`
-	CanvasID      string          `json:"canvas_id"`
-	Grant         json.RawMessage `json:"canvas_auto_run_grant"`
-	CycleComplete bool            `json:"cycle_complete"`
-	Window        struct {
+	MonitorID      string          `json:"monitor_id"`
+	MonitorVersio  int64           `json:"monitor_version"`
+	CanvasID       string          `json:"canvas_id"`
+	Grant          json.RawMessage `json:"canvas_auto_run_grant"`
+	CycleComplete  bool            `json:"cycle_complete"`
+	VideoDiscovery bool            `json:"video_discovery"`
+	KnowledgeReady bool            `json:"knowledge_ready"`
+	Window         struct {
 		ScheduledAt string `json:"scheduled_at"`
 		From        string `json:"from"`
 		To          string `json:"to"`
@@ -42,11 +44,14 @@ func ConsumeMonitorCanvasEvent(db *gorm.DB, e Event) (enqueued bool, err error) 
 	if db == nil {
 		return false, errors.New("flow: canvas auto run db not configured")
 	}
-	if e.Type != "collection.completed" || e.TenantID == "" || e.EventID == "" {
+	if (e.Type != "collection.completed" && e.Type != "video.knowledge_ready") || e.TenantID == "" || e.EventID == "" {
 		return false, nil
 	}
 	var p MonitorCanvasEventPayload
 	if json.Unmarshal(e.Payload, &p) != nil {
+		return false, nil
+	}
+	if (e.Type == "collection.completed" && p.VideoDiscovery) || (e.Type == "video.knowledge_ready" && !p.KnowledgeReady) {
 		return false, nil
 	}
 	if !p.CycleComplete || p.MonitorID == "" || p.CanvasID == "" || len(p.Grant) == 0 || p.OperationID == "" {

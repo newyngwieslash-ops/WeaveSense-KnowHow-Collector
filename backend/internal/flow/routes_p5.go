@@ -29,6 +29,7 @@ func internalServiceCtx(c *gin.Context, cfg Config) (ExecutionContext, bool) {
 // RegisterP5Routes mounts billing, org/invite, notification and the
 // engine-facing authorize/summarize endpoints.
 func RegisterP5Routes(api gin.IRouter, db *gorm.DB, cfg Config, user UserFunc, gw ModelGateway) {
+	registerVideoModelRoutes(api, db, cfg, gw)
 	billing := Billing{DB: db}
 	authed := func(c *gin.Context) (*model.User, bool) {
 		u, err := user(c)

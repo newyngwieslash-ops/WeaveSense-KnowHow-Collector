@@ -1,0 +1,38 @@
+WeaveSense video processing adapters
+
+BiliNote https://github.com/JefferyHcool/BiliNote
+Commit 90940fde4d224d0f69ad99674f4af0a1ea52d3c4; MIT; Copyright (c) 2024 Jeffery Huang.
+Reference: backend/app/utils/video_reader.py and backend/app/gpt/request_chunker.py.
+The new implementation follows the scene/time-grid/grouping and bounded-message
+organization ideas. It is rewritten around scoped immutable objects, per-task
+directories, tail preservation, cancellation, and the existing host Model Gateway.
+No BiliNote UI, Chroma/vector store, account system, scheduler, credentials,
+downloaders or PDF/export dependencies are redistributed.
+
+DTK https://github.com/Evil0ctal/Douyin_TikTok_Download_API
+Commit 3d540dbf3783449e638403b65d81c882c4a99575; Apache-2.0; Evil0ctal contributors.
+Only a protocol client is implemented here. DTK source is not vendored or packaged.
+Its own distribution, license and third-party dependency notices remain required
+when deploying that separate service. No watchlist or identity/captcha bypass is
+started or implemented by this adapter.
+
+This software's licenses do not grant rights to platform videos or their content.
+
+BiliNote MIT notice:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

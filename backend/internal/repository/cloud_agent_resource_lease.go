@@ -89,6 +89,9 @@ func uniqueSortedStrings(values []string) []string {
 }
 
 func (r *Repository) CloudAgentCanvasMutationChain(userID, runID, canvasID string) ([]model.CloudAgentCanvasMutation, error) {
+	if err := r.CheckVideoRunProjection(userID, runID); err != nil {
+		return nil, err
+	}
 	var records []model.CloudAgentCanvasMutation
 	err := r.db.Where("user_id = ? AND run_id = ? AND canvas_id = ? AND status IN ?", userID, runID, canvasID, []string{"applied", "not_undoable"}).Order("created_at, id").Find(&records).Error
 	return records, err
@@ -100,5 +103,10 @@ func (r *Repository) CloudAgentCanvasMutationChain(userID, runID, canvasID strin
 func (r *Repository) LatestCloudAgentCanvasMutationForCanvas(userID, canvasID string) (*model.CloudAgentCanvasMutation, error) {
 	var mutation model.CloudAgentCanvasMutation
 	err := r.db.Where("user_id = ? AND canvas_id = ? AND status IN ?", userID, canvasID, []string{"applied", "not_undoable"}).Order("created_at DESC, id DESC").First(&mutation).Error
+	if err == nil {
+		if err := r.CheckVideoRunProjection(userID, mutation.RunID); err != nil {
+			return nil, err
+		}
+	}
 	return &mutation, err
 }

@@ -132,6 +132,7 @@ func New(repo *repository.Repository, dataDir string) *Service {
 }
 
 func newService(repo *repository.Repository, dataDir string) *Service {
+	repo.SetVideoProjectionGuard(flow.CheckVideoConversationProjection)
 	coordinator, err := platform.NewCoordinator(repo.Dialect())
 	pluginRuntime, pluginRuntimeErr := newPluginRuntime(dataDir)
 	paymentRegistry, _ := payment.NewRegistry()

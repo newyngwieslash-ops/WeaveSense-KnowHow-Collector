@@ -53,7 +53,7 @@ export const connectorFetcher = (env: ConnectorEnv): Fetcher => async (url, sour
 };
 /** A13 failure classes: auth ⇒ pause; rate_limited/transient ⇒ backoff; permanent ⇒ record only. */
 export function classifyFailure(error: string): "auth" | "rate_limited" | "transient" | "permanent" {
-  if (/\b(401|403)\b|unauthori[sz]ed|forbidden|credential|auth_key|session (expired|revoked)/i.test(error)) return "auth";
+  if (/\b(401|403)\b|unauthori[sz]ed|forbidden|credential|auth_key|auth_required|session (expired|revoked)/i.test(error)) return "auth";
   if (/\b429\b|rate.?limit|too many requests|flood/i.test(error)) return "rate_limited";
   if (/membership_required/i.test(error)) return "auth"; // operator must (re)join the channel
   if (/\b5\d\d\b|timeout|timed out|unavailable|ECONN|ENOTFOUND|EAI_AGAIN|socket/i.test(error)) return "transient";
@@ -98,8 +98,15 @@ const defaultExtractor: Extractor = async (url) => (await import("../src/lib/ser
 
 import { HttpError } from "./errors.ts";
 import { rawItem, snippetHash, enqueueDerived, extractionCompleteness, extractionMethodFor, costEstimate, monitorExpansion, archiveRawResponse, objectStoreWriterFromEnv, embedderFromEnv, cosineSimilarity, type Embedder, type PriceHint, type ObjectStore, type ObjectStorePut, objectStoreFromEnv } from "./gaps9.ts";
-import { nextCron, checkTimezone } from "./cron.ts";
+import { nextCron, previousCron, checkTimezone } from "./cron.ts";
+import { VideoCoordinator } from "./video.ts";
+import { isVideoKind } from "./video-contract.ts";
+import { revokeVideoDependencies, applyVideoRetention } from "./video-knowledge.ts";
+import { appendVideoRetentionIntent, markVideoRetentionApplied, lockVideoRetentionTransaction, assertVideoRetentionJournal } from "./video-journal.ts";
+import { videoAccess } from "./video-access.ts";
 export { HttpError };
+
+const videoAccessSQL = (engine: Engine) => videoAccess(engine) ? VIDEO_ACCESS_SQL : "d.video_asset_id IS NULL";
 
 export const newId = (p: string) => p + randomBytes(10).toString("hex");
 
@@ -121,6 +128,13 @@ export function eventOccurredAt(it: { occurred_at?: string | null; title?: strin
 }
 const CHUNK = 1200;
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
+// Video revocation applies to legacy document APIs too, including historical revisions after a restore.
+const VIDEO_ACCESS_SQL = `d.video_ready AND d.video_revoked_at IS NULL AND (d.video_asset_id IS NULL OR d.video_text_access_expires_at>now() OR
+  (d.video_text_access_expires_at IS NULL AND NOT EXISTS(SELECT 1 FROM flow_video_jobs policy_job WHERE policy_job.tenant_id=d.tenant_id AND policy_job.workspace_id=d.workspace_id AND policy_job.document_id=d.id))) AND (d.video_asset_id IS NULL OR (
+  EXISTS(SELECT 1 FROM flow_video_assets va WHERE va.id=d.video_asset_id AND va.tenant_id=d.tenant_id AND va.workspace_id=d.workspace_id AND va.revoked_at IS NULL)
+  AND EXISTS(SELECT 1 FROM flow_sources vs WHERE vs.id=d.source_id AND vs.tenant_id=d.tenant_id AND vs.workspace_id=d.workspace_id AND vs.status<>'revoked'
+    AND (vs.config->>'authorization_expires_at' IS NULL OR (vs.config->>'authorization_expires_at')::timestamptz>now()))
+  AND NOT EXISTS(SELECT 1 FROM flow_video_deletion_tombstones dt WHERE dt.tenant_id=d.tenant_id AND dt.workspace_id=d.workspace_id AND dt.document_id=d.id)))`;
 type Scope = Pick<ExecutionContext, "tenant_id" | "workspace_id">;
 
 export interface CanvasAutoRunGrant {
@@ -197,6 +211,7 @@ function monitorCanvasBinding(s: Scope, actor: string, cur: any, next: any, expa
 }
 
 export class Engine {
+  video: VideoCoordinator;
   db: Db; fetcher: Fetcher; now: () => Date; extractor: Extractor = defaultExtractor;
   articleReader: ArticleReader = defaultArticleReader; subtitles: SubtitleClient = subtitleClient(); ocr: OcrClient = ocrClient(); asr: AsrClient = asrClient();
   connectorEnv: ConnectorEnv = connectorEnvFromProcess();
@@ -221,12 +236,15 @@ export class Engine {
   tenantMaxConcurrency = Math.max(1, Number(process.env.LOOM_TENANT_MAX_CONCURRENCY) || 4);
   constructor(db: Db, fetcher: Fetcher = defaultFetcher, now: () => Date = () => new Date()) {
     this.db = db; this.fetcher = fetcher; this.now = now;
+    this.video = new VideoCoordinator(this);
   }
 
   async createSource(s: Scope, input: { url?: string; title?: string; kind?: string; config?: any }) {
     const kind = input.kind ?? "rss";
     let url: string; let config: any = {};
-    if (kind === "telegram") {
+    if (isVideoKind(kind)) {
+      ({ url, config } = await this.video.validateSource(s, input));
+    } else if (kind === "telegram") {
       const handle = normalizeHandle(input.config?.handle ?? input.url ?? "");
       if (!/^[A-Za-z0-9_]{4,64}$/.test(handle)) throw new HttpError(400, "telegram: channel handle required");
       url = `https://t.me/s/${handle}`; config = { handle };
@@ -251,9 +269,32 @@ export class Engine {
 
   /** Revokes a source: scheduled windows stop (scheduler requires active), queued jobs are cancelled, running ones fenced out. */
   async revokeSource(s: Scope, id: string, reason = "revoked") {
+    const source = (await this.db.query(`SELECT kind FROM flow_sources WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [s.tenant_id, s.workspace_id, id])).rows[0];
+    if (source && isVideoKind(source.kind)) {
+      await assertVideoRetentionJournal(this, s);
+      const current = (await this.db.query(`SELECT status FROM flow_sources WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [s.tenant_id, s.workspace_id, id])).rows[0];
+      if (current?.status === "revoked") return { source_id: id, status: "revoked", cancelled_runs: 0 };
+      const requestHash = sha(JSON.stringify([s.tenant_id, s.workspace_id, id, "source.revoke"]));
+      const record = await appendVideoRetentionIntent(this, { version: 1, event_id: `vjr_${requestHash}`, tenant_id: s.tenant_id, workspace_id: s.workspace_id, source_id: id, action: "revoked",
+        request_hash: requestHash, actor_hash: sha(JSON.stringify((s as any).actor ?? { type: "service_principal", id: "loom-engine" })), requested_at: this.now().toISOString() });
+      return this.db.tx(async q => {
+        await lockVideoRetentionTransaction(q);
+        await applyVideoRetention(this, q, s, { action: "revoked", source_id: id });
+        await q.query(`UPDATE flow_sources SET revoked_reason=$4 WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [s.tenant_id, s.workspace_id, id, reason.slice(0, 200)]);
+        const c = await q.query(`UPDATE flow_collection_runs SET status='cancelled',finished_at=now(),lease_owner=NULL,fencing_token=fencing_token+1,error='source revoked'
+          WHERE tenant_id=$1 AND workspace_id=$2 AND source_id=$3 AND status IN ('queued','leased','running','retry_wait','cancel_requested')`, [s.tenant_id, s.workspace_id, id]);
+        await markVideoRetentionApplied(q, record);
+        return { source_id: id, status: "revoked", cancelled_runs: affected(c) };
+      });
+    }
     return this.db.tx(async (q) => {
       const r = await q.query(`UPDATE flow_sources SET status='revoked', revoked_reason=$4 WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 RETURNING id`, [s.tenant_id, s.workspace_id, id, reason.slice(0, 200)]);
       if (!r.rows[0]) throw new HttpError(404, "source not found");
+      const videoDocs = (await q.query(`SELECT id FROM flow_documents WHERE tenant_id=$1 AND workspace_id=$2 AND source_id=$3 AND video_asset_id IS NOT NULL`, [s.tenant_id, s.workspace_id, id])).rows;
+      await revokeVideoDependencies(q, s, videoDocs.map((d: any) => d.id), reason, false);
+      await q.query(`UPDATE flow_video_jobs SET state='cancelled',error='{"code":"AUTH_REQUIRED"}'::jsonb WHERE tenant_id=$1 AND workspace_id=$2 AND source_id=$3 AND state NOT IN ('completed','completed_with_gaps','cancelled')`, [s.tenant_id, s.workspace_id, id]);
+      await q.query(`UPDATE flow_video_stages SET state='cancelled',fencing_token=fencing_token+1,lease_owner=NULL WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id IN (SELECT id FROM flow_video_jobs WHERE tenant_id=$1 AND workspace_id=$2 AND source_id=$3 AND state='cancelled')`, [s.tenant_id, s.workspace_id, id]);
+      await q.query(`UPDATE flow_video_objects SET state='delete_pending' WHERE tenant_id=$1 AND workspace_id=$2 AND state='accepted' AND video_job_id IN (SELECT id FROM flow_video_jobs WHERE tenant_id=$1 AND workspace_id=$2 AND source_id=$3)`, [s.tenant_id, s.workspace_id, id]);
       const c = await q.query(`UPDATE flow_collection_runs SET status='cancelled', finished_at=now(), lease_owner=NULL, fencing_token=fencing_token+1, error='source revoked'
           WHERE tenant_id=$1 AND source_id=$2 AND status IN ('queued','leased','running','retry_wait','cancel_requested')`, [s.tenant_id, id]);
       return { source_id: id, status: "revoked", cancelled_runs: affected(c) };
@@ -268,13 +309,14 @@ export class Engine {
   /** On-demand main-text extraction for a document URL; a changed text becomes a new revision (old citations keep theirs). */
   private async currentDocument(s: Scope, id: string) {
     const d = (await this.db.query(`SELECT d.*, r.content_hash, r.body FROM flow_documents d JOIN flow_document_revisions r ON r.document_id=d.id AND r.revision=d.current_revision
-        WHERE d.tenant_id=$1 AND d.workspace_id=$2 AND d.id=$3`, [s.tenant_id, s.workspace_id, id])).rows[0];
+        WHERE d.tenant_id=$1 AND d.workspace_id=$2 AND d.id=$3 AND ${videoAccessSQL(this)}`, [s.tenant_id, s.workspace_id, id])).rows[0];
     if (!d) throw new HttpError(404, "document not found");
     return d;
   }
 
   /** Writes title+text as a new revision (old revisions kept) and re-indexes; unchanged content is a no-op. */
   private async addRevision(d: any, title: string, text: string, tag: string, extra: Record<string, unknown> = {}) {
+    if (d.video_asset_id) throw new HttpError(409, "VIDEO_IMMUTABLE_USE_CORRECTION");
     const hash = sha(`${title}\n${text}`);
     if (hash === d.content_hash) return { document_id: d.id, revision: d.current_revision, changed: false, chars: text.length, ...extra };
     return this.db.tx(async (q) => {
@@ -467,7 +509,7 @@ export class Engine {
   }
 
   async listSources(s: Scope) {
-    return (await this.db.query(`SELECT * FROM flow_sources WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY created_at`, [s.tenant_id, s.workspace_id])).rows;
+    return (await this.db.query(`SELECT * FROM flow_sources WHERE tenant_id=$1 AND workspace_id=$2 AND ($3 OR kind NOT IN ('bilibili','douyin')) ORDER BY created_at`, [s.tenant_id, s.workspace_id, videoAccess(this)])).rows;
   }
 
   /** Sources with health (intel_list_sources): status, failures, backoff, last run and cursor position. */
@@ -477,7 +519,7 @@ export class Engine {
         (SELECT row_to_json(x) FROM (SELECT r.id AS run_id, r.status, r.items_new, r.items_revised, r.error, r.finished_at FROM flow_collection_runs r
            WHERE r.tenant_id=s.tenant_id AND r.source_id=s.id ORDER BY r.created_at DESC LIMIT 1) x) AS last_run
         FROM flow_sources s LEFT JOIN flow_source_cursors c ON c.source_id=s.id AND c.tenant_id=s.tenant_id
-        WHERE s.tenant_id=$1 AND s.workspace_id=$2 ORDER BY s.created_at`, [s.tenant_id, s.workspace_id]);
+        WHERE s.tenant_id=$1 AND s.workspace_id=$2 AND ($3 OR s.kind NOT IN ('bilibili','douyin')) ORDER BY s.created_at`, [s.tenant_id, s.workspace_id, videoAccess(this)]);
     const now = this.now().getTime();
     return r.rows.map((x: any) => {
       const lr = typeof x.last_run === "string" ? JSON.parse(x.last_run) : x.last_run;
@@ -501,10 +543,11 @@ export class Engine {
       // Only connector-neutral settings are editable; the identity (handle/feed/url) needs a new source.
       const patchCfg: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(o.config ?? {})) {
-        if (["handle", "gateway_source_id"].includes(k)) throw new HttpError(400, `config.${k} cannot change; create a new source`);
+        if (["handle", "gateway_source_id"].includes(k) || (isVideoKind(cur.kind) && ["source_type", "native_id", "author_id", "part_id"].includes(k))) throw new HttpError(400, `config.${k} cannot change; create a new source`);
         patchCfg[k] = v;
       }
       const next = { title: o.title ?? cur.title, status: o.status ?? cur.status, config: { ...cfg, ...patchCfg } };
+      if (isVideoKind(cur.kind)) next.config = (await this.video.validateSource(s, { kind: cur.kind, url: cur.url, config: next.config }, q)).config;
       const same = next.title === cur.title && next.status === cur.status && JSON.stringify(next.config) === JSON.stringify(cfg);
       if (Number(cur.revision) !== exp) {
         // Same change already applied at expected+1 ⇒ replay; anything else is a conflict.
@@ -528,7 +571,7 @@ export class Engine {
 
   /** Revision list of a document (newest first) with evidence counts. */
   async listRevisions(s: Scope, docId: string) {
-    const d = (await this.db.query(`SELECT id, current_revision FROM flow_documents WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [s.tenant_id, s.workspace_id, docId])).rows[0];
+    const d = (await this.db.query(`SELECT d.id, d.current_revision FROM flow_documents d WHERE d.tenant_id=$1 AND d.workspace_id=$2 AND d.id=$3 AND ${videoAccessSQL(this)}`, [s.tenant_id, s.workspace_id, docId])).rows[0];
     if (!d) throw new HttpError(404, "document not found");
     const r = await this.db.query(`SELECT r.revision, r.title, r.content_hash, r.created_at AS collected_at, r.collected_by_run, length(r.body) AS chars,
         (SELECT count(*)::int FROM flow_evidence e WHERE e.tenant_id=r.tenant_id AND e.document_id=r.document_id AND e.revision=r.revision) AS evidence_count
@@ -565,7 +608,7 @@ export class Engine {
 
   private async ownedSources(q: Q, s: Scope, ids: string[]) {
     if (!ids.length) throw new HttpError(400, "source_ids required");
-    const r = await q.query(`SELECT id, kind, title, url FROM flow_sources WHERE tenant_id=$1 AND workspace_id=$2 AND id = ANY($3::text[]) ORDER BY id`, [s.tenant_id, s.workspace_id, ids]);
+    const r = await q.query(`SELECT id, kind, title, url, config FROM flow_sources WHERE tenant_id=$1 AND workspace_id=$2 AND id = ANY($3::text[]) ORDER BY id`, [s.tenant_id, s.workspace_id, ids]);
     // Foreign or guessed IDs are indistinguishable from missing ones.
     if (r.rows.length !== new Set(ids).size) throw new HttpError(404, "source not found");
     return r.rows;
@@ -582,13 +625,16 @@ export class Engine {
         if (prior.rows[0].request_hash !== hash) throw new HttpError(409, "idempotency key reused with different parameters");
         return { operation_id: prior.rows[0].operation_id, job_ids: prior.rows.map((r: any) => r.id), replayed: true };
       }
-      await this.ownedSources(q, s, ids);
+      const sourceRows = await this.ownedSources(q, s, ids);
       const op = newId("op_");
       const jobs: string[] = [];
       for (const sid of ids) {
         const job = newId("job_");
-        await q.query(`INSERT INTO flow_collection_runs (id, operation_id, tenant_id, workspace_id, source_id, idempotency_key, request_hash)
-                       VALUES ($1,$2,$3,$4,$5,$6,$7)`, [job, op, s.tenant_id, s.workspace_id, sid, idemKey, hash]);
+        const src = sourceRows.find((x: any) => x.id === sid);
+        const context = s as ExecutionContext;
+        await q.query(`INSERT INTO flow_collection_runs (id, operation_id, tenant_id, workspace_id, source_id, idempotency_key, request_hash,video_source_config,video_grant_actor,video_policy_version)
+                       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [job, op, s.tenant_id, s.workspace_id, sid, idemKey, hash, isVideoKind(src.kind) ? JSON.stringify(src.config) : null,
+                       context.actor ? `${context.actor.type}:${context.actor.id}` : null, context.policy_version ?? null]);
         jobs.push(job);
       }
       await this.emit(q, s, op, jobs[0], "collection.accepted", { job_ids: jobs });
@@ -628,6 +674,23 @@ export class Engine {
     });
   }
 
+  /** Narrow CAS enable/disable: never changes cadence or silently expands a monitor grant. */
+  async setScheduleEnabled(s: Scope, id: string, input: { enabled: boolean; expected_revision: number }) {
+    if (typeof input.enabled !== "boolean" || !Number.isSafeInteger(input.expected_revision) || input.expected_revision < 1) throw new HttpError(400, "invalid schedule update");
+    return this.db.tx(async q => {
+      const schedule = (await q.query(`SELECT * FROM flow_schedules WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 FOR UPDATE`, [s.tenant_id, s.workspace_id, id])).rows[0];
+      if (!schedule) throw new HttpError(404, "schedule not found");
+      if (schedule.revision !== input.expected_revision) throw new HttpError(409, "schedule changed concurrently");
+      if ((await q.query(`SELECT id FROM flow_monitors WHERE tenant_id=$1 AND workspace_id=$2 AND schedule_id=$3`, [s.tenant_id, s.workspace_id, id])).rows.length) throw new HttpError(409, "MONITOR_OWNS_SCHEDULE");
+      if (input.enabled) {
+        await this.ownedSources(q, s, schedule.source_ids);
+        if (this.authorize && !(await this.authorize(schedule, "intel.collect"))) throw new HttpError(403, "AUTH_REQUIRED");
+      }
+      return (await q.query(`UPDATE flow_schedules SET enabled=$4,revision=revision+1,state=$5,disabled_reason=$6 WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 RETURNING *`,
+        [s.tenant_id, s.workspace_id, id, input.enabled, input.enabled ? "active" : "disabled", input.enabled ? null : "operator_paused"])).rows[0];
+    });
+  }
+
   /**
    * Due windows of a schedule at `now` and the next fire time after the last one.
    * misfire_policy: coalesce (default) → one catch-up run for the latest missed window;
@@ -660,7 +723,7 @@ export class Engine {
   }
 
   async listSchedules(s: Scope) {
-    return (await this.db.query(`SELECT * FROM flow_schedules WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY created_at`, [s.tenant_id, s.workspace_id])).rows;
+    return (await this.db.query(`SELECT sc.*,m.id AS monitor_id FROM flow_schedules sc LEFT JOIN flow_monitors m ON m.schedule_id=sc.id AND m.tenant_id=sc.tenant_id AND m.workspace_id=sc.workspace_id WHERE sc.tenant_id=$1 AND sc.workspace_id=$2 ORDER BY sc.created_at`, [s.tenant_id, s.workspace_id])).rows;
   }
 
   private async recordMonitorHit(q: Q, run: any, cycle: any, sourceId: string, documentId: string, revision: number, text: string) {
@@ -739,6 +802,7 @@ export class Engine {
         const { run: windows, next } = this.dueWindows(sc, now);
         for (const w of windows) {
           const scheduledAt = w.toISOString();
+          const windowSeconds = sc.kind === "cron" ? Math.round((w.getTime() - previousCron(sc.cron, sc.timezone, w).getTime()) / 1000) : sc.interval_seconds;
           const key = `${sc.tenant_id}:${sc.id}:${scheduledAt}`;
           // A budgeted window without a reservation is not admitted (fail closed).
           if (this.budget && Number(sc.budget_micro_per_window) > 0 && !reservations.has(key)) continue;
@@ -749,11 +813,12 @@ export class Engine {
             monitor_id, monitor_version, keywords, canvas_id, canvas_auto_run_grant, interval_seconds, timezone)
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT DO NOTHING`,
             [sc.tenant_id, sc.workspace_id, op, sc.id, scheduledAt, sc.source_ids, monitor?.id ?? null, monitor?.version ?? null,
-             monitor?.keywords ?? [], monitor?.canvas_id ?? null, monitor?.canvas_auto_run_grant == null ? null : JSON.stringify(monitor.canvas_auto_run_grant), sc.interval_seconds, sc.timezone]);
+             monitor?.keywords ?? [], monitor?.canvas_id ?? null, monitor?.canvas_auto_run_grant == null ? null : JSON.stringify(monitor.canvas_auto_run_grant), windowSeconds, sc.timezone]);
           for (const sid of sc.source_ids as string[]) {
-            const r = await q.query(`INSERT INTO flow_collection_runs (id, operation_id, tenant_id, workspace_id, source_id, idempotency_key, request_hash, schedule_id, scheduled_at, budget_reservation_id)
-               SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$11 WHERE EXISTS (SELECT 1 FROM flow_sources WHERE id=$5 AND tenant_id=$3 AND status='active' AND (backoff_until IS NULL OR backoff_until <= $10))
-               ON CONFLICT DO NOTHING`, [newId("job_"), op, sc.tenant_id, sc.workspace_id, sid, key, sha(key), sc.id, scheduledAt, now.toISOString(), reservations.get(key) ?? null]);
+            const r = await q.query(`INSERT INTO flow_collection_runs (id, operation_id, tenant_id, workspace_id, source_id, idempotency_key, request_hash, schedule_id, scheduled_at, budget_reservation_id,video_source_config,video_grant_actor,video_policy_version)
+               SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$11,config,$12,$13 FROM flow_sources WHERE id=$5 AND tenant_id=$3 AND workspace_id=$4 AND status='active' AND (backoff_until IS NULL OR backoff_until <= $10) AND ($14 OR kind NOT IN ('bilibili','douyin'))
+               ON CONFLICT DO NOTHING`, [newId("job_"), op, sc.tenant_id, sc.workspace_id, sid, key, sha(key), sc.id, scheduledAt, now.toISOString(), reservations.get(key) ?? null, sc.grant_actor, sc.policy_version,
+                 videoAccess(this) && this.video.enabled && (!(process.env.FLOW_VIDEO_WORKSPACES ?? "").trim() || (process.env.FLOW_VIDEO_WORKSPACES ?? "").split(",").map(x => x.trim()).includes(sc.workspace_id))]);
             created += affected(r);
           }
         }
@@ -804,6 +869,7 @@ export class Engine {
    */
   async claim(owner: string, leaseMs = 60_000) {
     const now = this.now();
+    const videoWorkspaces = (process.env.FLOW_VIDEO_WORKSPACES ?? "").split(",").map(x => x.trim()).filter(Boolean);
     return this.db.tx(async (q) => {
       await q.query(`UPDATE flow_collection_runs SET status='cancelled', finished_at=$1, lease_owner=NULL, fencing_token=fencing_token+1
           WHERE status='cancel_requested' AND (lease_expires_at IS NULL OR lease_expires_at < $1)`, [now.toISOString()]);
@@ -814,7 +880,8 @@ export class Engine {
           SELECT r.id FROM flow_collection_runs r LEFT JOIN live l ON l.tenant_id=r.tenant_id LEFT JOIN flow_tenant_limits t ON t.tenant_id=r.tenant_id
           WHERE (r.status='queued' OR (r.status='retry_wait' AND r.retry_at <= $1) OR (r.status IN ('leased','running') AND r.lease_expires_at < $1))
             AND coalesce(l.n,0) < coalesce(t.max_concurrent_jobs, $2)
-          ORDER BY coalesce(l.n,0), r.created_at, r.id LIMIT 20`, [now.toISOString(), this.tenantMaxConcurrency]);
+            AND (NOT EXISTS(SELECT 1 FROM flow_sources vs WHERE vs.id=r.source_id AND vs.tenant_id=r.tenant_id AND vs.workspace_id=r.workspace_id AND vs.kind IN ('bilibili','douyin')) OR ($3 AND ($4::text[] IS NULL OR r.workspace_id=ANY($4::text[]))))
+          ORDER BY coalesce(l.n,0), r.created_at, r.id LIMIT 20`, [now.toISOString(), this.tenantMaxConcurrency, videoAccess(this) && this.video.enabled, videoWorkspaces.length ? videoWorkspaces : null]);
       let r: any = { rows: [] };
       for (const c of cand.rows as any[]) {
         r = await q.query(`SELECT id FROM flow_collection_runs WHERE id=$1 AND (status='queued' OR (status='retry_wait' AND retry_at <= $2) OR (status IN ('leased','running') AND lease_expires_at < $2))
@@ -882,6 +949,10 @@ export class Engine {
     if (hb === "stale") throw new HttpError(409, "stale lease (fencing token mismatch)");
     const src = (await this.db.query(`SELECT * FROM flow_sources WHERE id=$1 AND tenant_id=$2`, [run.source_id, run.tenant_id])).rows[0];
     if (!src || src.status !== "active") return this.fail(run, "source revoked");
+    if (isVideoKind(src.kind)) {
+      try { return await this.video.executeDiscovery(run, src); }
+      catch (e: any) { if (e.reason === "STALE_FENCE") throw e; return this.fail(run, e.reason ?? String(e?.message ?? e)); }
+    }
     const cursor = (await this.db.query(`SELECT last_external_id, feed_etag, feed_last_modified, feed_validator_identity FROM flow_source_cursors WHERE source_id=$1 AND tenant_id=$2`, [src.id, run.tenant_id])).rows[0];
     const feedValidators = cursor?.feed_validator_identity ? { etag: cursor.feed_etag ?? "", last_modified: cursor.feed_last_modified ?? "", identity: cursor.feed_validator_identity } : null;
     let items: ConnectorItem[]; let meta: { collector: string; provider?: string; mode: string } = { collector: "rss", mode: "live" };
@@ -1051,15 +1122,23 @@ export class Engine {
   }
 
   /** Splits a revision into ~CHUNK chars windows (paragraph aware) and indexes them for FTS. */
-  async indexChunks(q: Q, run: Scope, sourceId: string, docId: string, rev: number, text: string, pub: string | null) {
+  chunkText(text: string) {
+    const chunks: { chunk_index: number; char_start: number; char_end: number; text: string }[] = [];
     let start = 0, i = 0;
     while (start < text.length) {
       let end = Math.min(text.length, start + CHUNK);
       if (end < text.length) { const br = text.lastIndexOf("\n", end); if (br > start + CHUNK / 2) end = br + 1; }
+      if (end < text.length && text.charCodeAt(end) >= 0xDC00 && text.charCodeAt(end) <= 0xDFFF && text.charCodeAt(end - 1) >= 0xD800 && text.charCodeAt(end - 1) <= 0xDBFF) end--;
       const piece = text.slice(start, end);
-      await q.query(`INSERT INTO flow_document_chunks (document_id, revision, chunk_index, tenant_id, workspace_id, source_id, char_start, char_end, text, published_at, tsv)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, to_tsvector('simple', $9))`, [docId, rev, i++, run.tenant_id, run.workspace_id, sourceId, start, end, piece, pub]);
+      chunks.push({ chunk_index: i++, char_start: start, char_end: end, text: piece });
       start = end;
+    }
+    return chunks;
+  }
+  async indexChunks(q: Q, run: Scope, sourceId: string, docId: string, rev: number, text: string, pub: string | null) {
+    for (const chunk of this.chunkText(text)) {
+      await q.query(`INSERT INTO flow_document_chunks (document_id, revision, chunk_index, tenant_id, workspace_id, source_id, char_start, char_end, text, published_at, tsv)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, to_tsvector('simple', $9))`, [docId, rev, chunk.chunk_index, run.tenant_id, run.workspace_id, sourceId, chunk.char_start, chunk.char_end, chunk.text, pub]);
     }
   }
 
@@ -1076,7 +1155,7 @@ export class Engine {
       const r = await this.db.query(`SELECT c.document_id, c.revision, c.chunk_index, c.char_start, c.char_end, c.source_id, c.published_at, d.title, d.url,
             (SELECT max(ts_rank(c.tsv, plainto_tsquery('simple', v))) FROM unnest($3::text[]) v) AS rank, left(c.text, 300) AS snippet
           FROM flow_document_chunks c JOIN flow_documents d ON d.id=c.document_id AND d.current_revision=c.revision
-          WHERE c.tenant_id=$1 AND c.workspace_id=$2 AND (EXISTS (SELECT 1 FROM unnest($3::text[]) v WHERE c.tsv @@ plainto_tsquery('simple', v))
+          WHERE c.tenant_id=$1 AND c.workspace_id=$2 AND ${videoAccessSQL(this)} AND (EXISTS (SELECT 1 FROM unnest($3::text[]) v WHERE c.tsv @@ plainto_tsquery('simple', v))
             OR EXISTS (SELECT 1 FROM unnest($9::text[]) v WHERE c.text ILIKE '%'||v||'%'))
             AND ($4::text[] IS NULL OR c.source_id = ANY($4::text[]))
             AND ($5::timestamptz IS NULL OR c.published_at >= $5) AND ($6::timestamptz IS NULL OR c.published_at < $6)
@@ -1087,7 +1166,7 @@ export class Engine {
     const ftsRows = (await this.db.query(`SELECT c.document_id, c.revision, c.chunk_index, c.char_start, c.char_end, c.source_id, c.published_at, d.title, d.url,
           (SELECT max(ts_rank(c.tsv, plainto_tsquery('simple', v))) FROM unnest($3::text[]) v) AS rank, left(c.text, 300) AS snippet
         FROM flow_document_chunks c JOIN flow_documents d ON d.id=c.document_id AND d.current_revision=c.revision
-        WHERE c.tenant_id=$1 AND c.workspace_id=$2 AND (EXISTS (SELECT 1 FROM unnest($3::text[]) v WHERE c.tsv @@ plainto_tsquery('simple', v))
+        WHERE c.tenant_id=$1 AND c.workspace_id=$2 AND ${videoAccessSQL(this)} AND (EXISTS (SELECT 1 FROM unnest($3::text[]) v WHERE c.tsv @@ plainto_tsquery('simple', v))
           OR EXISTS (SELECT 1 FROM unnest($7::text[]) v WHERE c.text ILIKE '%'||v||'%'))
           AND ($4::text[] IS NULL OR c.source_id = ANY($4::text[]))
           AND ($5::timestamptz IS NULL OR c.published_at >= $5) AND ($6::timestamptz IS NULL OR c.published_at < $6)
@@ -1099,7 +1178,7 @@ export class Engine {
         FROM flow_document_embeddings e
         JOIN flow_documents d ON d.id=e.document_id AND d.current_revision=e.revision AND d.tenant_id=e.tenant_id
         JOIN flow_document_chunks c ON c.document_id=e.document_id AND c.revision=e.revision AND c.chunk_index=e.chunk_index AND c.tenant_id=e.tenant_id
-        WHERE e.tenant_id=$1 AND e.workspace_id=$2 AND e.provider=$3 AND e.dims=$4
+        WHERE e.tenant_id=$1 AND e.workspace_id=$2 AND e.provider=$3 AND e.dims=$4 AND ${videoAccessSQL(this)}
           AND ($5::text[] IS NULL OR c.source_id = ANY($5::text[]))
           AND ($6::timestamptz IS NULL OR c.published_at >= $6) AND ($7::timestamptz IS NULL OR c.published_at < $7)
         LIMIT 500`,
@@ -1143,7 +1222,7 @@ export class Engine {
 
   /** Chunked read with coverage info so the agent knows what it has not seen. */
   async readDocument(s: Scope, o: { document_id: string; revision?: number; offset?: number; max_chars?: number }) {
-    const d = (await this.db.query(`SELECT * FROM flow_documents WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [s.tenant_id, s.workspace_id, o.document_id])).rows[0];
+    const d = (await this.db.query(`SELECT d.*,s.kind AS source_kind FROM flow_documents d JOIN flow_sources s ON s.id=d.source_id AND s.tenant_id=d.tenant_id AND s.workspace_id=d.workspace_id WHERE d.tenant_id=$1 AND d.workspace_id=$2 AND d.id=$3 AND ${videoAccessSQL(this)}`, [s.tenant_id, s.workspace_id, o.document_id])).rows[0];
     if (!d) throw new HttpError(404, "document not found");
     const rev = Number(o.revision) || d.current_revision;
     const r = (await this.db.query(`SELECT title, body FROM flow_document_revisions WHERE document_id=$1 AND revision=$2 AND tenant_id=$3`, [d.id, rev, s.tenant_id])).rows[0];
@@ -1155,7 +1234,7 @@ export class Engine {
     if (splitsPair(end)) end--;
     if (end === off && off < full.length) throw new HttpError(400, "max_chars cannot split a Unicode character");
     const text = full.slice(off, end);
-    return { document_id: d.id, revision: rev, title: d.title, url: d.url, offset: off, text,
+    return { document_id: d.id, document_ids: [d.id], video_derived: !!d.video_asset_id, source_kind: d.source_kind, revision: rev, title: d.title, url: d.url, offset: off, text,
       times: { published_at: d.published_at, event_occurred_at: d.event_occurred_at ?? null, event_occurred_at_source: d.event_occurred_at_source ?? null, collected_at: d.created_at },
       coverage: { total_chars: full.length, returned_chars: text.length, truncated: off + text.length < full.length, next_offset: off + text.length < full.length ? off + text.length : null } };
   }
@@ -1292,9 +1371,12 @@ export class Engine {
 
   /** Cancels queued jobs immediately; running jobs are flagged and fenced out on commit. */
   async cancelOperation(s: Scope, op: string) {
-    return this.db.tx(async (q) => {
+    const result = await this.db.tx(async (q) => {
       const r = await q.query(`SELECT id, status FROM flow_collection_runs WHERE tenant_id=$1 AND workspace_id=$2 AND operation_id=$3 FOR UPDATE`, [s.tenant_id, s.workspace_id, op]);
-      if (!r.rows.length) throw new HttpError(404, "operation not found");
+      if (!r.rows.length) {
+        if (!(await q.query(`SELECT 1 FROM flow_video_operation_jobs WHERE tenant_id=$1 AND workspace_id=$2 AND operation_id=$3`, [s.tenant_id, s.workspace_id, op])).rows.length) throw new HttpError(404, "operation not found");
+        return { operation_id: op, cancelled: 0, cancel_requested: 0 };
+      }
       // Not yet owned by a worker → cancelled at once (fencing bumped so a late claim cannot run it).
       const now1 = await q.query(`UPDATE flow_collection_runs SET status='cancelled', finished_at=now(), lease_owner=NULL, fencing_token=fencing_token+1
           WHERE operation_id=$1 AND tenant_id=$2 AND status IN ('queued','retry_wait')`, [op, s.tenant_id]);
@@ -1305,6 +1387,10 @@ export class Engine {
       if (cancelled || cancel_requested) await this.emit(q, s, op, r.rows[0].id, cancel_requested ? "operation.cancel_requested" : "operation.cancelled", { cancelled, cancel_requested });
       return { operation_id: op, cancelled: cancelled + cancel_requested, cancel_requested };
     });
+    const video = (await this.db.query(`SELECT j.id FROM flow_video_operation_jobs x JOIN flow_video_jobs j ON j.id=x.video_job_id AND j.tenant_id=x.tenant_id AND j.workspace_id=x.workspace_id
+      WHERE x.tenant_id=$1 AND x.workspace_id=$2 AND x.operation_id=$3 AND j.state NOT IN ('completed','completed_with_gaps')`, [s.tenant_id, s.workspace_id, op])).rows;
+    for (const job of video) await this.video.cancel(s, job.id, "operation_cancelled");
+    return { ...result, video_jobs_cancelled: video.length };
   }
 
   /** Exact UTF-16 spans only. Receipt lookup is by scoped idempotency key, not a recent-list scan. */
@@ -1313,7 +1399,7 @@ export class Engine {
     return this.db.tx(async (q) => {
       let created = 0; const receipts: any[] = [];
       for (const [i, it] of o.items.entries()) {
-        const d = (await q.query(`SELECT current_revision, url FROM flow_documents WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [s.tenant_id, s.workspace_id, it.document_id])).rows[0];
+        const d = (await q.query(`SELECT d.current_revision, d.url FROM flow_documents d WHERE d.tenant_id=$1 AND d.workspace_id=$2 AND d.id=$3 AND ${videoAccessSQL(this)}`, [s.tenant_id, s.workspace_id, it.document_id])).rows[0];
         if (!d) throw new HttpError(404, "document not found");
         const rev = it.revision ?? d.current_revision, start = it.char_start ?? 0, end = it.char_end;
         const quote = it.quote;
@@ -1336,7 +1422,10 @@ export class Engine {
   }
 
   async listEvidence(s: Scope, documentId?: string) {
-    return (await this.db.query(`SELECT * FROM flow_evidence WHERE tenant_id=$1 AND workspace_id=$2 AND ($3::text IS NULL OR document_id=$3) ORDER BY created_at DESC LIMIT 200`,
+    return (await this.db.query(`SELECT e.*, t.start_ms,t.end_ms,t.frame_ref,t.alignment_method,t.media_sha256 FROM flow_evidence e
+      JOIN flow_documents d ON d.id=e.document_id AND d.tenant_id=e.tenant_id AND d.workspace_id=e.workspace_id
+      LEFT JOIN flow_video_temporal_evidence t ON t.evidence_id=e.id AND t.tenant_id=e.tenant_id AND t.workspace_id=e.workspace_id
+      WHERE e.tenant_id=$1 AND e.workspace_id=$2 AND ${videoAccessSQL(this)} AND ($3::text IS NULL OR e.document_id=$3) ORDER BY e.created_at DESC LIMIT 200`,
       [s.tenant_id, s.workspace_id, documentId || null])).rows;
   }
 
@@ -1367,8 +1456,8 @@ export class Engine {
     const r = await this.db.query(`SELECT r.id AS job_id, r.operation_id, r.source_id, s.title AS source_title, s.kind AS source_kind, r.schedule_id, r.scheduled_at, r.status,
         r.items_new, r.items_revised, r.error, r.partial_reason, r.attempts, r.max_attempts, r.retry_at, r.created_at, r.finished_at
         FROM flow_collection_runs r LEFT JOIN flow_sources s ON s.id=r.source_id AND s.tenant_id=r.tenant_id
-        WHERE r.tenant_id=$1 AND r.workspace_id=$2 AND ($3::text IS NULL OR r.status=$3) ORDER BY r.created_at DESC, r.id LIMIT $4`,
-      [s.tenant_id, s.workspace_id, filterStatus, limit]);
+        WHERE r.tenant_id=$1 AND r.workspace_id=$2 AND ($3::text IS NULL OR r.status=$3) AND ($5 OR s.kind NOT IN ('bilibili','douyin')) ORDER BY r.created_at DESC, r.id LIMIT $4`,
+      [s.tenant_id, s.workspace_id, filterStatus, limit, videoAccess(this)]);
     return r.rows.map((x: any) => ({ ...x, job_state: prdJobState(x.status), prd_status: prdOperationStatus(x.status) }));
   }
 
@@ -1378,7 +1467,7 @@ export class Engine {
         d.event_occurred_at_source, d.created_at AS collected_at, d.current_revision, d.media, r.extraction, length(r.body) AS body_chars
         FROM flow_documents d LEFT JOIN flow_sources s ON s.id=d.source_id AND s.tenant_id=d.tenant_id
         LEFT JOIN flow_document_revisions r ON r.document_id=d.id AND r.revision=d.current_revision AND r.tenant_id=d.tenant_id
-        WHERE d.tenant_id=$1 AND d.workspace_id=$2 AND ($3::text IS NULL OR d.title ILIKE '%'||$3||'%') AND ($4::text IS NULL OR d.source_id=$4)
+        WHERE d.tenant_id=$1 AND d.workspace_id=$2 AND ${videoAccessSQL(this)} AND ($3::text IS NULL OR d.title ILIKE '%'||$3||'%') AND ($4::text IS NULL OR d.source_id=$4)
         ORDER BY d.published_at DESC NULLS LAST, d.id LIMIT $5`, [s.tenant_id, s.workspace_id, opts.q || null, opts.source_id || null, limit])).rows;
     return rows.map(({ media, body_chars, extraction, ...d }: any) => {
       const m: MediaRef[] = typeof media === "string" ? JSON.parse(media) : (media ?? []);
@@ -1389,13 +1478,13 @@ export class Engine {
   }
 
   async getRevision(s: Scope, docId: string, rev: number) {
-    const r = await this.db.query(`SELECT r.* FROM flow_document_revisions r JOIN flow_documents d ON d.id=r.document_id
-        WHERE d.tenant_id=$1 AND d.workspace_id=$2 AND d.id=$3 AND r.revision=$4`, [s.tenant_id, s.workspace_id, docId, rev]);
+    const r = await this.db.query(`SELECT r.*,d.video_asset_id IS NOT NULL AS video_derived,s.kind AS source_kind FROM flow_document_revisions r JOIN flow_documents d ON d.id=r.document_id JOIN flow_sources s ON s.id=d.source_id AND s.tenant_id=d.tenant_id AND s.workspace_id=d.workspace_id
+        WHERE d.tenant_id=$1 AND d.workspace_id=$2 AND d.id=$3 AND r.revision=$4 AND (r.video_text_access_expires_at IS NULL OR r.video_text_access_expires_at>now()) AND ${videoAccessSQL(this)}`, [s.tenant_id, s.workspace_id, docId, rev]);
     if (!r.rows[0]) throw new HttpError(404, "document not found");
     // §11: a revision comes with the evidence recorded against it.
     const ev = await this.db.query(`SELECT id, char_start, char_end, quote, created_by, created_at FROM flow_evidence WHERE tenant_id=$1 AND workspace_id=$2 AND document_id=$3 AND revision=$4 ORDER BY created_at`,
       [s.tenant_id, s.workspace_id, docId, rev]);
-    return { ...r.rows[0], evidence: ev.rows };
+    return { ...r.rows[0], document_ids: [docId], evidence: ev.rows };
   }
 
   /** Delivers pending outbox events in sequence order; at-least-once (platform dedupes). */

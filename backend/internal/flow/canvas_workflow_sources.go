@@ -565,6 +565,7 @@ func (t Tools) sourceMonitorHits(ctx context.Context, ss SubjectScope, userID, m
 func (t Tools) monitorRevisionEvidence(ctx context.Context, ss SubjectScope, userID string, hit monitorHitRow) []CanvasWorkflowEvidence {
 	var revision struct {
 		Evidence []struct {
+			ResolvedEvidence
 			ID        string `json:"id"`
 			CharStart int    `json:"char_start"`
 			CharEnd   int    `json:"char_end"`
@@ -579,7 +580,9 @@ func (t Tools) monitorRevisionEvidence(ctx context.Context, ss SubjectScope, use
 		if row.ID == "" {
 			continue
 		}
-		out = append(out, CanvasWorkflowEvidence{ResolvedEvidence: ResolvedEvidence{EvidenceID: row.ID, DocumentID: hit.DocumentID, SourceID: hit.SourceID, Revision: hit.Revision, Quote: row.Quote}, TenantID: ss.Scope.TenantID, WorkspaceID: ss.Scope.WorkspaceID, CharStart: row.CharStart, CharEnd: row.CharEnd})
+		evidence := row.ResolvedEvidence
+		evidence.EvidenceID, evidence.DocumentID, evidence.SourceID, evidence.Revision, evidence.Quote = row.ID, hit.DocumentID, hit.SourceID, hit.Revision, row.Quote
+		out = append(out, CanvasWorkflowEvidence{ResolvedEvidence: evidence, TenantID: ss.Scope.TenantID, WorkspaceID: ss.Scope.WorkspaceID, CharStart: row.CharStart, CharEnd: row.CharEnd})
 	}
 	return out
 }

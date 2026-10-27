@@ -30,6 +30,12 @@ type TurnContext struct {
 const recentWindow = 12
 
 func BuildTurnContext(db *gorm.DB, conv model.FlowAgentConversation, ss SubjectScope) (TurnContext, error) {
+	if err := ensureConversationVideoProjection(db, conv); err != nil {
+		return TurnContext{}, err
+	}
+	if err := db.First(&conv, "id = ?", conv.ID).Error; err != nil {
+		return TurnContext{}, err
+	}
 	tc := TurnContext{Subject: ss.Subject, TenantID: ss.Scope.TenantID, WorkspaceID: ss.Scope.WorkspaceID, Role: ss.Scope.Role,
 		Summary: conv.Summary, EvidenceScope: map[string]any{}, ConfirmedPlans: []any{}, ActionReceipts: []ToolResult{}, BackgroundJobs: []map[string]any{}}
 	// Recent messages after the summarized prefix, oldest first.

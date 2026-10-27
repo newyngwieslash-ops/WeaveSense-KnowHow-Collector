@@ -111,7 +111,13 @@ func (r *Repository) CreditLedgerReferenceExists(referenceKey string) (bool, err
 }
 
 func (r *Repository) CreateTaskWithCreditReservation(task *model.Task, order *model.BillingOrder, activeTaskLimit int) error {
+	if err := r.checkVideoTaskCandidate(task, false); err != nil {
+		return err
+	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := New(tx.Set(videoProjectionLocalKey, true).Session(&gorm.Session{})).checkVideoTaskCandidate(task, true); err != nil {
+			return err
+		}
 		if err := r.requireActiveLogicalModelForTask(tx, task); err != nil {
 			return err
 		}
@@ -126,7 +132,13 @@ func (r *Repository) CreateTaskWithCreditReservation(task *model.Task, order *mo
 }
 
 func (r *Repository) CreateTaskWithActiveLimit(task *model.Task, activeTaskLimit int) error {
+	if err := r.checkVideoTaskCandidate(task, false); err != nil {
+		return err
+	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := New(tx.Set(videoProjectionLocalKey, true).Session(&gorm.Session{})).checkVideoTaskCandidate(task, true); err != nil {
+			return err
+		}
 		if err := r.requireActiveLogicalModelForTask(tx, task); err != nil {
 			return err
 		}
@@ -138,6 +150,9 @@ func (r *Repository) CreateTaskWithActiveLimit(task *model.Task, activeTaskLimit
 }
 
 func (r *Repository) RetryTaskWithBilling(userID string, prepared *model.Task, order *model.BillingOrder, activeTaskLimit int) (*model.Task, error) {
+	if err := r.checkVideoTaskProjection(userID, prepared.ID); err != nil {
+		return nil, err
+	}
 	var task model.Task
 	taskID := prepared.ID
 	err := r.db.Transaction(func(tx *gorm.DB) error {

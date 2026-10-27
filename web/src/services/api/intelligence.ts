@@ -80,8 +80,8 @@ export const listReports = (workspaceId: string) => http.get<ReportSummary[]>("/
 export const getReport = (workspaceId: string, id: string) => http.get<ReportDetail>(`/intelligence/reports/${encodeURIComponent(id)}`, ws(workspaceId));
 export const listBriefSchedules = (workspaceId: string) => http.get<BriefSchedule[]>("/intelligence/brief-schedules", ws(workspaceId));
 
-export type SourceKind = "rss" | "telegram" | "wechat";
-export type IntelSource = { id: string; kind: SourceKind; url: string; title: string; status: string; last_error?: string | null; config?: Record<string, unknown> };
+export type SourceKind = "rss" | "telegram" | "wechat" | "bilibili" | "douyin";
+export type IntelSource = { id: string; kind: SourceKind; url: string; title: string; status: string; revision?: number; last_error?: string | null; config?: Record<string, unknown> };
 export type ConnectorSample = { id: string; kind: string; source_id: string; collector: string; provider?: string | null; mode: "live" | "fixture"; items: number; media_unsupported: number; recorded_at: string };
 export const listSources = (workspaceId: string) => http.get<IntelSource[]>("/intelligence/sources", ws(workspaceId));
 export const createSource = (workspaceId: string, input: { kind: SourceKind; url?: string; title?: string; config?: Record<string, unknown> }) => http.post<IntelSource>("/intelligence/sources", input, ws(workspaceId));
@@ -114,8 +114,8 @@ export type FlowNotification = { id: string; type: string; title: string; refId:
 export const listNotifications = (workspaceId: string) => http.get<FlowNotification[]>("/intelligence/notifications", ws(workspaceId));
 export const markNotificationRead = (workspaceId: string, id: string | "all") => http.post<{ updated: number }>(`/intelligence/notifications/${encodeURIComponent(id)}/read`, {}, ws(workspaceId));
 
-export type SkillDef = { id: string; version: string; name: string; method: string; hash: string; pack_id: string };
-export type SkillPack = { id: string; version: string; name: string; kind?: string; skills: SkillDef[] };
+export type SkillDef = { id: string; version: string; name: string; method: string; hash: string; pack_id: string; steps?: string[]; references?: string[]; output_schema?: Record<string, unknown> };
+export type SkillPack = { id: string; version: string; name: string; kind?: string; required_tools?: string[]; mcp_requirements?: string[]; skills: SkillDef[] };
 export type SkillInstall = { id: string; skillId: string; version: string; hash: string; packId: string; updatedAt: string };
 export const listSkills = (workspaceId: string) => http.get<{ packs: SkillPack[]; installed: SkillInstall[] }>("/intelligence/skills", ws(workspaceId));
 export const installSkills = (workspaceId: string, input: { packId?: string; skillId?: string; version?: string }) => http.post<SkillInstall[]>("/intelligence/skills/install", input, ws(workspaceId));
@@ -171,6 +171,8 @@ export type CollectionJob = {
 };
 export type CollectionSchedule = {
     id: string;
+    revision?: number;
+    monitor_id?: string | null;
     source_ids: string[];
     kind: "interval" | "cron";
     interval_seconds?: number | null;

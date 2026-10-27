@@ -91,8 +91,22 @@ func ConsumeEvent(db *gorm.DB, consumerID string, e Event) (bool, error) {
 	}
 	applied := false
 	err := db.Transaction(func(tx *gorm.DB) error {
+		erased, err := videoEventContentErased(tx, e)
+		if err != nil {
+			return err
+		}
+		stored := map[string]any{}
+		_ = json.Unmarshal(e.Payload, &stored)
+		if stored == nil {
+			stored = map[string]any{}
+		}
+		if erased {
+			stored = map[string]any{"content_erased": true}
+		}
+		stored["_host_workspace_id"] = e.WorkspaceID
+		storedPayload, _ := json.Marshal(stored)
 		row := model.FlowEventInbox{ConsumerID: consumerID, EventID: e.EventID, TenantID: e.TenantID,
-			OperationID: e.OperationID, Type: e.Type, Payload: string(e.Payload), ReceivedAt: time.Now().UTC()}
+			OperationID: e.OperationID, Type: e.Type, Payload: string(storedPayload), ReceivedAt: time.Now().UTC()}
 		res := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row)
 		if res.Error != nil {
 			return res.Error
@@ -102,6 +116,14 @@ func ConsumeEvent(db *gorm.DB, consumerID string, e Event) (bool, error) {
 			return nil
 		}
 		applied = true
+		if erased {
+			return nil
+		}
+		if e.Type == "knowledge.dependencies_revoked" {
+			if err := purgeVideoCaches(tx, e); err != nil {
+				return err
+			}
+		}
 		if e.Type == "report.completed" {
 			var p struct {
 				ReportID string `json:"report_id"`
@@ -165,11 +187,16 @@ func ConsumeEvent(db *gorm.DB, consumerID string, e Event) (bool, error) {
 				Quantity   int64  `json:"quantity"`
 				DocumentID string `json:"document_id"`
 				ObjectKey  string `json:"object_key"`
+				VideoJobID string `json:"video_job_id"`
 			}
 			_ = json.Unmarshal(e.Payload, &p)
 			if validUsageType(p.UsageType) && p.Quantity >= 0 {
+				ref := strings.Trim(p.DocumentID+":"+p.ObjectKey, ":")
+				if p.VideoJobID != "" {
+					ref = "video_job:" + p.VideoJobID + ":" + ref
+				}
 				if _, err := DefaultUsageRecorder.Record(tx, UsageInput{TenantID: e.TenantID, WorkspaceID: e.WorkspaceID, UsageType: p.UsageType, Quantity: p.Quantity,
-					CostMicro: -1, SubjectRef: strings.Trim(p.DocumentID+":"+p.ObjectKey, ":"), IdemKey: "event:" + e.EventID, Charge: true}, time.Now().UTC()); err != nil {
+					CostMicro: -1, SubjectRef: ref, IdemKey: "event:" + e.EventID, Charge: true}, time.Now().UTC()); err != nil {
 					return err
 				}
 			}
@@ -194,7 +221,7 @@ func ConsumeEvent(db *gorm.DB, consumerID string, e Event) (bool, error) {
 			}
 		}
 		var p model.FlowOperationProjection
-		err := tx.First(&p, "operation_id = ?", e.OperationID).Error
+		err = tx.First(&p, "operation_id = ?", e.OperationID).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return tx.Create(&model.FlowOperationProjection{OperationID: e.OperationID, TenantID: e.TenantID,
 				WorkspaceID: e.WorkspaceID, JobID: e.JobID, Status: status, Sequence: e.Sequence, AsOf: e.OccurredAt, SourceVersion: e.Sequence, SyncStatus: "synced"}).Error

@@ -13,6 +13,9 @@ import (
 )
 
 func (r *Repository) CloudAgentPiSession(userID, runID string) (*model.CloudAgentPiSession, error) {
+	if err := r.CheckVideoRunProjection(userID, runID); err != nil {
+		return nil, err
+	}
 	var session model.CloudAgentPiSession
 	err := r.db.First(&session, "run_id = ? AND user_id = ?", runID, userID).Error
 	return &session, err
@@ -24,6 +27,25 @@ func (r *Repository) SaveCloudAgentPiSession(session *model.CloudAgentPiSession,
 	if session == nil || session.RunID == "" || session.UserID == "" {
 		return fmt.Errorf("invalid Agent session identity")
 	}
+	if err := r.CheckVideoRunProjection(session.UserID, session.RunID); err != nil {
+		return err
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Serialize a session writer against revocation's execution-row fence.
+		if tx.Migrator().HasTable(&model.CloudAgentExecution{}) {
+			if err := tx.Model(&model.CloudAgentExecution{}).Where("id = ? AND user_id = ?", session.RunID, session.UserID).UpdateColumn("revision", gorm.Expr("revision")).Error; err != nil {
+				return err
+			}
+		}
+		local := New(tx.Set(videoProjectionLocalKey, true).Session(&gorm.Session{}))
+		if err := local.CheckVideoRunProjection(session.UserID, session.RunID); err != nil {
+			return err
+		}
+		return local.saveCloudAgentPiSession(session, expectedRevision)
+	})
+}
+
+func (r *Repository) saveCloudAgentPiSession(session *model.CloudAgentPiSession, expectedRevision int64) error {
 	if expectedRevision == 0 {
 		session.Revision = 1
 		return r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(session).Error
@@ -42,6 +64,27 @@ func (r *Repository) SaveCloudAgentPiSession(session *model.CloudAgentPiSession,
 }
 
 func (r *Repository) EnsureCloudAgent(run *model.CloudAgentExecution) error {
+	if err := r.CheckVideoRunProjection(run.UserID, run.ID); err != nil {
+		return err
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		local := New(tx.Set(videoProjectionLocalKey, true).Session(&gorm.Session{}))
+		if id := nativeConversationID(run.StateJSON, false); id != "" {
+			if err := tx.Model(&model.FlowAgentConversation{}).Where("id = ? AND user_id = ?", id, run.UserID).UpdateColumn("last_seq", gorm.Expr("last_seq")).Error; err != nil {
+				return err
+			}
+			if err := local.checkVideoConversationProjection(run.UserID, id); err != nil {
+				return err
+			}
+		}
+		if err := local.CheckVideoRunProjection(run.UserID, run.ID); err != nil {
+			return err
+		}
+		return local.ensureCloudAgent(run)
+	})
+}
+
+func (r *Repository) ensureCloudAgent(run *model.CloudAgentExecution) error {
 	if run.ConversationID == "" {
 		run.ConversationID = run.ID
 		if run.ParentID != "" {
@@ -64,6 +107,9 @@ func (r *Repository) EnsureCloudAgent(run *model.CloudAgentExecution) error {
 // （运行时事件、工具结果）可能落在两次查询之间：读到旧的计数配新的行，解码时会被
 // 当成"记录不完整"而把一次正常运行判死。
 func (r *Repository) CloudAgent(userID, id string) (*model.CloudAgentExecution, error) {
+	if err := r.CheckVideoRunProjection(userID, id); err != nil {
+		return nil, err
+	}
 	var run model.CloudAgentExecution
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.First(&run, "id = ? AND user_id = ?", id, userID).Error; err != nil {
@@ -83,6 +129,9 @@ func (r *Repository) CloudAgent(userID, id string) (*model.CloudAgentExecution, 
 const CloudAgentJournalWindow = 40
 
 func (r *Repository) hydrateCloudAgent(run *model.CloudAgentExecution) error {
+	if err := New(r.db.Set(videoProjectionLocalKey, true).Session(&gorm.Session{})).CheckVideoRunProjection(run.UserID, run.ID); err != nil {
+		return err
+	}
 	if run.CheckpointVersion < 2 {
 		return nil
 	}
@@ -105,6 +154,9 @@ func (r *Repository) hydrateCloudAgent(run *model.CloudAgentExecution) error {
 // CloudAgentEventRecords 取 seq > afterSeq 的事件（升序），keyset 分页走
 // (run_id, sequence) 主键，用于增量拉取与 SSE 断线重连。
 func (r *Repository) CloudAgentEventRecords(userID, runID string, afterSeq, limit int) ([]model.CloudAgentEventRecord, error) {
+	if err := r.CheckVideoRunProjection(userID, runID); err != nil {
+		return nil, err
+	}
 	if limit <= 0 {
 		limit = CloudAgentJournalWindow
 	}
@@ -117,6 +169,9 @@ func (r *Repository) CloudAgentEventRecords(userID, runID string, afterSeq, limi
 // CloudAgentEventRecordsBefore 取 seq < beforeSeq 的**最近** limit 条（升序返回），
 // 供"请求的页比内存窗口更深、要往前补"的读路径使用。
 func (r *Repository) CloudAgentEventRecordsBefore(userID, runID string, beforeSeq, limit int) ([]model.CloudAgentEventRecord, error) {
+	if err := r.CheckVideoRunProjection(userID, runID); err != nil {
+		return nil, err
+	}
 	if limit <= 0 {
 		limit = CloudAgentJournalWindow
 	}
@@ -141,6 +196,9 @@ func (r *Repository) CloudAgentEventRecordCount(userID, runID string) (int64, er
 }
 
 func (r *Repository) CloudAgentForActiveTask(userID, taskID string) (*model.CloudAgentExecution, error) {
+	if err := r.checkVideoTaskProjection(userID, taskID); err != nil {
+		return nil, err
+	}
 	var run model.CloudAgentExecution
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("user_id = ? AND active_task_id = ? AND status IN ?", userID, taskID, []string{"running", "queued"}).First(&run).Error; err != nil {
@@ -194,6 +252,9 @@ func (r *Repository) ActiveCloudAgents() ([]model.CloudAgentExecution, error) {
 
 // Do not load the transcript, tasks and bills for an unchanged SSE subscription.
 func (r *Repository) CloudAgentRevision(userID, id string) (int64, error) {
+	if err := r.CheckVideoRunProjection(userID, id); err != nil {
+		return 0, err
+	}
 	var run model.CloudAgentExecution
 	err := r.db.Select("id", "revision").Where("id = ? AND user_id = ?", id, userID).First(&run).Error
 	return run.Revision, err
@@ -217,6 +278,16 @@ func (r *Repository) RecentCloudAgentEventsForUser(userID string, runLimit int) 
 	if len(runIDs) == 0 {
 		return nil, nil
 	}
+	allowed := runIDs[:0]
+	for _, id := range runIDs {
+		if r.CheckVideoRunProjection(userID, id) == nil {
+			allowed = append(allowed, id)
+		}
+	}
+	runIDs = allowed
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
 	var records []model.CloudAgentEventRecord
 	err := r.db.Where("user_id = ? AND run_id IN ?", userID, runIDs).
 		Order("created_at, sequence").
@@ -226,7 +297,11 @@ func (r *Repository) RecentCloudAgentEventsForUser(userID string, runLimit int) 
 
 // Lock before reading: checkpoints, canvas writes and task reservations commit together.
 func (r *Repository) MutateCloudAgent(userID, id string, revision int64, fn func(*model.CloudAgentExecution, *Repository) error) error {
+	if err := r.CheckVideoRunProjection(userID, id); err != nil {
+		return err
+	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		tx = tx.Set(videoProjectionLocalKey, true).Session(&gorm.Session{})
 		q := tx.Model(&model.CloudAgentExecution{}).Where("id = ? AND user_id = ? AND revision = ?", id, userID, revision).UpdateColumn("revision", gorm.Expr("revision + 1"))
 		if q.Error != nil {
 			return q.Error
@@ -362,10 +437,16 @@ func canonicalJSONValue(value any) any {
 }
 
 func (r *Repository) CreateCloudAgentCanvasMutation(mutation *model.CloudAgentCanvasMutation) error {
-	return r.db.Create(mutation).Error
+	if mutation == nil || mutation.UserID == "" || mutation.RunID == "" {
+		return fmt.Errorf("invalid Agent mutation identity")
+	}
+	return r.mutateCloudAgentCanvasReceipt(mutation.UserID, mutation.RunID, func(tx *gorm.DB) error { return tx.Create(mutation).Error })
 }
 
 func (r *Repository) LatestCloudAgentCanvasMutation(userID, runID string) (*model.CloudAgentCanvasMutation, error) {
+	if err := r.CheckVideoRunProjection(userID, runID); err != nil {
+		return nil, err
+	}
 	var mutation model.CloudAgentCanvasMutation
 	err := r.db.Where("user_id = ? AND run_id = ?", userID, runID).
 		Order("created_at DESC, id DESC").First(&mutation).Error
@@ -373,16 +454,40 @@ func (r *Repository) LatestCloudAgentCanvasMutation(userID, runID string) (*mode
 }
 
 func (r *Repository) MarkCloudAgentCanvasMutationUndone(userID, runID, mutationID string, undoneAt time.Time) error {
-	result := r.db.Model(&model.CloudAgentCanvasMutation{}).
-		Where("id = ? AND user_id = ? AND run_id = ? AND status = ?", mutationID, userID, runID, "applied").
-		Updates(map[string]any{"status": "undone", "undone_at": undoneAt})
-	if result.Error != nil {
-		return result.Error
+	return r.mutateCloudAgentCanvasReceipt(userID, runID, func(tx *gorm.DB) error {
+		result := tx.Model(&model.CloudAgentCanvasMutation{}).
+			Where("id = ? AND user_id = ? AND run_id = ? AND status = ?", mutationID, userID, runID, "applied").
+			Updates(map[string]any{"status": "undone", "undone_at": undoneAt})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrCreationConflict
+		}
+		return nil
+	})
+}
+
+// The execution row is also the revocation purge's write fence. An in-flight
+// snapshot/undo either commits before that purge and is scrubbed by it, or
+// observes the terminal retention marker before writing. Canvas payloads are
+// never changed by this receipt helper.
+func (r *Repository) mutateCloudAgentCanvasReceipt(userID, runID string, fn func(*gorm.DB) error) error {
+	if err := r.CheckVideoRunProjection(userID, runID); err != nil {
+		return err
 	}
-	if result.RowsAffected != 1 {
-		return ErrCreationConflict
-	}
-	return nil
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if tx.Migrator().HasTable(&model.CloudAgentExecution{}) {
+			if err := tx.Model(&model.CloudAgentExecution{}).Where("id = ? AND user_id = ?", runID, userID).UpdateColumn("revision", gorm.Expr("revision")).Error; err != nil {
+				return err
+			}
+		}
+		local := New(tx.Set(videoProjectionLocalKey, true).Session(&gorm.Session{}))
+		if err := local.CheckVideoRunProjection(userID, runID); err != nil {
+			return err
+		}
+		return fn(local.db)
+	})
 }
 
 // MarkCloudAgentFailed is a terminal CAS transition that does not read or
@@ -390,6 +495,9 @@ func (r *Repository) MarkCloudAgentCanvasMutationUndone(userID, runID, mutationI
 // can no longer be decoded; leaving such a run in running would make the
 // scheduler retry it forever.
 func (r *Repository) MarkCloudAgentFailed(userID, id string, revision int64, message ...string) error {
+	if err := r.CheckVideoRunProjection(userID, id); err != nil {
+		return err
+	}
 	detail := "Agent 运行状态损坏，本轮已停止"
 	if len(message) > 0 {
 		detail = message[0]

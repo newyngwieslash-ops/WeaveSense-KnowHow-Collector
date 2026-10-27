@@ -1,0 +1,94 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { coveredMilliseconds, videoMetricRecord, videoMetrics } from "./video-metrics.ts";
+import { pgliteDb, migrate } from "./db.ts";
+import { Engine } from "./engine.ts";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { initializeVideoDeletionJournal, configureVideoRetentionJournal, replayVideoRetentionJournal } from "./video-journal.ts";
+import { applyVideoRetention } from "./video-knowledge.ts";
+
+test("coverage is interval union; unknown/invalid is not a fabricated zero", () => {
+  assert.equal(coveredMilliseconds([[0, 30], [20, 60], [70, 90]], 100), 80);
+  assert.equal(coveredMilliseconds([], 100), 0);
+  assert.equal(coveredMilliseconds([[0, 101]], 100), null);
+  assert.equal(coveredMilliseconds(undefined, 100), null);
+  assert.equal(coveredMilliseconds([[0, 1]], 0), null);
+});
+test("completed task is not content accuracy; unsettled cost stays unknown", () => {
+  const row = { id: "synthetic", profile_version: 1, state: "completed", actual_usage_micro: "0", coverage: {}, processors: { secret_response: "must-not-leak" } };
+  const unknown = videoMetricRecord(row);
+  assert.equal(unknown.cost_micro, null); assert.equal(unknown.audio_processed_ratio, null);
+  assert.equal(unknown.visual_sample_count, null); assert.equal(unknown.pipeline_completed, true);
+  assert.equal(unknown.measured_execution.seconds_total, null);
+  const measured = videoMetricRecord({ ...row, measured_usage: { execution_seconds_total: 2.5, execution_quanta: 3, asr_chunk_cache_hits: 2, private_output: "not-returned" } });
+  assert.equal(measured.measured_execution.seconds_total, 2.5); assert.equal(measured.measured_execution.asr_chunk_cache_hits, 2);
+  assert.ok(!JSON.stringify(measured).includes("not-returned"));
+  assert.ok(!JSON.stringify(unknown).includes("must-not-leak"));
+  const known = videoMetricRecord({ ...row, budget_closed_at: "now", budget_reservation_id: "host", actual_usage_micro: "120", reused_from_job_id: "prior", coverage: { duration_ms: 120000, intervals: { processed: [[0, 100000], [50000, 120000]] }, visual: { sampled_timestamps_ms: [0, 60000, 60000], budget_limited: true } } });
+  assert.equal(known.cost_micro_per_media_minute, 60); assert.equal(known.audio_processed_ratio, 1);
+  assert.equal(known.visual_sample_count, 2); assert.equal(known.visual_samples_per_minute, 1); assert.equal(known.cache_hit, true);
+});
+test("actual scoped metrics query excludes foreign/revoked source and validates bounded window", async t => {
+  const db = await pgliteDb(); t.after(() => db.close()); await migrate(db);
+  const now = new Date("2026-10-26T00:00:00Z"); const engine = new Engine(db, async () => [], () => now); engine.video.enabled = true;
+  const root = await mkdtemp(join(tmpdir(), "metrics-journal-")); t.after(() => rm(root, { recursive: true, force: true }));
+  const config = { directory: join(root, "journal"), journalId: "synthetic-metrics", key: "synthetic-metrics-key-not-a-production-secret" };
+  await initializeVideoDeletionJournal(config); configureVideoRetentionJournal(engine, config, (q, e) => applyVideoRetention(engine, q, e, e)); await replayVideoRetentionJournal(engine);
+  const scope = { tenant_id: "metrics_t", workspace_id: "metrics_w", actor: { type: "user", id: "reviewer" }, policy_version: "fixture" };
+  const p = await engine.video.saveProfile(scope, { name: "Synthetic metrics", config: { required_capabilities: ["transcript"] } });
+  const source = await engine.createSource(scope, { kind: "bilibili", title: "private-title", url: "https://space.bilibili.com/1", config: { source_type: "account", author_id: "1", profile_id: p.id, profile_version: 1, usage_basis: "synthetic", allowed_uses: ["knowledge"] } });
+  const job = await engine.video.start(scope, "metric", { source_id: source.id, native_id: "BVfixture", canonical_url: "https://www.bilibili.com/video/BVfixture" });
+  await db.query(`UPDATE flow_video_jobs SET created_at='2026-10-25T00:00:00Z' WHERE id=$1`, [job.video_job_id]);
+  const result = await videoMetrics(engine, scope);
+  assert.equal(result.total_matching_jobs, 1); assert.equal(result.records[0].cost_status, "unknown_or_unsettled");
+  assert.equal(result.quality.accuracy, null); assert.ok(!JSON.stringify(result).includes("private-title"));
+  assert.equal(result.operational.ready_latency.mean_ms, null);
+  assert.equal(result.operational.stages[0].duration_samples, 0);
+  await db.query(`UPDATE flow_video_stages SET state='running' WHERE video_job_id=$1`, [job.video_job_id]);
+  await db.query(`UPDATE flow_video_stages SET state='retry_wait',error='{"code":"RATE_LIMITED"}' WHERE video_job_id=$1`, [job.video_job_id]);
+  await db.query(`UPDATE flow_video_stages SET next_poll_at=now() WHERE video_job_id=$1`, [job.video_job_id]);
+  let operational = (await videoMetrics(engine, scope)).operational;
+  assert.equal(operational.stages[0].rate_limit_events, 1, "poll must not inflate event counts");
+  await db.query(`UPDATE flow_video_stages SET state='queued',error=NULL WHERE video_job_id=$1`, [job.video_job_id]);
+  await db.query(`UPDATE flow_video_stages SET state='running' WHERE video_job_id=$1`, [job.video_job_id]);
+  await db.query(`UPDATE flow_video_stages SET state='retry_wait',error='{"code":"RATE_LIMITED"}' WHERE video_job_id=$1`, [job.video_job_id]);
+  await db.query(`UPDATE flow_video_stages SET state='blocked_auth',error='{"code":"AUTH_REQUIRED"}' WHERE video_job_id=$1`, [job.video_job_id]);
+  await db.query(`UPDATE flow_video_jobs SET state='blocked_auth' WHERE id=$1`, [job.video_job_id]);
+  operational = (await videoMetrics(engine, scope)).operational;
+  assert.equal(operational.stages[0].rate_limit_events, 2); assert.equal(operational.stages[0].auth_required_events, 1); assert.equal(operational.needs_auth_current, 1);
+  await db.query(`UPDATE flow_video_stages SET state='completed',error=NULL WHERE video_job_id=$1`, [job.video_job_id]);
+  await db.query(`UPDATE flow_video_jobs SET state='completed',completion_level='knowledge_ready',finished_at='2026-10-25T00:02:00Z' WHERE id=$1`, [job.video_job_id]);
+  await db.query(`INSERT INTO flow_video_requests(tenant_id,workspace_id,namespace,idempotency_key,request_hash,video_job_id) SELECT tenant_id,workspace_id,namespace,'second-key',request_hash,video_job_id FROM flow_video_requests WHERE video_job_id=$1 LIMIT 1`, [job.video_job_id]);
+  operational = (await videoMetrics(engine, scope)).operational;
+  assert.equal(operational.ready_latency.mean_ms, 120000); assert.equal(operational.ready_latency.samples, 1);
+  assert.equal(operational.stages[0].duration_samples, 1); assert.ok(operational.stages[0].mean_wall_duration_ms! >= 0);
+  assert.equal(operational.duplicate_suppression.collapsed_request_keys, 1); assert.equal(operational.duplicate_suppression.same_key_replays, null);
+  const governance = (await videoMetrics(engine, scope)).governance;
+  assert.equal(governance.failure_recovery.observed_failure_jobs, 1);
+  assert.equal(governance.failure_recovery.completed_after_observed_failure, 1);
+  assert.equal(governance.citation_support.semantic_support_accuracy, null);
+  assert.equal(governance.source_independence.calibrated_accuracy, null);
+  // Typed persisted fixtures test the read model, not the approval workflow.
+  await db.query(`INSERT INTO flow_knowledge_units(id,tenant_id,workspace_id,profile_id,profile_version,version,content_hash,state,approval,created_by,created_at)
+    VALUES('metric_unit',$1,$2,$3,1,2,'fixture-hash','approved','{"checks":{"evidence_support":true},"content_hash":"fixture-hash"}','fixture','2026-10-25T01:00:00Z')`, [scope.tenant_id, scope.workspace_id, p.id]);
+  await db.query(`INSERT INTO flow_knowledge_versions(tenant_id,workspace_id,knowledge_id,version,content_hash,unit,method,evidence_snapshot,created_by)
+    VALUES($1,$2,'metric_unit',2,'fixture-hash','{"claim_kind":"model_inference","statement":"private-not-in-metrics"}','{}','[]','fixture')`, [scope.tenant_id, scope.workspace_id]);
+  await db.query(`INSERT INTO flow_knowledge_reviews(id,tenant_id,workspace_id,knowledge_id,version,content_hash,decision,reason,actor,created_at)
+    VALUES('metric_review',$1,$2,'metric_unit',2,'fixture-hash','request_changes','private-review-reason','user:fixture','2026-10-25T01:00:00Z')`, [scope.tenant_id, scope.workspace_id]);
+  const auditCounts = await videoMetrics(engine, scope);
+  assert.equal(auditCounts.governance.citation_support.units, 1);
+  assert.equal(auditCounts.governance.citation_support.units_without_current_evidence_links, 1);
+  assert.equal(auditCounts.governance.citation_support.units_with_explicit_support_review, 1);
+  assert.equal(auditCounts.governance.citation_support.model_inference_units, 1);
+  assert.equal(auditCounts.governance.review_revision.revised_units, 1);
+  assert.equal(auditCounts.governance.review_revision.additional_versions, 1);
+  assert.equal(auditCounts.governance.review_revision.events_in_window.request_changes, 1);
+  assert.ok(!JSON.stringify(auditCounts).includes('private-not-in-metrics'));
+  assert.ok(!JSON.stringify(auditCounts).includes('private-review-reason'));
+  assert.equal((await videoMetrics(engine, { ...scope, workspace_id: "foreign" })).total_matching_jobs, 0);
+  await assert.rejects(videoMetrics(engine, scope, { from: "2020-01-01" }), /INVALID_METRICS_WINDOW/);
+  await db.query(`UPDATE flow_sources SET status='revoked' WHERE id=$1`, [source.id]);
+  assert.equal((await videoMetrics(engine, scope)).total_matching_jobs, 0);
+});

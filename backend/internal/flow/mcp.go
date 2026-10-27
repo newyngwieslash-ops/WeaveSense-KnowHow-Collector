@@ -91,7 +91,9 @@ type MCPGateway struct {
 	// PolicyVersion is an optional runtime policy version folded into MCPToolCacheKey.
 	PolicyVersion int
 	// ToolCache overrides the process-wide scoped MCP tool cache when non-nil.
-	ToolCache *MCPToolListCache
+	ToolCache       *MCPToolListCache
+	TrustedServices []TrustedMCPService
+	InternalConfig  *Config
 }
 
 // MCPToolCacheKey scopes cached MCP tool lists and rendered agent tool definitions
@@ -317,8 +319,12 @@ func MCPAgentToolName(slug, tool string) string {
 func IsMCPToolName(name string) bool { return strings.HasPrefix(name, mcpToolPrefix) }
 
 func (g MCPGateway) Create(scope Scope, userID string, in MCPConnectionInput) (model.FlowMCPConnection, error) {
+	trusted, policyErr := g.trustedService(strings.TrimSpace(in.Endpoint))
+	if policyErr != nil {
+		return model.FlowMCPConnection{}, policyErr
+	}
 	u, err := url.Parse(strings.TrimSpace(in.Endpoint))
-	if err != nil || u.Host == "" || u.User != nil || !(u.Scheme == "https" || (g.AllowInsecure && u.Scheme == "http")) {
+	if err != nil || u.Host == "" || u.User != nil || u.Fragment != "" || !(u.Scheme == "https" || ((g.AllowInsecure || trusted != nil) && u.Scheme == "http")) {
 		return model.FlowMCPConnection{}, fmt.Errorf("%w: endpoint must be an https URL", ErrMCPInvalid)
 	}
 	if in.Transport == "" {
@@ -416,7 +422,34 @@ func (g MCPGateway) session(ctx context.Context, c model.FlowMCPConnection) (*mc
 	if g.HTTP != nil && g.HTTP.Transport != nil {
 		base = g.HTTP.Transport
 	}
-	hc := &http.Client{Transport: headerRT{base: base, secret: secret}, Timeout: time.Duration(c.TimeoutMS) * time.Millisecond}
+	var transport http.RoundTripper = headerRT{base: base, secret: secret}
+	trusted, err := g.trustedService(c.Endpoint)
+	if err != nil {
+		return nil, "", err
+	}
+	if trusted != nil {
+		base, err = trustedMCPTransport(*trusted)
+		if err != nil {
+			return nil, "", err
+		}
+		cfg := ConfigFromEnv()
+		if g.InternalConfig != nil {
+			cfg = *g.InternalConfig
+		}
+		delegation, ok := ctx.Value(mcpDelegateKey{}).(mcpDelegate)
+		if !ok || delegation.Scope.TenantID != c.TenantID || delegation.Scope.WorkspaceID != c.WorkspaceID {
+			return nil, "", ErrForbidden
+		}
+		token, err := Sign(cfg.SigningKey, ExecutionContext{Issuer: cfg.Issuer, Audience: trusted.Audience,
+			TenantID: c.TenantID, WorkspaceID: c.WorkspaceID, Actor: delegation.Actor, Scopes: ScopesForRole(delegation.Scope.Role),
+			ServiceIdentity: trusted.ServiceIdentity, ConnectionID: c.ID, CapabilitySnapshotID: capabilityFromCtx(ctx), PolicyVersion: "video_v1"}, g.now(), time.Minute)
+		if err != nil {
+			return nil, "", err
+		}
+		transport = trustedMCPRT{base: base, endpoint: c.Endpoint, secret: secret, delegation: token}
+	}
+	hc := &http.Client{Transport: transport, Timeout: time.Duration(c.TimeoutMS) * time.Millisecond,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return ErrEgressBlocked }}
 	client := mcp.NewClient(&mcp.Implementation{Name: "weavesense-flow-mcp-gateway", Version: "1"}, nil)
 	cs, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: c.Endpoint, HTTPClient: hc, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
 	if err != nil {
@@ -446,6 +479,7 @@ func discoverTools(ctx context.Context, cs *mcp.ClientSession) (map[string]MCPTo
 
 // Discover lists the server's current tools with schema hashes (for operator review).
 func (g MCPGateway) Discover(ctx context.Context, scope Scope, id string) ([]MCPToolInfo, error) {
+	ctx = withMCPDelegate(ctx, scope, Actor{Type: "service_principal", ID: "mcp-discovery"})
 	c, err := g.get(scope, id)
 	if err != nil {
 		return nil, err
@@ -490,6 +524,7 @@ func (g MCPGateway) DiscoverCached(ctx context.Context, scope Scope, id string, 
 
 // Approve (operator) freezes the allow-list and each allowed tool's schema hash.
 func (g MCPGateway) Approve(ctx context.Context, scope Scope, id, operatorID string, allowed []string) (MCPConnectionView, error) {
+	ctx = withMCPDelegate(ctx, scope, Actor{Type: "user", ID: operatorID})
 	c, err := g.get(scope, id)
 	if err != nil {
 		return MCPConnectionView{}, err
@@ -562,6 +597,7 @@ func (g MCPGateway) Execute(ctx context.Context, scope Scope, actorID, connID, t
 }
 
 func (g MCPGateway) execute(ctx context.Context, scope Scope, actorID, connID, tool string, args map[string]any, idemKey string) (string, bool, error) {
+	ctx = withMCPDelegate(ctx, scope, Actor{Type: "user", ID: actorID})
 	start := time.Now()
 	c, err := g.get(scope, connID)
 	if err != nil {
@@ -614,23 +650,16 @@ func (g MCPGateway) execute(ctx context.Context, scope Scope, actorID, connID, t
 		g.usage(c, tool, actorID, "unknown", start, 0, 0)
 		return "", false, fmt.Errorf("%w: %s", errMCPSent, redact(err.Error(), secret))
 	}
-	var b strings.Builder
-	for _, ct := range res.Content {
-		if t, ok := ct.(*mcp.TextContent); ok {
-			b.WriteString(t.Text)
-			b.WriteString("\n")
-		} else {
-			b.WriteString("[non-text content omitted]\n")
-		}
-	}
-	if res.StructuredContent != nil {
-		raw, _ := json.Marshal(res.StructuredContent)
-		b.Write(raw)
-	}
-	out := redact(b.String(), secret)
+	out := redact(mcpResultText(res), secret)
 	truncated := false
 	if r := []rune(out); len(r) > c.OutputCap {
-		out, truncated = string(r[:c.OutputCap]), true
+		if res.StructuredContent != nil {
+			// Never turn a valid machine-readable receipt into malformed JSON.
+			out = `{"reason":"output_cap_exceeded","truncated":true,"recovery":"read a smaller result page"}`
+		} else {
+			out = string(r[:c.OutputCap])
+		}
+		truncated = true
 	}
 	status := "succeeded"
 	if res.IsError {
@@ -641,6 +670,21 @@ func (g MCPGateway) execute(ctx context.Context, scope Scope, actorID, connID, t
 		return out, truncated, fmt.Errorf("mcp tool returned an error: %s", out)
 	}
 	return out, truncated, nil
+}
+
+func mcpResultText(res *mcp.CallToolResult) string {
+	if res.StructuredContent != nil {
+		raw, _ := json.Marshal(res.StructuredContent)
+		return string(raw)
+	}
+	var b strings.Builder
+	for _, ct := range res.Content {
+		if t, ok := ct.(*mcp.TextContent); ok {
+			b.WriteString(t.Text)
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
 }
 
 // AgentTools renders approved tools of approved connections as Pi function tools.

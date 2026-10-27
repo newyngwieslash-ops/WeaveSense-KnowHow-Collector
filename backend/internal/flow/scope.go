@@ -64,10 +64,14 @@ func ListWorkspaces(db *gorm.DB, userID string) ([]model.Workspace, error) {
 
 // ScopesForRole maps workspace roles to Engine scopes.
 func ScopesForRole(role string) []string {
-	read := []string{"intel.sources.read", "intel.documents.read", "intel.operations.read"}
+	read := []string{"intel.sources.read", "intel.documents.read", "intel.operations.read", "intel.video.read", "intel.knowledge.read"}
 	switch role {
 	case "owner", "admin", "editor", "analyst":
-		return append(read, "intel.sources.write", "intel.monitors.write", "intel.schedules.write", "intel.collect", "intel.reports.write", "intel.research", "intel.mcp.use")
+		read = append(read, "intel.sources.write", "intel.monitors.write", "intel.schedules.write", "intel.collect", "intel.reports.write", "intel.research", "intel.mcp.use",
+			"intel.video.write", "intel.video.process", "intel.knowledge.write", "intel.knowledge.research", "intel.profiles.write")
+		if role == "owner" || role == "admin" {
+			read = append(read, "intel.knowledge.review", "intel.knowledge.publish", "intel.skills.release")
+		}
 	}
 	return read
 }

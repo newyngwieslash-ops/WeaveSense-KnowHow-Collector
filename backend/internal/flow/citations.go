@@ -18,10 +18,19 @@ type ResolvedEvidence struct {
 	Title      string `json:"title,omitempty"`
 	Quote      string `json:"quote,omitempty"`
 	// §7.3 snippet hash + URL, re-verified by the Engine on every resolve.
-	SnippetHash string `json:"snippet_hash,omitempty"`
-	URL         string `json:"url,omitempty"`
-	SnippetOK   *bool  `json:"snippet_ok,omitempty"`
-	URLOK       *bool  `json:"url_ok,omitempty"`
+	SnippetHash     string `json:"snippet_hash,omitempty"`
+	URL             string `json:"url,omitempty"`
+	SnippetOK       *bool  `json:"snippet_ok,omitempty"`
+	URLOK           *bool  `json:"url_ok,omitempty"`
+	StartMS         *int64 `json:"start_ms,omitempty"`
+	EndMS           *int64 `json:"end_ms,omitempty"`
+	FrameRef        string `json:"frame_ref,omitempty"`
+	AlignmentMethod string `json:"alignment_method,omitempty"`
+	MediaSHA256     string `json:"media_sha256,omitempty"`
+	MaterialType    string `json:"material_type,omitempty"`
+	OriginCluster   string `json:"origin_cluster,omitempty"`
+	OffsetUnit      string `json:"offset_unit,omitempty"`
+	Availability    string `json:"availability,omitempty"`
 }
 
 // Citation as submitted by the model.
@@ -110,11 +119,17 @@ func ValidateCitations(claims []ReportClaim, scope MaterialScope, resolved []Res
 				problems = append(problems, fmt.Sprintf("claim %d: evidence %s cited with a different snippet hash", i, ct.EvidenceID))
 			case ct.URL != "" && ct.URL != r.URL:
 				problems = append(problems, fmt.Sprintf("claim %d: evidence %s cited with a different url", i, ct.EvidenceID))
+			case c.Kind != "model_inference" && (r.MaterialType == "derived_summary" || r.MaterialType == "model_summary" || r.MaterialType == "model_inference" || r.MaterialType == "model_derived" || r.MaterialType == "visual_inference"):
+				problems = append(problems, fmt.Sprintf("claim %d: model-derived output cannot be original source evidence", i))
 			}
 			if r.Truncated {
 				truncated = append(truncated, ct.EvidenceID)
 			}
-			sources[r.SourceID] = true
+			origin := r.SourceID
+			if r.OriginCluster != "" {
+				origin = "origin:" + r.OriginCluster
+			}
+			sources[origin] = true
 		}
 		if c.Kind == "cross_source_verified" && len(sources) < 2 {
 			problems = append(problems, fmt.Sprintf("claim %d: cross_source_verified needs evidence from ≥2 sources", i))

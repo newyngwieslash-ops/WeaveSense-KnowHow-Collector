@@ -123,6 +123,9 @@ func (s *Service) cloudAgentPiModel(ctx context.Context, userID, runID string, p
 		}
 		result, retryable, err := s.runCloudAgentModelStep(ctx, userID, runID, request.Messages, request.ThinkingLevel, correction...)
 		if err == nil {
+			if err := s.repo.CheckVideoRunProjection(userID, runID); err != nil {
+				return nil, err
+			}
 			return result, nil
 		}
 		lastErr = err

@@ -34,7 +34,7 @@ export async function applyMediaKeyMigration(db: Db, plan: MediaKeyMove[], copie
   for (const m of plan) byDoc.set(m.document_id, [...(byDoc.get(m.document_id) ?? []), m]);
   let updated = 0, skipped = 0;
   for (const [id, moves] of byDoc) {
-    const ok = [];
+    const ok: MediaKeyMove[] = [];
     for (const m of moves) if (await copied(m)) ok.push(m);
     if (!ok.length) { skipped++; continue; }
     const before = moves[0].media_before;

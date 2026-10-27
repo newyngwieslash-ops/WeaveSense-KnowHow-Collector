@@ -1,0 +1,114 @@
+{
+  "fixture_kind": "generated_synthetic_not_platform_or_industry_gold",
+  "python": "3.12.14",
+  "model_repository": "Systran/faster-whisper-tiny",
+  "model_revision": "d90ca5fe260221311c53c58e660288d3deb8d356",
+  "model_sha256": "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1",
+  "model": "tiny",
+  "engine": "faster-whisper 1.1.1",
+  "device": "cpu",
+  "compute_type": "int8",
+  "silence": {
+    "input_sha256": "20eaebffe1816e0ffa6f7f854f5ef4ea80d5349faaf0ce1fec1b713e7fde58fa",
+    "seconds": 2,
+    "text": "",
+    "segment_count": 0,
+    "elapsed_seconds": 0.8236283599999297,
+    "passed": true
+  },
+  "multimodal": {
+    "input_sha256": "fc2a50375991b6cf2610808dd7bf96d19cee8010fb1d4d1fd1fddcb29edafe61",
+    "source_phrase": "This is a generated voice sample. The quick brown fox jumps over the lazy dog.",
+    "recognized_asr": "This is a generated voice sample, the quick brown fox jumps over the lazy log.",
+    "recognized_ocr": "WEAVE TEST 42 WEAVE TEST 42 WEAVE TEST 42 WEAVE TEST 42",
+    "frame_count": 4,
+    "coverage": {
+      "required": [
+        "transcript",
+        "vision",
+        "ocr"
+      ],
+      "completed": [
+        "transcript",
+        "vision",
+        "ocr"
+      ],
+      "missing": [],
+      "optional_missing": [],
+      "processing_mode": "subtitles_first",
+      "duration_ms": 5105,
+      "transcript_status": "ok",
+      "chunk_manifest": [
+        {
+          "object": {
+            "object_key": "tenants/tn_synthetic/workspaces/ws_synthetic/video/vjob_synthetic/9cdf9b1cc0f9eeea1c35e38f37f997d0d814050b0264fd10a119e3f96e5f69f6/chunk.json",
+            "sha256": "9cdf9b1cc0f9eeea1c35e38f37f997d0d814050b0264fd10a119e3f96e5f69f6",
+            "bytes": 225,
+            "content_type": "application/json"
+          },
+          "input_sha256": "f64fbd6b46b195a71b5f0e77440c9bae51bc6e801d542ea634364f98efaf9c83",
+          "status": "completed",
+          "index": 0,
+          "start_ms": 0,
+          "end_ms": 5105,
+          "core_start_ms": 0,
+          "core_end_ms": 5105
+        }
+      ],
+      "intervals": {
+        "processed": [
+          [
+            0,
+            5105
+          ]
+        ],
+        "speech": [
+          [
+            0,
+            5000
+          ]
+        ],
+        "silence": [],
+        "unknown": [
+          [
+            5000,
+            5105
+          ]
+        ]
+      },
+      "visual": {
+        "strategy": "scene_plus_time_grid",
+        "interval_ms": 2000,
+        "scene_threshold": 0.35,
+        "budget_limited": false,
+        "sampled_timestamps_ms": [
+          0,
+          2000,
+          4000,
+          5000
+        ],
+        "full_frame_analysis": false,
+        "duration_ms": 5100
+      }
+    },
+    "usage": {
+      "asr_seconds": 0.46969412899943563,
+      "ocr_requests": 3,
+      "frame_count": 4,
+      "model_tasks": [],
+      "audio_ms": 5105
+    },
+    "asr_manifest_parts_verified": true,
+    "elapsed_seconds": 1.7780719229995157,
+    "passed": true
+  },
+  "passed": true,
+  "environment": {
+    "ctranslate2": "4.8.4",
+    "ffmpeg": "7.1.5-0+deb13u1",
+    "tesseract": "5.5.0",
+    "docker_build": "not_executed",
+    "model_remote_inference": false,
+    "stack_policy": "4.5.0 RWE GNU_STACK rejected; 4.8.4 RW GNU_STACK executed without relaxing policy"
+  }
+}

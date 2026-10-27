@@ -1,0 +1,254 @@
+{
+  "schema_version": 1,
+  "platform": "Linux x86_64 CPython 3.12",
+  "status": "local_smoke_installed_wheels_not_container_build_lock",
+  "wheels": [
+    {
+      "file": "PyYAML-6.0.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "sha256": "80bab7bfc629882493af4aa31a4cfa43a4c57c83813253626916b8c7ada83476",
+      "metadata": [
+        "Name: PyYAML",
+        "Version: 6.0.2",
+        "License: MIT",
+        "Requires-Python: >=3.8"
+      ]
+    },
+    {
+      "file": "av-14.1.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "sha256": "a258a03e3f5d19ce599281968402ad5e799cdc0a84f53fe47ac01b27bb61e62a",
+      "metadata": [
+        "Name: av",
+        "Version: 14.1.0",
+        "License: BSD",
+        "Requires-Python: >=3.9"
+      ]
+    },
+    {
+      "file": "certifi-2026.10.23-py3-none-any.whl",
+      "sha256": "e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1",
+      "metadata": [
+        "Name: certifi",
+        "Version: 2026.10.23",
+        "License: MPL-2.0",
+        "Requires-Python: >=3.7"
+      ]
+    },
+    {
+      "file": "charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "sha256": "3d31298449090ab8d47b7b1b2a555ff73cac7ed438a08b7ac160980c7ebed649",
+      "metadata": [
+        "Name: charset-normalizer",
+        "Version: 3.5.2",
+        "License: MIT",
+        "Requires-Python: >=3.7"
+      ]
+    },
+    {
+      "file": "coloredlogs-15.0.1-py2.py3-none-any.whl",
+      "sha256": "612ee75c546f53e92e70049c9dbfcc18c935a2b9a53b66085ce9ef6a6e5c0934",
+      "metadata": [
+        "Name: coloredlogs",
+        "Version: 15.0.1",
+        "License: MIT",
+        "Requires-Python: >=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+      ]
+    },
+    {
+      "file": "faster_whisper-1.1.1-py3-none-any.whl",
+      "sha256": "5808dc334fb64fb4336921450abccfe5e313a859b31ba61def0ac7f639383d90",
+      "metadata": [
+        "Name: faster-whisper",
+        "Version: 1.1.1",
+        "License: MIT",
+        "Requires-Python: >=3.9"
+      ]
+    },
+    {
+      "file": "filelock-4.2.4-py3-none-any.whl",
+      "sha256": "301241438c57936ef93f4243a94f2559022268bfcf9b375a9a72eb0f8db8358e",
+      "metadata": [
+        "Name: filelock",
+        "Version: 4.2.4",
+        "License-Expression: MIT",
+        "Requires-Python: >=3.11"
+      ]
+    },
+    {
+      "file": "flatbuffers-25.12.19-py2.py3-none-any.whl",
+      "sha256": "7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4",
+      "metadata": [
+        "Name: flatbuffers",
+        "Version: 25.12.19",
+        "License: Apache 2.0"
+      ]
+    },
+    {
+      "file": "fsspec-2026.9.0-py3-none-any.whl",
+      "sha256": "8dd6e646e99ea382bd85f97a45e6b526a442d79423a7dc673f1e2756d05fcb5f",
+      "metadata": [
+        "Name: fsspec",
+        "Version: 2026.9.0",
+        "License-Expression: BSD-3-Clause",
+        "Requires-Python: >=3.10"
+      ]
+    },
+    {
+      "file": "huggingface_hub-0.28.1-py3-none-any.whl",
+      "sha256": "aa6b9a3ffdae939b72c464dbb0d7f99f56e649b55c3d52406f49e0a5a620c0a7",
+      "metadata": [
+        "Name: huggingface-hub",
+        "Version: 0.28.1",
+        "License: Apache",
+        "Requires-Python: >=3.8.0"
+      ]
+    },
+    {
+      "file": "humanfriendly-10.0-py2.py3-none-any.whl",
+      "sha256": "1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477",
+      "metadata": [
+        "Name: humanfriendly",
+        "Version: 10.0",
+        "License: MIT",
+        "Requires-Python: >=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+      ]
+    },
+    {
+      "file": "idna-3.20-py3-none-any.whl",
+      "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "metadata": [
+        "Name: idna",
+        "Version: 3.20",
+        "Requires-Python: >=3.9",
+        "License-Expression: BSD-3-Clause"
+      ]
+    },
+    {
+      "file": "mpmath-1.3.0-py3-none-any.whl",
+      "sha256": "a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "metadata": [
+        "Name: mpmath",
+        "Version: 1.3.0",
+        "License: BSD"
+      ]
+    },
+    {
+      "file": "numpy-2.2.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "sha256": "0349b025e15ea9d05c3d63f9657707a4e1d471128a3b1d876c095f328f8ff7f0",
+      "metadata": [
+        "Name: numpy",
+        "Version: 2.2.2",
+        "License: Copyright (c) 2005-2024, NumPy Developers.",
+        "Requires-Python: >=3.10"
+      ]
+    },
+    {
+      "file": "onnxruntime-1.20.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+      "sha256": "bb71a814f66517a65628c9e4a2bb530a6edd2cd5d87ffa0af0f6f773a027d99e",
+      "metadata": [
+        "Name: onnxruntime",
+        "Version: 1.20.1",
+        "License: MIT License"
+      ]
+    },
+    {
+      "file": "packaging-26.3-py3-none-any.whl",
+      "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "metadata": [
+        "Name: packaging",
+        "Version: 26.3",
+        "Requires-Python: >=3.9",
+        "License-Expression: Apache-2.0 OR BSD-2-Clause"
+      ]
+    },
+    {
+      "file": "protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl",
+      "sha256": "89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2",
+      "metadata": [
+        "Name: protobuf",
+        "License: 3-Clause BSD License",
+        "Requires-Python: >=3.10",
+        "Version: 7.36.2"
+      ]
+    },
+    {
+      "file": "requests-2.34.2-py3-none-any.whl",
+      "sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
+      "metadata": [
+        "Name: requests",
+        "Version: 2.34.2",
+        "License: Apache-2.0",
+        "Requires-Python: >=3.10"
+      ]
+    },
+    {
+      "file": "setuptools-84.2.1-py3-none-any.whl",
+      "sha256": "ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2",
+      "metadata": [
+        "Name: setuptools",
+        "Version: 84.2.1",
+        "License-Expression: MIT",
+        "Requires-Python: >=3.10"
+      ]
+    },
+    {
+      "file": "sympy-1.14.0-py3-none-any.whl",
+      "sha256": "e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5",
+      "metadata": [
+        "Name: sympy",
+        "Version: 1.14.0",
+        "License: BSD",
+        "Requires-Python: >=3.9",
+        "License: New BSD License (see the [LICENSE](LICENSE) file for details) covers all"
+      ]
+    },
+    {
+      "file": "tokenizers-0.21.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "sha256": "e84ca973b3a96894d1707e189c14a774b701596d579ffc7e69debfc036a61a04",
+      "metadata": [
+        "Name: tokenizers",
+        "Version: 0.21.0",
+        "Requires-Python: >=3.7"
+      ]
+    },
+    {
+      "file": "tqdm-4.67.1-py3-none-any.whl",
+      "sha256": "26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2",
+      "metadata": [
+        "Name: tqdm",
+        "Version: 4.67.1",
+        "License: MPL-2.0 AND MIT",
+        "Requires-Python: >=3.7"
+      ]
+    },
+    {
+      "file": "typing_extensions-4.16.0-py3-none-any.whl",
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "metadata": [
+        "Name: typing_extensions",
+        "Version: 4.16.0",
+        "Requires-Python: >=3.9",
+        "License-Expression: PSF-2.0"
+      ]
+    },
+    {
+      "file": "urllib3-2.8.0-py3-none-any.whl",
+      "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+      "metadata": [
+        "Name: urllib3",
+        "Version: 2.8.0",
+        "License-Expression: MIT",
+        "Requires-Python: >=3.10"
+      ]
+    },
+    {
+      "file": "ctranslate2-4.8.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+      "sha256": "0d1830d12c84b2240bf51893ee6bfe24a671dccfd232b05a74ef197d27fb164a",
+      "metadata": [
+        "Name: ctranslate2",
+        "Version: 4.8.4",
+        "License: MIT",
+        "Requires-Python: >=3.9"
+      ]
+    }
+  ]
+}

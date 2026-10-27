@@ -29,9 +29,13 @@ var ErrModelUnknownOutcome = errors.New("flow: model call outcome unknown")
 // OpenAICompatGateway calls an OpenAI-compatible /chat/completions endpoint
 // (FLOW_MODEL_GATEWAY_URL / _KEY / _MODEL). Cost = tokens × FLOW_MODEL_MICRO_PER_1K_TOKENS / 1000.
 type OpenAICompatGateway struct {
-	URL, Key, Model string
-	MicroPer1KTok   int64
-	HTTP            *http.Client
+	URL, Key, Model        string
+	MicroPer1KTok          int64
+	HTTP                   *http.Client
+	SupportsVision         bool
+	EmbeddingModel         string
+	EmbeddingMicroPer1KTok int64
+	EmbeddingDimensions    int
 }
 
 func ModelGatewayFromEnv() *OpenAICompatGateway {
@@ -43,13 +47,21 @@ func ModelGatewayFromEnv() *OpenAICompatGateway {
 	if price <= 0 {
 		price = 2000
 	}
-	return &OpenAICompatGateway{URL: u, Key: os.Getenv("FLOW_MODEL_GATEWAY_KEY"), Model: os.Getenv("FLOW_MODEL_GATEWAY_MODEL"), MicroPer1KTok: price}
+	embedPrice, _ := strconv.ParseInt(os.Getenv("FLOW_MODEL_GATEWAY_EMBEDDING_MICRO_PER_1K_TOKENS"), 10, 64)
+	embedDimensions, _ := strconv.Atoi(os.Getenv("FLOW_MODEL_GATEWAY_EMBEDDING_DIMENSIONS"))
+	return &OpenAICompatGateway{URL: u, Key: os.Getenv("FLOW_MODEL_GATEWAY_KEY"), Model: os.Getenv("FLOW_MODEL_GATEWAY_MODEL"), MicroPer1KTok: price, SupportsVision: strings.EqualFold(os.Getenv("FLOW_MODEL_GATEWAY_SUPPORTS_VISION"), "true"), EmbeddingModel: os.Getenv("FLOW_MODEL_GATEWAY_EMBEDDING_MODEL"), EmbeddingMicroPer1KTok: embedPrice, EmbeddingDimensions: embedDimensions}
 }
 
 func (g *OpenAICompatGateway) Complete(ctx context.Context, system, user string, maxTokens int) (string, int64, error) {
+	videoAccounting, _ := ctx.Value(videoAccountingKey{}).(bool)
+	var userContent any = user
+	if images, ok := ctx.Value(videoImagesKey{}).([]map[string]any); ok && len(images) > 0 {
+		content := []map[string]any{{"type": "text", "text": user}}
+		userContent = append(content, images...)
+	}
 	body, _ := json.Marshal(map[string]any{"model": g.Model, "max_tokens": maxTokens, "temperature": 0.2,
 		"response_format": map[string]any{"type": "json_object"},
-		"messages":        []map[string]string{{"role": "system", "content": system}, {"role": "user", "content": user}}})
+		"messages":        []map[string]any{{"role": "system", "content": system}, {"role": "user", "content": userContent}}})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.URL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return "", 0, err
@@ -101,10 +113,20 @@ func (g *OpenAICompatGateway) Complete(ctx context.Context, system, user string,
 		} `json:"usage"`
 	}
 	if err := json.Unmarshal(raw, &out); err != nil || len(out.Choices) == 0 {
+		if videoAccounting {
+			return "", 0, ErrModelUnknownOutcome
+		}
 		return "", 0, errors.New("model gateway: invalid response")
+	}
+	if videoAccounting && (out.Usage.TotalTokens <= 0 || out.Usage.PromptTokens < 0 || out.Usage.CompletionTokens < 0 || out.Usage.PromptTokens+out.Usage.CompletionTokens != out.Usage.TotalTokens) {
+		return "", 0, ErrModelUnknownOutcome
 	}
 	if u := modelUsageFrom(ctx); u != nil {
 		u.InputTokens, u.OutputTokens = out.Usage.PromptTokens, out.Usage.CompletionTokens
+	}
+	if videoAccounting {
+		cost, err := canvasTokenCost(out.Usage.TotalTokens, g.MicroPer1KTok)
+		return out.Choices[0].Message.Content, cost, err
 	}
 	return out.Choices[0].Message.Content, out.Usage.TotalTokens * g.MicroPer1KTok / 1000, nil
 }

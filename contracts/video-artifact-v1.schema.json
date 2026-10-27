@@ -1,0 +1,496 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:weavesense:video-artifact:v1",
+  "title": "Immutable scoped two-stage video artifact",
+  "description": "Shape contract only. Loom additionally verifies actual scoped bytes/hashes, parent lineage, required capability coverage and current execution fence before visibility.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_stage",
+    "video_job_id",
+    "stage_attempt",
+    "fencing_token",
+    "input_kind",
+    "input_hash",
+    "media_sha256",
+    "availability",
+    "objects",
+    "coverage",
+    "processors"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "artifact_stage": {
+      "enum": [
+        "input_ready",
+        "processing_complete"
+      ]
+    },
+    "video_job_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,80}$"
+    },
+    "stage_attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "fencing_token": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "input_kind": {
+      "enum": [
+        "platform_subtitles",
+        "media"
+      ]
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "media_sha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "availability": {
+      "enum": [
+        "not_acquired",
+        "available"
+      ]
+    },
+    "parent_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "objects": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "required": [
+          "object_key",
+          "sha256",
+          "bytes",
+          "content_type"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object_key": {
+            "type": "string",
+            "pattern": "^tenants/[A-Za-z0-9_-]{1,64}/workspaces/[A-Za-z0-9_-]{1,64}/video/[A-Za-z0-9_-]{1,80}/[a-f0-9]{64}/[A-Za-z0-9_.-]{1,120}$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000000
+          },
+          "content_type": {
+            "enum": [
+              "application/json",
+              "application/x-subrip",
+              "text/vtt",
+              "text/plain",
+              "video/mp4",
+              "audio/wav",
+              "audio/mpeg",
+              "image/png",
+              "image/jpeg"
+            ]
+          },
+          "artifact_type": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "retention_class": {
+            "type": "string",
+            "maxLength": 80
+          }
+        }
+      }
+    },
+    "processors": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "language": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "transcript": {
+      "type": "object",
+      "required": [
+        "parts"
+      ],
+      "properties": {
+        "parts": {
+          "type": "array",
+          "maxItems": 100000,
+          "items": {
+            "type": "object",
+            "required": [
+              "object_key",
+              "sha256",
+              "segment_count",
+              "start_ms",
+              "end_ms"
+            ],
+            "properties": {
+              "object_key": {
+                "type": "string",
+                "pattern": "^tenants/[A-Za-z0-9_-]{1,64}/workspaces/[A-Za-z0-9_-]{1,64}/video/[A-Za-z0-9_-]{1,80}/[a-f0-9]{64}/[A-Za-z0-9_.-]{1,120}$"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "segment_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "start_ms": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 86400000
+              },
+              "end_ms": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 86400000
+              }
+            }
+          }
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "required": [
+          "frame_id",
+          "object_key",
+          "sha256",
+          "timestamp_ms",
+          "media_sha256"
+        ],
+        "properties": {
+          "frame_id": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "object_key": {
+            "type": "string",
+            "pattern": "^tenants/[A-Za-z0-9_-]{1,64}/workspaces/[A-Za-z0-9_-]{1,64}/video/[A-Za-z0-9_-]{1,80}/[a-f0-9]{64}/[A-Za-z0-9_.-]{1,120}$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "timestamp_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 86400000
+          },
+          "media_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": [
+        "required",
+        "completed",
+        "missing"
+      ],
+      "properties": {
+        "required": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "completed": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "optional_missing": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000
+        },
+        "transcript_status": {
+          "type": "string"
+        },
+        "intervals": {
+          "type": "object"
+        }
+      }
+    },
+    "usage": {
+      "type": "object"
+    },
+    "source_metadata": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "visual": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "record_count",
+        "parts"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "parts": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "required": [
+              "object_key",
+              "sha256",
+              "bytes",
+              "content_type",
+              "record_count",
+              "start_ms",
+              "end_ms"
+            ],
+            "properties": {
+              "object_key": {
+                "type": "string",
+                "pattern": "^tenants/[A-Za-z0-9_-]{1,64}/workspaces/[A-Za-z0-9_-]{1,64}/video/[A-Za-z0-9_-]{1,80}/[a-f0-9]{64}/[A-Za-z0-9_.-]{1,120}$"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 262144
+              },
+              "content_type": {
+                "const": "application/json"
+              },
+              "artifact_type": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "retention_class": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "record_count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "start_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 86400000
+              },
+              "end_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 86400000
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "input_kind": {
+            "const": "platform_subtitles"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "media_sha256": {
+            "type": "null"
+          },
+          "availability": {
+            "const": "not_acquired"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input_kind": {
+            "const": "media"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "media_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "availability": {
+            "const": "available"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_stage": {
+            "const": "processing_complete"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "parent_manifest_sha256",
+          "transcript"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "object": {
+      "type": "object",
+      "required": [
+        "object_key",
+        "sha256",
+        "bytes",
+        "content_type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "object_key": {
+          "type": "string",
+          "pattern": "^tenants/[A-Za-z0-9_-]{1,64}/workspaces/[A-Za-z0-9_-]{1,64}/video/[A-Za-z0-9_-]{1,80}/[a-f0-9]{64}/[A-Za-z0-9_.-]{1,120}$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000000000
+        },
+        "content_type": {
+          "enum": [
+            "application/json",
+            "application/x-subrip",
+            "text/vtt",
+            "text/plain",
+            "video/mp4",
+            "audio/wav",
+            "audio/mpeg",
+            "image/png",
+            "image/jpeg"
+          ]
+        }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "required": [
+        "text",
+        "start_ms",
+        "end_ms"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 86400000
+        },
+        "end_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 86400000
+        },
+        "kind": {
+          "enum": [
+            "subtitle",
+            "asr",
+            "ocr",
+            "observation"
+          ]
+        },
+        "frame_ref": {
+          "type": "string"
+        },
+        "alignment_method": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

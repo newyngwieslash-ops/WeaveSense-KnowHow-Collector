@@ -1,3 +1,5 @@
 plugin-packages/*.sh text eol=lf
 *.sh text eol=lf
 *.bat text eol=crlf
+# Approved inputs are byte-hash-bound; preserve their original CRLF/EOF bytes.
+docs/video-ingestion/spec/* -text

@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card, Checkbox, Input, InputNumber, List, Select, Space, Tag, Typography, message } from "antd";
+import { MutationError, describeVideoError } from "./video-common";
+import { VideoConnectionHealth } from "./video-connection-health";
+import { useUserStore } from "@/stores/use-user-store";
 
 import {
     approveMcpConnection,
@@ -24,6 +27,7 @@ const STATUS_LABEL: Record<string, string> = { approved: "已批准", pending: "
 
 /** P4: managed MCP connections. Credentials are referenced by name only (env:FLOW_MCP_CRED_*, oauth:FLOW_MCP_OAUTH_* or interactive oauthcode:FLOW_MCP_OAUTHCODE_*); values never reach the browser. */
 export default function McpConnectionsPage() {
+    const userId = useUserStore(s => s.user?.id);
     const [workspaces, setWorkspaces] = useState<IntelWorkspace[]>([]);
     const [workspaceId, setWorkspaceId] = useState<string>();
     const [rows, setRows] = useState<McpConnection[]>([]);
@@ -31,27 +35,36 @@ export default function McpConnectionsPage() {
     const [review, setReview] = useState<{ id: string; tools: McpTool[]; picked: string[] }>();
     const [unknownCalls, setUnknownCalls] = useState<McpCall[]>([]);
     const [oauth, setOauth] = useState<Record<string, { connected: boolean; expiresAt?: string }>>({});
+    const [loadError, setLoadError] = useState<string>();
+    const currentWorkspace = useRef(workspaceId);
+    currentWorkspace.current = workspaceId;
 
     useEffect(() => {
+        let cancelled = false;
+        setWorkspaces([]); setWorkspaceId(undefined); setRows([]); setUnknownCalls([]); setReview(undefined); setOauth({});
         void listIntelWorkspaces().then((list) => {
+            if (cancelled) return;
             setWorkspaces(list);
-            setWorkspaceId((c) => c ?? list[0]?.id);
-        });
-    }, []);
+            setWorkspaceId(list[0]?.id);
+        }).catch(error => { if (!cancelled) setLoadError(describeVideoError(error)); });
+        return () => { cancelled = true; };
+    }, [userId]);
     const refresh = useCallback(() => {
         if (workspaceId) {
             void listMcpConnections(workspaceId)
                 .then((list) => {
+                    if (currentWorkspace.current !== workspaceId) return;
                     setRows(list);
+                    setLoadError(undefined);
                     for (const c of list.filter((x) => x.credentialRef.startsWith("oauthcode:")))
                         void getMcpOAuth(workspaceId, c.id)
-                            .then((st) => setOauth((cur) => ({ ...cur, [c.id]: st })))
+                            .then((st) => { if (currentWorkspace.current === workspaceId) setOauth((cur) => ({ ...cur, [c.id]: st })); })
                             .catch(() => undefined);
                 })
-                .catch(() => setRows([]));
+                .catch(error => { if (currentWorkspace.current === workspaceId) setLoadError(describeVideoError(error)); });
             void listMcpCalls(workspaceId, "unknown")
-                .then(setUnknownCalls)
-                .catch(() => setUnknownCalls([]));
+                .then(calls => { if (currentWorkspace.current === workspaceId) setUnknownCalls(calls); })
+                .catch(error => { if (currentWorkspace.current === workspaceId) setLoadError(describeVideoError(error)); });
         }
     }, [workspaceId]);
     useEffect(refresh, [refresh]);
@@ -69,7 +82,7 @@ export default function McpConnectionsPage() {
         <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 16, padding: 16 }}>
             <Card size="small" title="新建 MCP 连接">
                 <Space direction="vertical" style={{ width: "100%" }}>
-                    <Select style={{ width: "100%" }} value={workspaceId} onChange={setWorkspaceId} options={workspaces.map((w) => ({ value: w.id, label: w.name }))} />
+                    <Select style={{ width: "100%" }} value={workspaceId} onChange={value => { setRows([]); setUnknownCalls([]); setReview(undefined); setOauth({}); setWorkspaceId(value); }} options={workspaces.map((w) => ({ value: w.id, label: w.name }))} />
                     <Input placeholder="连接名称" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                     <Input placeholder="https://mcp.example.com/mcp（Streamable HTTP）" value={form.endpoint} onChange={(e) => setForm({ ...form, endpoint: e.target.value })} />
                     <Input placeholder="凭据引用（如 env:FLOW_MCP_CRED_ACME）" value={form.credentialRef} onChange={(e) => setForm({ ...form, credentialRef: e.target.value })} />
@@ -96,6 +109,7 @@ export default function McpConnectionsPage() {
                 </Space>
             </Card>
             <Card size="small" title="已配置连接">
+                <MutationError error={loadError} />
                 <List
                     dataSource={rows}
                     locale={{ emptyText: "暂无 MCP 连接" }}
@@ -138,6 +152,7 @@ export default function McpConnectionsPage() {
                                     </Typography.Text>
                                 </div>
                                 {c.statusReason && <Typography.Text type="warning">{c.statusReason}</Typography.Text>}
+                                <VideoConnectionHealth connection={c} />
                                 {review?.id === c.id && (
                                     <Card size="small" style={{ marginTop: 8 }} title="管理员审批：选择允许调用的工具（Schema 哈希已锁定）">
                                         <Checkbox.Group value={review.picked} onChange={(v) => setReview({ ...review, picked: v as string[] })}>

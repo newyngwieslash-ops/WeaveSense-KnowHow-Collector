@@ -6,6 +6,7 @@ export interface ExecutionContext {
   tenant_id: string; workspace_id: string;
   actor: { type: string; id: string };
   operation_id?: string; job_id?: string; scopes: string[];
+  stage_attempt?: number; fencing_token?: number;
   budget_reservation_id?: string; /** PRD §8.1 RunContext.capabilitySnapshotId (frozen run capabilities). */ capability_snapshot_id?: string; policy_version: string;
 }
 const HEADER = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString("base64url");
@@ -21,8 +22,8 @@ export function verify(key: string, token: string, audience: string, nowSec = Ma
   if (got.length !== sig.length || !timingSafeEqual(got, sig)) throw new AuthError("bad signature");
   let c: ExecutionContext;
   try { c = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")); } catch { throw new AuthError("bad body"); }
-  if (c.aud !== audience || !c.tenant_id || !c.workspace_id) throw new AuthError("bad audience/scope");
-  if (nowSec >= c.exp || c.exp - c.iat > MAX_TTL) throw new AuthError("expired");
+  if (c.aud !== audience || !c.tenant_id || !c.workspace_id || !c.iss || !["user", "service_principal"].includes(c.actor?.type) || !c.actor.id || !Array.isArray(c.scopes) || c.scopes.some(x => typeof x !== "string")) throw new AuthError("bad audience/scope");
+  if (!Number.isSafeInteger(c.exp) || !Number.isSafeInteger(c.iat) || c.iat > nowSec + 5 || c.exp <= c.iat || nowSec >= c.exp || c.exp - c.iat > MAX_TTL) throw new AuthError("expired");
   return c;
 }
 

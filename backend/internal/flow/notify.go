@@ -128,6 +128,9 @@ func cancelTargetDeliveries(tx *gorm.DB, targetID, reason string, now time.Time)
 }
 
 func ListNotificationDeliveries(db *gorm.DB, s Scope, status string) ([]model.FlowNotificationDelivery, error) {
+	if err := ensureNotificationVideoProjection(db, s); err != nil {
+		return nil, err
+	}
 	var out []model.FlowNotificationDelivery
 	q := db.Where("tenant_id = ? AND workspace_id = ?", s.TenantID, s.WorkspaceID)
 	if status != "" {
@@ -203,6 +206,17 @@ func (n Notifier) RunDue(ctx context.Context) (int, error) {
 
 func (n Notifier) deliver(ctx context.Context, d model.FlowNotificationDelivery) {
 	now := n.now()
+	video, projectionErr := videoSensitiveEvent(n.DB, d.TenantID, d.WorkspaceID, d.EventID)
+	if video && projectionErr == nil {
+		projectionErr = ReconcileVideoProjection(ctx, n.DB, ConfigFromEnv(), Scope{TenantID: d.TenantID, WorkspaceID: d.WorkspaceID})
+	}
+	if projectionErr != nil {
+		n.DB.Model(&model.FlowNotificationDelivery{}).Where("id = ? AND status = ?", d.ID, "sending").Updates(map[string]any{"status": StatusRetryWait, "last_error": "video projection quarantined", "lease_until": nil, "next_attempt_at": now.Add(time.Minute)})
+		return
+	}
+	if err := n.DB.First(&d, "id = ?", d.ID).Error; err != nil || d.Status != "sending" {
+		return
+	}
 	var t model.FlowNotificationTarget
 	if err := n.DB.First(&t, "id = ? AND tenant_id = ?", d.TargetID, d.TenantID).Error; err != nil || t.Status != "active" {
 		n.DB.Model(&model.FlowNotificationDelivery{}).Where("id = ?", d.ID).Updates(map[string]any{"status": "cancelled", "last_error": "target not active", "lease_until": nil, "updated_at": now})

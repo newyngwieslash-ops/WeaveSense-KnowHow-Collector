@@ -465,6 +465,8 @@ func migrations() []tableMigration {
 		migrateTable[model.FlowRunCapability]("flow_run_capabilities"),
 		migrateTable[model.FlowSkillInstall]("flow_skill_installs"),
 		migrateTable[model.FlowSkillRunPin]("flow_skill_run_pins"),
+		migrateTable[model.CanvasWorkflowExecution]("flow_canvas_workflow_executions"),
+		migrateTable[model.CanvasMonitorRunUsage]("flow_canvas_monitor_run_usage"),
 		migrateTable[model.CloudAgentGeminiCache]("cloud_agent_gemini_caches"),
 		migrateTable[model.AgentProfile]("agent_profiles"),
 		migrateTable[model.AgentLesson]("agent_lessons"),

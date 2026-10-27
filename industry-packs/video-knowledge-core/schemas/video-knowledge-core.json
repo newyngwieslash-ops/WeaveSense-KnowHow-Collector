@@ -1,0 +1,269 @@
+{
+  "$defs": {
+    "citation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "snippet_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "revision",
+        "snippet_hash"
+      ],
+      "type": "object"
+    },
+    "input_requirements": {
+      "properties": {
+        "evidence": {
+          "items": {
+            "properties": {
+              "evidence_id": {
+                "type": "string"
+              },
+              "revision": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "snippet_hash": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "evidence_id",
+              "revision",
+              "snippet_hash"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "profile_id": {
+          "type": "string"
+        },
+        "profile_version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "profile_id",
+        "profile_version",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "unit": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "boundaries": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "claim_kind": {
+          "enum": [
+            "source_statement",
+            "observation",
+            "model_inference",
+            "cross_source_verified"
+          ],
+          "type": "string"
+        },
+        "conditions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "conflict_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "counterexamples": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "domain_tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/citation"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "missing_fields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "parameters": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "conditions": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              },
+              "unit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "value",
+              "unit",
+              "conditions"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "statement": {
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "fact",
+            "definition",
+            "procedure",
+            "example",
+            "pitfall",
+            "parameter",
+            "constraint",
+            "risk"
+          ],
+          "type": "string"
+        },
+        "valid_from": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valid_until": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "title",
+        "domain_tags",
+        "statement",
+        "claim_kind",
+        "applicability",
+        "conditions",
+        "steps",
+        "parameters",
+        "boundaries",
+        "counterexamples",
+        "missing_fields",
+        "evidence",
+        "valid_from",
+        "valid_until",
+        "conflict_key"
+      ],
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "coverage_limitations": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "knowledge_units": {
+      "items": {
+        "$ref": "#/$defs/unit"
+      },
+      "maxItems": 50,
+      "type": "array"
+    },
+    "missing_information": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "profile_version": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "relevance": {
+      "enum": [
+        "relevant",
+        "irrelevant",
+        "uncertain"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "profile_id",
+    "profile_version",
+    "relevance",
+    "knowledge_units",
+    "missing_information",
+    "coverage_limitations"
+  ],
+  "type": "object"
+}

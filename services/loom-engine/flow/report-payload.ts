@@ -39,7 +39,8 @@ export function validateReportEvidence(claims: any[], scope: any, known: Map<str
       if (!scope.document_ids?.includes(ev.document_id) && !scope.source_ids?.includes(ev.source_id)) throw new HttpError(422, "citation outside material scope");
       if (x.chunk_index != null && x.chunk_index !== ev.chunk_index) throw new HttpError(422, "citation chunk mismatch");
       if (!ev.snippet_ok || !ev.url_ok || (x.snippet_hash != null && x.snippet_hash !== ev.snippet_hash) || (x.url != null && x.url !== ev.url)) throw new HttpError(422, "citation snippet hash or url mismatch");
-      if (ev.source_id) sources.add(ev.source_id);
+      if (c.kind === "cross_source_verified" && ev.origin_pending) throw new HttpError(422, "origin independence review pending");
+      if (ev.source_id) sources.add(ev.origin_cluster ?? ev.source_id);
     }
     if (c.kind === "cross_source_verified" && sources.size < 2) throw new HttpError(422, "cross_source_verified needs independent sources");
   }

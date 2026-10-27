@@ -29,11 +29,18 @@ export function checkTimezone(tz: string) {
 }
 /** Next fire time strictly after `after`, scanning minute by minute (≤ 62 days). */
 export function nextCron(expr: string, tz: string, after: Date): Date {
+  return adjacentCron(expr, tz, after, 1);
+}
+/** Previous real fire in the schedule timezone, including DST and non-uniform calendar gaps. */
+export function previousCron(expr: string, tz: string, before: Date): Date {
+  return adjacentCron(expr, tz, before, -1);
+}
+function adjacentCron(expr: string, tz: string, after: Date, direction: 1 | -1): Date {
   const c = parseCron(expr); checkTimezone(tz);
   const fmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", weekday: "short" });
   const wd: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  let t = Math.floor(after.getTime() / 60000) * 60000 + 60000;
-  for (let i = 0; i < 62 * 1440; i++, t += 60000) {
+  let t = (direction === 1 ? Math.floor(after.getTime() / 60000) + 1 : Math.ceil(after.getTime() / 60000) - 1) * 60000;
+  for (let i = 0; i < 62 * 1440; i++, t += direction * 60000) {
     const p = Object.fromEntries(fmt.formatToParts(new Date(t)).map((x) => [x.type, x.value]));
     const dom = c.dom.has(Number(p.day)), dow = c.dow.has(wd[p.weekday]);
     const dayOk = c.domAny || c.dowAny ? dom && dow : dom || dow;

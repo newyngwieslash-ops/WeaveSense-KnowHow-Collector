@@ -38,6 +38,9 @@ type ExecutionContext struct {
 	// CapabilitySnapshotID (PRD §8.1 RunContext.capabilitySnapshotId): the run's frozen capabilities.
 	CapabilitySnapshotID string `json:"capability_snapshot_id,omitempty"`
 	PolicyVersion        string `json:"policy_version"`
+	// Bound by the platform, never supplied in model tool arguments.
+	ServiceIdentity string `json:"service_identity,omitempty"`
+	ConnectionID    string `json:"connection_id,omitempty"`
 }
 
 const MaxTokenTTL = 5 * time.Minute
@@ -84,6 +87,9 @@ func Sign(key []byte, c ExecutionContext, now time.Time, ttl time.Duration) (str
 // Verify checks signature, algorithm, audience and expiry.
 func Verify(key []byte, token, audience string, now time.Time) (ExecutionContext, error) {
 	var c ExecutionContext
+	if len(key) < 32 {
+		return c, ErrBadToken
+	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return c, ErrBadToken
@@ -105,7 +111,7 @@ func Verify(key []byte, token, audience string, now time.Time) (ExecutionContext
 	if c.Audience != audience || c.TenantID == "" || c.WorkspaceID == "" {
 		return c, ErrBadToken
 	}
-	if now.Unix() >= c.ExpiresAt || c.ExpiresAt-c.IssuedAt > int64(MaxTokenTTL/time.Second) {
+	if c.IssuedAt > now.Unix()+5 || c.ExpiresAt <= c.IssuedAt || now.Unix() >= c.ExpiresAt || c.ExpiresAt-c.IssuedAt > int64(MaxTokenTTL/time.Second) {
 		return c, ErrExpiredToken
 	}
 	return c, nil

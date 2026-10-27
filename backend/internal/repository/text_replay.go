@@ -24,6 +24,9 @@ type TextReplayStats struct {
 }
 
 func (r *Repository) AppendTaskTextDelta(userID string, taskID string, content string, expiresAt time.Time, limits TextReplayLimits) (*model.TaskTextDelta, error) {
+	if err := r.checkVideoTaskProjection(userID, taskID); err != nil {
+		return nil, err
+	}
 	var created model.TaskTextDelta
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		var task model.Task
@@ -32,6 +35,9 @@ func (r *Repository) AppendTaskTextDelta(userID string, taskID string, content s
 		}
 		if task.Status == model.TaskStatusSucceeded || task.Status == model.TaskStatusFailed || task.Status == model.TaskStatusCancelled {
 			return ErrTextReplayClosed
+		}
+		if err := New(tx.Set(videoProjectionLocalKey, true).Session(&gorm.Session{})).checkVideoTaskProjection(userID, taskID); err != nil {
+			return err
 		}
 		var taskUsage struct {
 			Count int64
@@ -56,6 +62,9 @@ func (r *Repository) AppendTaskTextDelta(userID string, taskID string, content s
 }
 
 func (r *Repository) TaskTextDeltas(userID string, taskID string, after int64, limit int) ([]model.TaskTextDelta, error) {
+	if err := r.checkVideoTaskProjection(userID, taskID); err != nil {
+		return nil, err
+	}
 	var items []model.TaskTextDelta
 	if limit <= 0 || limit > 1000 {
 		limit = 1000
@@ -127,6 +136,9 @@ func (r *Repository) CleanupTaskTextDeltas(now time.Time) (int64, error) {
 // CompleteTextReplayTask 把前端自管的 text_replay 任务原子收尾：写入最终正文并置为 succeeded。
 // 条件更新保证只有仍处于 text_replay 状态的任务能被收尾，避免重复完成。
 func (r *Repository) CompleteTextReplayTask(userID string, taskID string, resultJSON string, now time.Time) (bool, error) {
+	if err := r.checkVideoTaskProjection(userID, taskID); err != nil {
+		return false, err
+	}
 	result := r.db.Model(&model.Task{}).
 		Where("id = ? AND user_id = ? AND status = ?", taskID, userID, model.TaskStatusTextReplay).
 		Updates(map[string]any{

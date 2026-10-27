@@ -3,6 +3,7 @@ package flow
 import (
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"yingce/backend/internal/model"
@@ -42,6 +43,12 @@ func (c Conversations) Get(userID, id string) (model.FlowAgentConversation, Subj
 	if err != nil || ss.Scope.TenantID != conv.TenantID {
 		return conv, SubjectScope{}, ErrNotFound
 	}
+	if err := ensureConversationVideoProjection(c.DB, conv); err != nil {
+		return conv, ss, err
+	}
+	if err := c.DB.First(&conv, "id = ?", conv.ID).Error; err != nil {
+		return conv, ss, err
+	}
 	return conv, ss, nil
 }
 
@@ -54,7 +61,18 @@ func (c Conversations) List(userID string, limit int, before time.Time) ([]model
 		q = q.Where("updated_at < ?", before)
 	}
 	var out []model.FlowAgentConversation
-	return out, q.Find(&out).Error
+	if err := q.Find(&out).Error; err != nil {
+		return nil, err
+	}
+	for i := range out {
+		if err := ensureConversationVideoProjection(c.DB, out[i]); err != nil {
+			return nil, err
+		}
+		if err := c.DB.First(&out[i], "id = ?", out[i].ID).Error; err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // Append adds a message with the next sequence number atomically.
@@ -66,6 +84,9 @@ func (c Conversations) Append(conv model.FlowAgentConversation, m model.FlowAgen
 			return err
 		}
 		kind = cur.SubjectKind
+		if (strings.Contains(cur.EvidenceScope, `"_video_content_erased":true`) || strings.Contains(cur.EvidenceScope, `"_video_content_revoked":true`)) && m.Role != "user" {
+			return ErrVideoProjectionUnavailable
+		}
 		m.ID, m.ConversationID, m.TenantID, m.Seq = NewID("msg_"), cur.ID, cur.TenantID, cur.LastSeq+1
 		if err := tx.Create(&m).Error; err != nil {
 			return err
@@ -83,6 +104,13 @@ func (c Conversations) Append(conv model.FlowAgentConversation, m model.FlowAgen
 
 // Messages pages newest-first by seq; beforeSeq=0 means latest.
 func (c Conversations) Messages(convID string, beforeSeq int64, limit int) ([]model.FlowAgentMessage, int64, error) {
+	var conv model.FlowAgentConversation
+	if err := c.DB.First(&conv, "id = ?", convID).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := ensureConversationVideoProjection(c.DB, conv); err != nil {
+		return nil, 0, err
+	}
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}

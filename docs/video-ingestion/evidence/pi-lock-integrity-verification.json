@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "scope": "official_registry_read_only_exact_versions_and_tarball_byte_hash_verification",
+  "target": "backend/agent-runtime/pi/package-lock.json",
+  "required_before_sha256": "976cc4b3c4edde2eafd3f67d3d6efe7a667a31f103da8f313edded1d4917703b",
+  "verification_result": "5_of_5_sha512_and_sha1_match_official_registry_metadata",
+  "packages": [
+    {
+      "name": "@earendil-works/chord",
+      "version": "0.87.1",
+      "lock_key": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/chord",
+      "metadata_url": "https://registry.npmjs.org/@earendil-works%2Fchord/0.87.1",
+      "metadata_sha256": "85d96cac8710388dd6e7f31811e80dccb6840f976b480802d2a29ebfcef06757",
+      "tarball_url": "https://registry.npmjs.org/@earendil-works/chord/-/chord-0.87.1.tgz",
+      "tarball_bytes": 236677,
+      "tarball_sha256": "4d1b2911c858dc5b7f858af6626e63e057b355d50ce90b472239e9192ce749f4",
+      "tarball_sha1": "f983a4eae3e22c8204c53ea13070bf491330a31a",
+      "computed_integrity": "sha512-bg7IkJGFcEaMqqYgOGUiq5Ky9RghpRfrlZ8I/v/1b4bBZ02A7t3E+6uhPRbadwWb/kWsnVFbZsqOKRN4a3LLCg==",
+      "registry_integrity": "sha512-bg7IkJGFcEaMqqYgOGUiq5Ky9RghpRfrlZ8I/v/1b4bBZ02A7t3E+6uhPRbadwWb/kWsnVFbZsqOKRN4a3LLCg==",
+      "registry_sha1": "f983a4eae3e22c8204c53ea13070bf491330a31a",
+      "sha512_verified": true,
+      "sha1_verified": true,
+      "license_declared_in_registry": "MIT",
+      "signatures_present": true,
+      "signature_and_attestation_verification": "not_performed",
+      "install_or_package_execution": "not_performed"
+    },
+    {
+      "name": "@earendil-works/pi-agent-core",
+      "version": "0.87.1",
+      "lock_key": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core",
+      "metadata_url": "https://registry.npmjs.org/@earendil-works%2Fpi-agent-core/0.87.1",
+      "metadata_sha256": "f766c3c48e542c58841c7d94cf5bfe3c4f577185ebc311c0758543ba19a447fe",
+      "tarball_url": "https://registry.npmjs.org/@earendil-works/pi-agent-core/-/pi-agent-core-0.87.1.tgz",
+      "tarball_bytes": 994229,
+      "tarball_sha256": "646267cfa782ae4efcbb936728373e73568f1e16b8520d244f8c1d91088c12c4",
+      "tarball_sha1": "bfea5c2d96dd33f8e150b7f85f693dbc72973674",
+      "computed_integrity": "sha512-Zev3B0HK7YS5A4EZQ2XnEqiJuirx6QBiltJ+LpmjV5a/+2IU0cfKtIfnkNkORK707XOvKBY2WRtk7cAwHpbh2Q==",
+      "registry_integrity": "sha512-Zev3B0HK7YS5A4EZQ2XnEqiJuirx6QBiltJ+LpmjV5a/+2IU0cfKtIfnkNkORK707XOvKBY2WRtk7cAwHpbh2Q==",
+      "registry_sha1": "bfea5c2d96dd33f8e150b7f85f693dbc72973674",
+      "sha512_verified": true,
+      "sha1_verified": true,
+      "license_declared_in_registry": "MIT",
+      "signatures_present": true,
+      "signature_and_attestation_verification": "not_performed",
+      "install_or_package_execution": "not_performed"
+    },
+    {
+      "name": "@earendil-works/pi-ai",
+      "version": "0.87.1",
+      "lock_key": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai",
+      "metadata_url": "https://registry.npmjs.org/@earendil-works%2Fpi-ai/0.87.1",
+      "metadata_sha256": "f20f180e1fbaad6a1121eedfb8262b55f97357861bc4dac17058306159f46538",
+      "tarball_url": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-0.87.1.tgz",
+      "tarball_bytes": 838330,
+      "tarball_sha256": "35b4432f27cc2665f86beebb9af6a39b1251970883c3044bd8be4f4e8c731ca0",
+      "tarball_sha1": "7d1f174120d5e6d33f301503677ec3281f217e2a",
+      "computed_integrity": "sha512-X/3PfQBnnoeVdO9Cv8zHghUMglzlgNZYGNzoPnbRoGnHl3Rw3TlA2UKSUB7BRHUOxMryHXYa8dnjWZlbRheDZA==",
+      "registry_integrity": "sha512-X/3PfQBnnoeVdO9Cv8zHghUMglzlgNZYGNzoPnbRoGnHl3Rw3TlA2UKSUB7BRHUOxMryHXYa8dnjWZlbRheDZA==",
+      "registry_sha1": "7d1f174120d5e6d33f301503677ec3281f217e2a",
+      "sha512_verified": true,
+      "sha1_verified": true,
+      "license_declared_in_registry": "MIT",
+      "signatures_present": true,
+      "signature_and_attestation_verification": "not_performed",
+      "install_or_package_execution": "not_performed"
+    },
+    {
+      "name": "@earendil-works/pi-telemetry",
+      "version": "0.87.1",
+      "lock_key": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-telemetry",
+      "metadata_url": "https://registry.npmjs.org/@earendil-works%2Fpi-telemetry/0.87.1",
+      "metadata_sha256": "fb62a661eb3bd4f75d1faba71eb6dc5ded15451cc8cacb01897fc09c57699f90",
+      "tarball_url": "https://registry.npmjs.org/@earendil-works/pi-telemetry/-/pi-telemetry-0.87.1.tgz",
+      "tarball_bytes": 27323,
+      "tarball_sha256": "7bef6bde5f21f12f1b39c21fff4594db35e99166c9864b11abb789f9afc5daf4",
+      "tarball_sha1": "856ce8c1539d4ea24dee679f1be6e19ae353f04b",
+      "computed_integrity": "sha512-MC6TRQH5lgMXpcN+Vku2WMI2T8BsiUPzMQHGo81uqFZD3/9O79WWJAysEDGuzduP6R4tvtgwMLwmqIxynM10JQ==",
+      "registry_integrity": "sha512-MC6TRQH5lgMXpcN+Vku2WMI2T8BsiUPzMQHGo81uqFZD3/9O79WWJAysEDGuzduP6R4tvtgwMLwmqIxynM10JQ==",
+      "registry_sha1": "856ce8c1539d4ea24dee679f1be6e19ae353f04b",
+      "sha512_verified": true,
+      "sha1_verified": true,
+      "license_declared_in_registry": "MIT",
+      "signatures_present": true,
+      "signature_and_attestation_verification": "not_performed",
+      "install_or_package_execution": "not_performed"
+    },
+    {
+      "name": "@earendil-works/pi-tui",
+      "version": "0.87.1",
+      "lock_key": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui",
+      "metadata_url": "https://registry.npmjs.org/@earendil-works%2Fpi-tui/0.87.1",
+      "metadata_sha256": "9ed7d8dae6393a44ac601769efec8c9232e733235e9eec3c3ae1d9e6fb290c07",
+      "tarball_url": "https://registry.npmjs.org/@earendil-works/pi-tui/-/pi-tui-0.87.1.tgz",
+      "tarball_bytes": 593797,
+      "tarball_sha256": "6723150c4996003efa39e034c7f0f5975fc2abe7c1244c67e9a5e92703afbe38",
+      "tarball_sha1": "2e3cf93fe05b7a4277855d0489e388671fcb62c2",
+      "computed_integrity": "sha512-YEH2vRyOeiO7hhN6j6AE6YwKSq2Kz2f3XR8bj1TbR+aGE/JsnY1hLPMI2pvaZfRM1n9Y00tejxFQ4zbzvF7nkQ==",
+      "registry_integrity": "sha512-YEH2vRyOeiO7hhN6j6AE6YwKSq2Kz2f3XR8bj1TbR+aGE/JsnY1hLPMI2pvaZfRM1n9Y00tejxFQ4zbzvF7nkQ==",
+      "registry_sha1": "2e3cf93fe05b7a4277855d0489e388671fcb62c2",
+      "sha512_verified": true,
+      "sha1_verified": true,
+      "license_declared_in_registry": "MIT",
+      "signatures_present": true,
+      "signature_and_attestation_verification": "not_performed",
+      "install_or_package_execution": "not_performed"
+    }
+  ],
+  "proposed_json_patch": [
+    {
+      "op": "test",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1chord/version",
+      "value": "0.87.1"
+    },
+    {
+      "op": "test",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1chord/resolved",
+      "value": "https://registry.npmjs.org/@earendil-works/chord/-/chord-0.87.1.tgz"
+    },
+    {
+      "op": "add",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1chord/integrity",
+      "value": "sha512-bg7IkJGFcEaMqqYgOGUiq5Ky9RghpRfrlZ8I/v/1b4bBZ02A7t3E+6uhPRbadwWb/kWsnVFbZsqOKRN4a3LLCg=="
+    },
+    {
+      "op": "test",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-agent-core/version",
+      "value": "0.87.1"
+    },
+    {
+      "op": "test",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-agent-core/resolved",
+      "value": "https://registry.npmjs.org/@earendil-works/pi-agent-core/-/pi-agent-core-0.87.1.tgz"
+    },
+    {
+      "op": "add",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-agent-core/integrity",
+      "value": "sha512-Zev3B0HK7YS5A4EZQ2XnEqiJuirx6QBiltJ+LpmjV5a/+2IU0cfKtIfnkNkORK707XOvKBY2WRtk7cAwHpbh2Q=="
+    },
+    {
+      "op": "test",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-ai/version",
+      "value": "0.87.1"
+    },
+    {
+      "op": "test",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-ai/resolved",
+      "value": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-0.87.1.tgz"
+    },
+    {
+      "op": "add",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-ai/integrity",
+      "value": "sha512-X/3PfQBnnoeVdO9Cv8zHghUMglzlgNZYGNzoPnbRoGnHl3Rw3TlA2UKSUB7BRHUOxMryHXYa8dnjWZlbRheDZA=="
+    },
+    {
+      "op": "test",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-telemetry/version",
+      "value": "0.87.1"
+    },
+    {
+      "op": "test",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-telemetry/resolved",
+      "value": "https://registry.npmjs.org/@earendil-works/pi-telemetry/-/pi-telemetry-0.87.1.tgz"
+    },
+    {
+      "op": "add",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-telemetry/integrity",
+      "value": "sha512-MC6TRQH5lgMXpcN+Vku2WMI2T8BsiUPzMQHGo81uqFZD3/9O79WWJAysEDGuzduP6R4tvtgwMLwmqIxynM10JQ=="
+    },
+    {
+      "op": "test",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-tui/version",
+      "value": "0.87.1"
+    },
+    {
+      "op": "test",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-tui/resolved",
+      "value": "https://registry.npmjs.org/@earendil-works/pi-tui/-/pi-tui-0.87.1.tgz"
+    },
+    {
+      "op": "add",
+      "path": "/packages/node_modules~1@earendil-works~1pi-coding-agent~1node_modules~1@earendil-works~1pi-tui/integrity",
+      "value": "sha512-YEH2vRyOeiO7hhN6j6AE6YwKSq2Kz2f3XR8bj1TbR+aGE/JsnY1hLPMI2pvaZfRM1n9Y00tejxFQ4zbzvF7nkQ=="
+    }
+  ],
+  "remaining_gates": [
+    "Registry signatures/provenance attestations and publisher/source relationship not cryptographically verified.",
+    "Final image OS/application closure and special/unknown license distribution review remain separate."
+  ],
+  "registry_verification_phase": {
+    "lock_modified": false,
+    "package_install_or_execution": false
+  },
+  "application_state": {
+    "status": "applied_by_parent_and_locked_npm_ci_passed",
+    "target_sha256": "c401f46ddc69ffe1a0efcefde4cce5e12c4a710aa1aa00da4f71fb67f2dc62cb",
+    "changed_fields": "exactly_five_existing_packages_integrity_added",
+    "version_or_resolved_or_package_set_changes": false,
+    "source_diff_verified_independently": true,
+    "npm_ci": {
+      "command": "npm ci --ignore-scripts --cache <existing-workspace-runtime>/npm-cache",
+      "exit_status_reported_by_parent": 0,
+      "log_summary": "added 230 packages in 10s",
+      "log_sha256": "a3538c7f5a07b97a2dd63ecea2fe2be9058dd47ebbb6141b5bcab649e83801e9",
+      "lifecycle_scripts": "disabled",
+      "initial_attempt": "default_cache_ENOENT; corrected_to_existing_workspace_cache; final_run_passed",
+      "warnings": [
+        "Unknown env config http-proxy (value not inspected)",
+        "node-domexception@1.0.0 deprecated; no version change performed"
+      ]
+    },
+    "scope_limit": "This is locked installation verification, not application tests, vulnerabilities audit, registry-signature verification, or Docker build."
+  }
+}

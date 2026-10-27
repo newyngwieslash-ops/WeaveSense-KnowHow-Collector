@@ -1,0 +1,654 @@
+{
+  "schema_version": 1,
+  "scope": "Loom core implementation evidence; not production acceptance",
+  "updated_at": "2026-10-26T18:30:00Z",
+  "baseline": "514c70f666cb04e3e72cbfb967fac74d9f350747",
+  "global_boundaries": [
+    "No live platform credentials, paid model calls, public publication, deployment or seven-day pilot performed.",
+    "Synthetic fixtures are explicitly labeled; real PGlite, local HTTP, SQLite and FFmpeg execution do not prove platform or model quality.",
+    "All referenced task IDs preserved; no P2 work started."
+  ],
+  "test_runs": [
+    {
+      "command": "node --experimental-strip-types --test --test-concurrency=1 flow/video.test.ts flow/video-qa.test.ts flow/engine.test.ts",
+      "cwd": "services/loom-engine",
+      "log": "/tmp/video-final-core.log",
+      "result": "25 passed, 0 failed",
+      "mode": "synthetic fixtures + real local components"
+    },
+    {
+      "command": "node --experimental-strip-types --test --test-concurrency=1 flow/video-qa.test.ts flow/gaps5.test.ts",
+      "log": "/tmp/video-core-qa2.log",
+      "result": "18 passed, 0 failed",
+      "mode": "earlier focused regression"
+    },
+    {
+      "command": "npx tsc --noEmit --module nodenext --moduleResolution nodenext --target es2023 --allowImportingTsExtensions --skipLibCheck flow/video*.ts flow/server.ts flow/auth.ts",
+      "log": "/tmp/video-typecheck.log",
+      "result": "fails baseline unrelated legacy/src typing; no claim of typecheck success"
+    },
+    {
+      "command": "node --experimental-strip-types --test --test-concurrency=1 flow/video.test.ts flow/video-qa.test.ts flow/video-visual-qa.test.ts flow/video-retention-policy.test.ts flow/engine.test.ts",
+      "cwd": "services/loom-engine",
+      "log": "/tmp/video-core-wave-serial.log",
+      "result": "49 tests: 47 passed, 0 failed, 2 explicit PostgreSQL opt-in skips",
+      "mode": "actual local PGlite/HTTP/Python/FFmpeg with explicitly synthetic platform/intelligence callbacks"
+    },
+    {
+      "command": "node_modules/.bin/tsc --project tsconfig.flow.json && node --experimental-strip-types --test --test-concurrency=1 flow/video.test.ts flow/video-visual-qa.test.ts",
+      "cwd": "services/loom-engine",
+      "log": "/tmp/video-final-controls2.log",
+      "result": "strict production TypeScript passed; 21 runtime tests passed, 0 failed",
+      "mode": "final focused controls including resource/fairness/share-text/typed visual conflict guards"
+    },
+    {
+      "command": "QA independent cross-language visual/media/repair fixture",
+      "log": "/tmp/knowhow-visual-media-repair-recheck.log",
+      "result": "1 passed: exact-hash controlled repair and immutable original evidence",
+      "mode": "actual Python/SQLite/FFmpeg/Loom HTTP with synthetic platform, ASR/OCR/VLM; no model-quality claim"
+    },
+    {
+      "command": "node --experimental-strip-types --test --test-concurrency=1 --test-name-pattern='G15 expired same-owner' flow/video.test.ts",
+      "log": "/tmp/video-g15-expired-before.log",
+      "result": "Expected red regression: provider, source and workspace scenarios each reproduced expired-owner capacity bypass before fix"
+    },
+    {
+      "command": "node_modules/.bin/tsc --project tsconfig.flow.json && node --experimental-strip-types --test --test-concurrency=1 flow/video.test.ts",
+      "log": "/tmp/video-g15-serial.log",
+      "result": "Strict production TypeScript passed; 23 runtime tests passed, 0 failed, 0 skipped after requiring live lease for all same-owner capacity exemptions",
+      "mode": "actual PGlite state/lease/fence tests; includes live continuation, expired rejection, slot release and stale-heartbeat denial"
+    },
+    {
+      "command": "node --experimental-strip-types --test --test-concurrency=1 --test-name-pattern='COL024' flow/video.test.ts",
+      "cwd": "/tmp/knowhow-col024-observation",
+      "log": "/tmp/video-col024-before.log",
+      "result": "Expected red regression: 2 tests reproduced absent external stage observation/status fields before the production patch",
+      "mode": "isolated copy of actual Loom code and PGlite; synthetic provider responses, no platform calls"
+    },
+    {
+      "command": "node_modules/.bin/tsc --project tsconfig.flow.json && node --experimental-strip-types --test --test-concurrency=1 flow/video.test.ts",
+      "cwd": "services/loom-engine",
+      "log": "/tmp/video-col024-production-serial.log",
+      "result": "Strict production TypeScript passed; 26 tests passed, 0 failed, 0 skipped after migration 0030 and fenced safe external-observation projection",
+      "mode": "actual PGlite migration/status/lease tests; pending submit and failed poll, lost response and no-ID reconcile, cancellation uncertainty, legacy unknown, cross-scope denial, redaction and stale-poll denial"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "FND-002",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video-contract.ts",
+        "services/loom-engine/flow/video-provider.ts",
+        "services/loom-engine/flow/server.ts"
+      ],
+      "verification": [
+        "docs/video-ingestion/CONTRACTS.md"
+      ],
+      "remaining_acceptance": [
+        "跨组件实现已协调；真实授权样本和行业评审待提供"
+      ]
+    },
+    {
+      "id": "CFG-001",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/migrations/0023_video_core.sql"
+      ],
+      "verification": [
+        "CFG001 immutable scoped versions and fresh JWTs share business fingerprint",
+        "QA CFG: job freezes the selected profile processing mode"
+      ],
+      "remaining_acceptance": [
+        "首发真实行业配置、术语词表和人工审核输入待提供"
+      ]
+    },
+    {
+      "id": "K-001",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/main.ts"
+      ],
+      "verification": [
+        "CFG001 immutable scoped versions and fresh JWTs share business fingerprint"
+      ],
+      "remaining_acceptance": [
+        "首发行业配置待业务确认"
+      ]
+    },
+    {
+      "id": "COL-002",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video-contract.ts",
+        "services/loom-engine/flow/video-provider.ts"
+      ],
+      "verification": [
+        "QA COL002: invalid platform and invalid Bilibili part never collapse to default identity"
+      ],
+      "remaining_acceptance": [
+        "真实双平台分页/删除/修订样本尚未验收"
+      ]
+    },
+    {
+      "id": "COL-003",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/migrations/0023_video_core.sql"
+      ],
+      "verification": [
+        "migrations are idempotent",
+        "QA COL017: file-backed PGlite restart preserves job and rejects pre-restart expired fence"
+      ],
+      "remaining_acceptance": [
+        "实现与本地回归证据已记录；最终跨组件及生产验收尚未签署"
+      ]
+    },
+    {
+      "id": "COL-004",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/engine.ts",
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/server.ts"
+      ],
+      "verification": [
+        "CFG001 immutable scoped versions and fresh JWTs share business fingerprint"
+      ],
+      "remaining_acceptance": [
+        "真实来源授权凭据和有效期轮换仍需运维验证"
+      ]
+    },
+    {
+      "id": "COL-008",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/server.ts"
+      ],
+      "verification": [
+        "COL009/010 preview discovery is isolated; scheduled pages persist tasks before watermark"
+      ],
+      "remaining_acceptance": [
+        "平台真实发现与导入样本待提供"
+      ]
+    },
+    {
+      "id": "COL-009",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/engine.ts"
+      ],
+      "verification": [
+        "COL009/010 preview discovery is isolated; scheduled pages persist tasks before watermark"
+      ],
+      "remaining_acceptance": [
+        "DTK未证明作者排序/置顶保证，不能用旧页推测边界；有界partial扫描但首次回溯/持续覆盖实测未完成"
+      ]
+    },
+    {
+      "id": "COL-010",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/migrations/0023_video_core.sql"
+      ],
+      "verification": [
+        "COL009/010 preview discovery is isolated; scheduled pages persist tasks before watermark"
+      ],
+      "remaining_acceptance": [
+        "生产PostgreSQL并发故障注入待运行"
+      ]
+    },
+    {
+      "id": "COL-011",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/engine.ts",
+        "services/loom-engine/flow/cron.ts"
+      ],
+      "verification": [
+        "cron window duration uses previous actual timezone occurrence across DST",
+        "flow/gaps5.test.ts 11 existing tests"
+      ],
+      "remaining_acceptance": [
+        "真实周期运行/授权撤销试点待提供"
+      ]
+    },
+    {
+      "id": "COL-012",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/migrations/0023_video_core.sql"
+      ],
+      "verification": [
+        "COL013 lost external response never resubmits; reconcile-by-key recovers confirmed task"
+      ],
+      "remaining_acceptance": [
+        "实现与本地回归证据已记录；最终跨组件及生产验收尚未签署"
+      ]
+    },
+    {
+      "id": "COL-013",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/video-provider.ts"
+      ],
+      "verification": [
+        "COL013 lost external response never resubmits; reconcile-by-key recovers confirmed task"
+      ],
+      "remaining_acceptance": [
+        "真实DTK接单后断线对账尚未运行"
+      ]
+    },
+    {
+      "id": "COL-014",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/video-provider.ts",
+        "services/loom-engine/flow/main.ts"
+      ],
+      "verification": [
+        "COL013 lost external response never resubmits; reconcile-by-key recovers confirmed task",
+        "QA cross-language media: real signed Python HTTP/SQLite/FFmpeg through Loom input and ready barriers"
+      ],
+      "remaining_acceptance": [
+        "实际长视频时延基线待授权样本"
+      ]
+    },
+    {
+      "id": "COL-015",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video-provider.ts",
+        "services/loom-engine/flow/video.ts"
+      ],
+      "verification": [
+        "QA cross-language media: real signed Python HTTP/SQLite/FFmpeg through Loom input and ready barriers"
+      ],
+      "remaining_acceptance": [
+        "多GB实测峰值内存/生产对象存储迁移待运行"
+      ]
+    },
+    {
+      "id": "COL-016",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video-contract.ts",
+        "services/loom-engine/flow/video-provider.ts",
+        "services/loom-engine/flow/server.ts"
+      ],
+      "verification": [
+        "QA IF010: verified bytes cannot be relabelled with forged input or parent identity"
+      ],
+      "remaining_acceptance": [
+        "生产对象存储ACL配置与带宽容量未验收"
+      ]
+    },
+    {
+      "id": "COL-017",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts"
+      ],
+      "verification": [
+        "QA COL017: file-backed PGlite restart preserves job and rejects pre-restart expired fence"
+      ],
+      "remaining_acceptance": [
+        "生产多副本长耗时/故障恢复试点未运行"
+      ]
+    },
+    {
+      "id": "COL-018",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/video-provider.ts",
+        "services/loom-engine/flow/engine.ts"
+      ],
+      "verification": [
+        "COL018 explicit auth rejection blocks without ambiguous submission intent",
+        "COL018 provider circuit persists failures and blocks new submits until bounded recovery"
+      ],
+      "remaining_acceptance": [
+        "真实平台限流、验证码和授权池故障场景未运行；固定部署URL与受控credential_ref由worker验证"
+      ]
+    },
+    {
+      "id": "COL-019",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/video-provider.ts"
+      ],
+      "verification": [
+        "COL013 lost external response never resubmits; reconcile-by-key recovers confirmed task"
+      ],
+      "remaining_acceptance": [
+        "真实平台不可取消任务的后续计量/清理需外部验收"
+      ]
+    },
+    {
+      "id": "COL-020",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/main.ts",
+        "services/loom-engine/flow/video-resources.ts"
+      ],
+      "verification": [
+        "COL020 unknown/open host child holds parent; settled costs are not double charged",
+        "COL020 retry of a closed parent reserves only remaining frozen cumulative budget",
+        "COL020 daily byte/time reservations are atomic, replay-safe, and unknown holds are not zero",
+        "COL020 provider/source admission does not let one busy source starve another",
+        "G15 expired same-owner reclaim obeys provider, source and workspace caps (before red, after all three green)"
+      ],
+      "remaining_acceptance": [
+        "真实价格/服务配置和生产压力验收待进行；资金以宿主既有Billing权威回执为准，资源账本不新增费用真相源"
+      ]
+    },
+    {
+      "id": "COL-021",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video-contract.ts",
+        "services/loom-engine/flow/video.ts"
+      ],
+      "verification": [
+        "QA IF010: verified bytes cannot be relabelled with forged input or parent identity",
+        "QA cross-language media: real signed Python HTTP/SQLite/FFmpeg through Loom input and ready barriers"
+      ],
+      "remaining_acceptance": [
+        "真实字幕来源和无字幕平台样本待提供"
+      ]
+    },
+    {
+      "id": "COL-022",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts"
+      ],
+      "verification": [
+        "QA AC12 long transcript full-tail/FTS/index rollback"
+      ],
+      "remaining_acceptance": [
+        "实现与本地回归证据已记录；最终跨组件及生产验收尚未签署"
+      ]
+    },
+    {
+      "id": "COL-023",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/engine.ts"
+      ],
+      "verification": [],
+      "remaining_acceptance": [
+        "聚合周期ready到真实Canvas计费执行仍需端到端验收"
+      ]
+    },
+    {
+      "id": "COL-024",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/metrics.ts",
+        "services/loom-engine/flow/server.ts",
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/migrations/0030_video_external_observation.sql"
+      ],
+      "verification": [
+        "COL013 lost external response never resubmits; reconcile-by-key recovers confirmed task",
+        "COL024 external stage status reports only persisted submit/poll observations",
+        "COL024 lost submit stays unknown until actual reconciliation; cancel is not external completion",
+        "COL024 stale poll cannot overwrite a newer lease generation's external observation"
+      ],
+      "remaining_acceptance": [
+        "运维告警阈值和人工值班演练未完成"
+      ]
+    },
+    {
+      "id": "COL-029",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/engine.ts",
+        "services/loom-engine/flow/video-retention-policy.ts",
+        "services/loom-engine/flow/video-journal.ts"
+      ],
+      "verification": [
+        "COL029 intermediate inventory requires verified delete receipts before execution erase",
+        "COL029 typed TTL exposes bounded defaults and rejects impossible or partial policies",
+        "COL029 media access expiry retains fixed proof/text, respects active jobs, and never renews late objects",
+        "QA expanded cross-language missing-object/authorized Range/repair/deletion fixture"
+      ],
+      "remaining_acceptance": [
+        "外部DTK物理删除及所有备份副本不由本地收据证明；未知ASR/对象写入须权威结果，仍保持unknown而非伪报清除"
+      ]
+    },
+    {
+      "id": "K-002",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/migrations/0023_video_core.sql",
+        "services/loom-engine/flow/video.ts"
+      ],
+      "verification": [
+        "QA K009 correction immutable/CAS/index rollback"
+      ],
+      "remaining_acceptance": [
+        "实现与本地回归证据已记录；最终跨组件及生产验收尚未签署"
+      ]
+    },
+    {
+      "id": "K-003",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video-contract.ts",
+        "services/loom-engine/flow/video.ts"
+      ],
+      "verification": [
+        "QA IF010: verified bytes cannot be relabelled with forged input or parent identity"
+      ],
+      "remaining_acceptance": [
+        "JSON schema文件本轮补齐，跨语言契约升级门禁待评审"
+      ]
+    },
+    {
+      "id": "K-006",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/engine.ts"
+      ],
+      "verification": [
+        "K006 lawful scoped input waits for exact streamed bytes and cannot import arbitrary object keys",
+        "Worker signed streaming upload/receipt/inventory tests; host scoped PUT boundary tests"
+      ],
+      "remaining_acceptance": [
+        "真实授权原片/字幕素材样本未提供；用户上传标记authorized_user_upload，不声称平台真实性已核实"
+      ]
+    },
+    {
+      "id": "K-008",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video-contract.ts",
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/engine.ts"
+      ],
+      "verification": [
+        "QA AC12: canonical UTF-16 offsets preserve emoji, combining marks and full tail"
+      ],
+      "remaining_acceptance": [
+        "真实多语言时轴人工标注偏差评估未运行"
+      ]
+    },
+    {
+      "id": "K-009",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/server.ts"
+      ],
+      "verification": [
+        "QA K009 correction immutable/CAS/index rollback"
+      ],
+      "remaining_acceptance": [
+        "真实人工校对流程和依赖重审场景待业务验收"
+      ]
+    },
+    {
+      "id": "K-016",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/engine.ts"
+      ],
+      "verification": [
+        "COL009/010 preview discovery is isolated; scheduled pages persist tasks before watermark"
+      ],
+      "remaining_acceptance": [
+        "真实平台元数据修改/视频替换/删除覆盖待提供"
+      ]
+    },
+    {
+      "id": "K-017",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/engine.ts"
+      ],
+      "verification": [
+        "QA K017 PGlite: coordinator required embedding gates FTS, vectors and ready event on verified host receipt",
+        "QA positive PostgreSQL embedding and Loom→Go→HTTP embeddings bridge logs ownedQA/Go lanes",
+        "QA AC09/12/13 full-tail UTF16/FTS and atomic rollback"
+      ],
+      "remaining_acceptance": [
+        "生产模型身份/价格/行业样本质量未验收；required embedding已正向验证，不再以缺凭据掩盖实现缺口"
+      ]
+    },
+    {
+      "id": "K-018",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/engine.ts"
+      ],
+      "verification": [
+        "QA AC12 long transcript full-tail/FTS/index rollback"
+      ],
+      "remaining_acceptance": [
+        "默认真实FTS已验证；语义检索不是本轮已验收能力"
+      ]
+    },
+    {
+      "id": "K-019",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/migrations/0023_video_core.sql"
+      ],
+      "verification": [
+        "CFG001 immutable scoped versions and fresh JWTs share business fingerprint",
+        "COL004/020 canonical Bili P1 and daily backend admission never double count replay",
+        "COL030 exact verified-input/current-revision reuse"
+      ],
+      "remaining_acceptance": [
+        "跨平台同源簇/近似搬运由独立候选+人工复核模块负责；真实重传样本未验收"
+      ]
+    },
+    {
+      "id": "COL-026",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.test.ts"
+      ],
+      "verification": [
+        "25-test focused suite passed /tmp/video-final-core.log"
+      ],
+      "remaining_acceptance": [
+        "验收范围以各测试断言为准，非全V1验收"
+      ]
+    },
+    {
+      "id": "COL-027",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video-qa.test.ts"
+      ],
+      "verification": [
+        "disk restart/fencing, lost submit reply, forged manifests, index rollback, signed Python FFmpeg fixture"
+      ],
+      "remaining_acceptance": [
+        "真实DTK/对象存储断网、生产多副本与7日试点未运行"
+      ]
+    },
+    {
+      "id": "COL-030",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video.ts"
+      ],
+      "verification": [
+        "COL030 bounded historical recheck verifies bytes and reuses only exact current ready evidence",
+        "Provider refresh/reacquire and exact-hash replica repair exercised independent Python fixture"
+      ],
+      "remaining_acceptance": [
+        "真实双平台更新、下架、重传样本和长周期运行未验收；未知远端处理器身份时安全重处理而非猜测缓存命中"
+      ]
+    },
+    {
+      "id": "K-025",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/engine.ts",
+        "services/loom-engine/flow/video.ts"
+      ],
+      "verification": [
+        "Independent PostgreSQL restore quarantine/RSS isolation fixture",
+        "Typed TTL and source authorization-expiry journal sweeps",
+        "Legacy document/revision/search/raw media deny revoked/expired material"
+      ],
+      "remaining_acceptance": [
+        "生产跨系统备份恢复和外部存储删除收据仍需部署演练；本地重放不是全部生态系统擦除完成"
+      ]
+    },
+    {
+      "id": "K-013",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video-visual.ts",
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/video-visual-qa.test.ts"
+      ],
+      "verification": [
+        "QA K013 each model frame identity matches accepted frame/ref and time envelope"
+      ],
+      "remaining_acceptance": [
+        "真实行业视觉质量及泛化语义冲突未验收；窄数值候选明确未复核、不判断哪侧为真"
+      ]
+    },
+    {
+      "id": "K-015",
+      "status": "待验收",
+      "code_paths": [
+        "services/loom-engine/flow/video-visual.ts",
+        "services/loom-engine/flow/video.ts",
+        "services/loom-engine/flow/video-visual-qa.test.ts"
+      ],
+      "verification": [
+        "K015 narrow numeric conflict candidates preserve actual audio/OCR sides and never assert truth",
+        "QA K015 OCR/model/temporal labels cannot masquerade as verified source agreement"
+      ],
+      "remaining_acceptance": [
+        "真实行业视觉质量及泛化语义冲突未验收；窄数值候选明确未复核、不判断哪侧为真"
+      ]
+    }
+  ]
+}

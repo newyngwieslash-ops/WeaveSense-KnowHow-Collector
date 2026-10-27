@@ -91,6 +91,9 @@ func (s *Service) cloudAgentExecutionOutput(task *model.Task, initial cloudAgent
 			out.SpentCredits += float64(order.ActualAmountMicrocredits) / float64(CreditScale)
 		}
 	}
+	if err := s.repo.CheckVideoRunProjection(task.UserID, task.ID); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -181,6 +184,9 @@ func (s *Service) wakeCloudAgentScheduler() {
 }
 
 func (s *Service) advanceCloudAgent(run *model.CloudAgentExecution) (err error) {
+	if err := s.repo.CheckVideoRunProjection(run.UserID, run.ID); err != nil {
+		return err
+	}
 	defer func() {
 		if errors.Is(err, errCloudAgentCheckpoint) {
 			message := "Agent 运行状态保存失败，本轮已停止；已有任务结果保留在任务中心"
