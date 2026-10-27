@@ -44,6 +44,14 @@ jobs:
       FLOW_TEST_PG_RLS_DSN: postgres://flow_app:flow_app_pw@127.0.0.1:5432/rls_test?sslmode=disable
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend/go.mod
@@ -122,6 +130,14 @@ jobs:
       FLOW_TEST_PG_APP_ROLE: flow_app:flow_app_pw
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
       - uses: actions/setup-node@v4
         with:
           node-version: 22.19.0
@@ -163,6 +179,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
       - name: MinIO backup/restore round trip
         env:
           MINIO_ROOT_USER: ci-minio
@@ -194,6 +218,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
       - name: Verify canonical payment packages
         env:
           PAYMENT_PLUGIN_SMOKE_TEST: "1"
@@ -225,7 +257,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.9

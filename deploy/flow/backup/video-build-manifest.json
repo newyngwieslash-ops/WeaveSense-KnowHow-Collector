@@ -20,7 +20,12 @@
   "required_runtime_env": ["VIDEO_DELETION_JOURNAL_DIR", "VIDEO_DELETION_JOURNAL_ID", "VIDEO_DELETION_JOURNAL_KEY", "BACKUP_VIDEO_JOURNAL_REQUIRED=true"],
   "offline_ack_env": "VIDEO_JOURNAL_OFFLINE_ACK=ALL_JOURNAL_CLIENTS_STOPPED",
   "generated_image_evidence": "/usr/local/share/video-backup/build-evidence.txt",
-  "build_status": "not_run_in_this_workspace",
-  "resolved_image_digests": null,
+  "build_status": "CI_workflow_added_result_must_be_checked_for_exact_commit",
+  "resolved_image_digests": "deploy/flow/backup/video-image-lock.json",
+  "public_build_env": "deploy/flow/backup/video-images.env",
+  "verified_platform": "linux/amd64",
+  "ci_workflow": ".github/workflows/video-container-validation.yml",
+  "ci_evidence_artifact": "video-container-evidence",
+  "inventory_limit": "SPDX installed-package inventory is partial, with NOASSERTION licenses; not a complete file SBOM, legal approval or production deployment",
   "production_deployment_status": "not_authorized_or_performed"
 }
