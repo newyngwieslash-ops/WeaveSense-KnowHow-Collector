@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "resolved_at": "2026-10-27T14:37:56.103583+00:00",
+  "purpose": "Pinned input images for isolated linux/amd64 backup build validation; not production deployment or vulnerability/license approval",
+  "images": [
+    {
+      "env": "VIDEO_BACKUP_NODE_IMAGE",
+      "reference": "node:22-bookworm-slim@sha256:ea11b74b986d520137cdef9a5346e447a00f275ecc4abc0055b7151226231e09",
+      "platform": "linux/amd64",
+      "source_tag_url": "https://registry-1.docker.io/v2/library/node/manifests/22-bookworm-slim",
+      "source_index_sha256": "sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d",
+      "manifest_url": "https://registry-1.docker.io/v2/library/node/manifests/sha256:ea11b74b986d520137cdef9a5346e447a00f275ecc4abc0055b7151226231e09",
+      "manifest_sha256": "sha256:ea11b74b986d520137cdef9a5346e447a00f275ecc4abc0055b7151226231e09",
+      "config_sha256": "sha256:58a96d9752cfedf3c4fcfcbe2dabbad725c147f7003caa9f7899a3f414ada3fc",
+      "manifest_header_and_bytes_verified": true
+    },
+    {
+      "env": "VIDEO_BACKUP_POSTGRES_IMAGE",
+      "reference": "postgres:17-bookworm@sha256:ec4dfc6571f04fe0731ce948c1500d676af49a7224392dcc6995cc1ee33a94bb",
+      "platform": "linux/amd64",
+      "source_tag_url": "https://registry-1.docker.io/v2/library/postgres/manifests/17-bookworm",
+      "source_index_sha256": "sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8ec2133ccaf80d27",
+      "manifest_url": "https://registry-1.docker.io/v2/library/postgres/manifests/sha256:ec4dfc6571f04fe0731ce948c1500d676af49a7224392dcc6995cc1ee33a94bb",
+      "manifest_sha256": "sha256:ec4dfc6571f04fe0731ce948c1500d676af49a7224392dcc6995cc1ee33a94bb",
+      "config_sha256": "sha256:e4bdd2f9eeabc0f516e1fa42c4acea97ae571f20877982ac082921b205a52618",
+      "manifest_header_and_bytes_verified": true
+    },
+    {
+      "env": "VIDEO_BACKUP_MC_IMAGE",
+      "reference": "bitnamilegacy/minio-client:2025.7.21@sha256:9f5decb1b742e92638b689d503f6c0564b3adaf84baf8ab97462ea3e8d5d162c",
+      "platform": "linux/amd64",
+      "source_tag_url": "https://registry-1.docker.io/v2/bitnamilegacy/minio-client/manifests/2025.7.21",
+      "source_index_sha256": "sha256:1a2f12802dc75668aded6de1b7b53d67518ac2a7df823760d9f935235fb3d948",
+      "manifest_url": "https://registry-1.docker.io/v2/bitnamilegacy/minio-client/manifests/sha256:9f5decb1b742e92638b689d503f6c0564b3adaf84baf8ab97462ea3e8d5d162c",
+      "manifest_sha256": "sha256:9f5decb1b742e92638b689d503f6c0564b3adaf84baf8ab97462ea3e8d5d162c",
+      "config_sha256": "sha256:fadc4247cee672c9abd0f28e83a080cea2e7d754b7f24e7ee442d6c004b4cc6c",
+      "manifest_header_and_bytes_verified": true
+    }
+  ],
+  "excluded_attempts": [
+    {
+      "repository": "minio/mc",
+      "tag": "latest",
+      "result": "HTTP 401; no access bypass; existing documented Bitnami legacy alternative selected"
+    }
+  ]
+}

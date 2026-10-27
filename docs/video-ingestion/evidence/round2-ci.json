@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "evidence_type": "observed_ci_checkpoint",
+  "source_commit": "5ac12630778d054b90742a5fed3fc9163c400a57",
+  "source_tree": "da84a315be654b3a53ec19419d5507e0bbfe0c78",
+  "repository": "newyngwieslash-ops/WeaveSense-KnowHow-Collector",
+  "pull_request": 1,
+  "branch": "feat/knowhow-release-hardening",
+  "successor_scope": "This checkpoint pins the tested commit. Later changes update documentation and isolate one Bun build regression test in a child process; application source is unchanged. Verify current PR head checks separately, and do not relabel these runs with a later commit SHA.",
+  "workflow_runs": [
+    {
+      "id": 40526996302,
+      "name": "Quality checks",
+      "conclusion": "success",
+      "jobs": 5,
+      "url": "https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996302"
+    },
+    {
+      "id": 40526996341,
+      "name": "Video knowledge integration",
+      "conclusion": "success",
+      "jobs": 6,
+      "url": "https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996341"
+    },
+    {
+      "id": 40526996199,
+      "name": "Video container validation",
+      "conclusion": "success",
+      "jobs": 1,
+      "url": "https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996199"
+    }
+  ],
+  "results": {
+    "flow": {
+      "tests": 203,
+      "pass": 203,
+      "fail": 0,
+      "skipped": 0,
+      "real_postgresql": true,
+      "mandatory_postgresql_gate": "passed"
+    },
+    "host": {
+      "top_level_pass": 1951,
+      "top_level_fail": 0,
+      "top_level_skipped": 5,
+      "test_packages_pass": 33,
+      "packages_without_tests": 19,
+      "mandatory_postgresql_redis_tests": 8,
+      "mandatory_dependency_gate": "passed",
+      "skips": [
+        {
+          "name": "TestDDCatLiveImageRoundTrip",
+          "reason": "Paid live API opt-in/key not provided; no paid calls authorized."
+        },
+        {
+          "name": "TestGeneratedAssetBrowserIdentity",
+          "reason": "Separate external Node browser runner not configured; new Chromium tests are not a substitute."
+        },
+        {
+          "name": "TestVideoReleaseCompiledChild",
+          "reason": "Top-level child fixture skipped; executed and PASS in isolated built archive by TestVideoReleaseIsolatedBuildAndRunningRegistry."
+        },
+        {
+          "name": "TestVideoQALoomReleaseCompiledChild",
+          "reason": "Top-level child fixture skipped; executed and PASS in isolated actual-domain archive by TestVideoQALoomExportBuildAndRunningRegistry."
+        },
+        {
+          "name": "TestRPCProviderRejectsIncompatibleFallbackBinary",
+          "reason": "Linux conditional; foreign executable classification covered by TestRPCProviderClassifiesExecutableStartFailures."
+        }
+      ]
+    },
+    "chromium": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "seconds": 33.4,
+      "boundary": "Actual Vite/React application, explicit synthetic HTTP fixtures; not live platform/Go authentication/industry E2E."
+    },
+    "web": {
+      "pass": 2530,
+      "fail": 0,
+      "files": 333,
+      "typecheck": "passed",
+      "lint": "passed",
+      "build": "passed",
+      "previs_chrome_assertions_pass": 65
+    },
+    "python_video": {
+      "pass": 46,
+      "fail": 0
+    },
+    "python_host_asr": {
+      "pass": 7,
+      "skip": 1,
+      "skipped_test": "test_real_whisper_when_installed",
+      "reason": "faster-whisper not installed; image-level model inference not verified in this run."
+    },
+    "script_unit_tests": {
+      "video": 37,
+      "flow_gate": 6,
+      "go_dependency_gate": 2
+    },
+    "preflight": {
+      "build": "passed",
+      "production_ready": false
+    },
+    "container": {
+      "platform": "linux/amd64",
+      "network_none_smoke": "passed",
+      "published": false,
+      "deployed": false,
+      "images": [
+        {
+          "name": "backup",
+          "image_config_id": "sha256:ce8532f7753ed75be6eb17fb83bfa496491e9a4df2e3454dd05eb10b5df94cf1",
+          "installed_package_entries": 438
+        },
+        {
+          "name": "worker",
+          "image_config_id": "sha256:2c5e5c982acff37308c40b7a67027cbe32dd02116b1afed9da19339711b00771",
+          "installed_package_entries": 303
+        }
+      ],
+      "inventory_limits": "Partial installed package SPDX with license NOASSERTION; not full file SBOM, vulnerability scan, license clearance, whole-stack deployment, or bit-reproducibility proof."
+    }
+  },
+  "artifacts": [
+    {
+      "id": 12745091774,
+      "name": "video-browser-test-evidence",
+      "sha256": "417684463d67abc39b810730e285fac880c68c010e25b5f6ab397a4c90826d4c",
+      "zip_digest_verified": true,
+      "source_commit": "5ac12630778d054b90742a5fed3fc9163c400a57",
+      "url": "https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996341/artifacts/12745091774"
+    },
+    {
+      "id": 12743953864,
+      "name": "video-flow-test-evidence",
+      "sha256": "289d000704a17697cc359444b4afb3a481767cd9d7ac2fb67379ede926b51f21",
+      "zip_digest_verified": true,
+      "source_commit": "5ac12630778d054b90742a5fed3fc9163c400a57",
+      "url": "https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996341/artifacts/12743953864"
+    },
+    {
+      "id": 12743669159,
+      "name": "video-host-test-evidence",
+      "sha256": "62cf8e3a049ec96937dc977753cf49c28d1becd62bc0e1f54e3443a196c7848d",
+      "zip_digest_verified": true,
+      "source_commit": "5ac12630778d054b90742a5fed3fc9163c400a57",
+      "url": "https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996341/artifacts/12743669159"
+    },
+    {
+      "id": 12743762711,
+      "name": "video-container-evidence",
+      "sha256": "ab79bd2ffba167b64c2bfa899ea32d02ede2924af9569ea7412684c61f3e4a68",
+      "zip_digest_verified": true,
+      "source_commit": "5ac12630778d054b90742a5fed3fc9163c400a57",
+      "url": "https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996199/artifacts/12743762711"
+    }
+  ],
+  "formal_acceptance": {
+    "complete": 2,
+    "awaiting_acceptance": 88,
+    "blocked": 10,
+    "p2_unstarted": 7,
+    "changed_by_ci": false
+  },
+  "boundaries": [
+    "No main merge",
+    "No production deployment",
+    "No image publication",
+    "No paid provider calls",
+    "No formal business acceptance inferred"
+  ]
+}

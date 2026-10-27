@@ -14,6 +14,8 @@ on:
       - "docs/video-ingestion/**"
       - "scripts/*video*"
       - ".github/workflows/video-knowledge.yml"
+      - ".github/browser/**"
+      - ".github/scripts/**"
   workflow_dispatch:
 
 permissions:
@@ -29,18 +31,50 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: python scripts/video-task-ledger.py check
       - run: python -m pip install PyYAML==6.0.3
       - run: python -m unittest discover -s scripts -p 'test_video*.py' -v
+      - run: python .github/scripts/test_check_flow_tests.py
       # Formal release acceptance is intentionally not inferred from this job.
   flow:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      FLOW_TEST_PG_ADMIN_URL: postgres://postgres:synthetic@127.0.0.1:5432/postgres
+      FLOW_TEST_PG_APP_ROLE: flow_app:synthetic
+      # Disposable CI service only: the video restore fixture owns this database.
+      FLOW_VIDEO_TEST_PG_URL: postgres://flow_app:synthetic@127.0.0.1:5432/video_qa
+      FLOW_VIDEO_RESTORE_TEST: "1"
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: synthetic
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
       - uses: actions/setup-node@v4
         with:
           node-version: "24.22.1"
@@ -49,19 +83,47 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg tesseract-ocr
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg tesseract-ocr postgresql-client
+      - name: Match PostgreSQL client to server major
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Create non-superuser Flow role
+        run: |
+          psql "$FLOW_TEST_PG_ADMIN_URL" -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE flow_app LOGIN PASSWORD 'synthetic' NOSUPERUSER NOBYPASSRLS CREATEDB" \
+            -c "CREATE DATABASE video_qa OWNER flow_app"
       - run: python -m pip install -r services/video-knowledge/requirements.txt
       - run: npm ci --ignore-scripts
         working-directory: services/loom-engine
       - run: npx tsc --noEmit -p tsconfig.flow.json
         working-directory: services/loom-engine
-      - run: node --experimental-strip-types --test --test-concurrency=1 flow/*.test.ts
+      - name: Flow suites including real PostgreSQL, with no skipped tests
+        run: |
+          set -o pipefail
+          node --experimental-strip-types --test --test-reporter=tap --test-concurrency=1 flow/*.test.ts | tee "$RUNNER_TEMP/video-flow-tests.tap"
+          python3 ../../.github/scripts/check-flow-tests.py "$RUNNER_TEMP/video-flow-tests.tap"
         working-directory: services/loom-engine
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-flow-test-evidence
+          path: ${{ runner.temp }}/video-flow-tests.tap
   media:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -94,6 +156,14 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.14"
@@ -130,6 +200,14 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.4"
@@ -138,3 +216,38 @@ jobs:
       - run: bun run lint
       - run: bun test
       - run: bun run build
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record checked source commit
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-source-sha
+          path: ${{ runner.temp }}/source-sha.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.22.1"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.9"
+      - run: bun install --frozen-lockfile --ignore-scripts
+        working-directory: web
+      - run: npm ci --ignore-scripts
+        working-directory: .github/browser
+      - run: npx playwright install --with-deps chromium
+        working-directory: .github/browser
+      - name: Real Chromium against the actual application (synthetic HTTP boundary)
+        run: npx playwright test
+        working-directory: .github/browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-browser-test-evidence
+          path: |
+            .github/browser/test-results/
+            .github/browser/playwright-report/

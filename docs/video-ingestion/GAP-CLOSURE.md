@@ -1,5 +1,12 @@
 # Independent V1 gap closure — 2026-10-26 18:43 UTC
 
+> Historical audit snapshot. Its source-ZIP/publication-pending statements below
+> describe the audit time. Source-only rebuild evidence and the complete GitHub
+> publication at [`cf2aad9`](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/cf2aad9c5926500bfaae7bb39e48316ccd192269)
+> subsequently closed that source-distribution boundary. This does not close G18's
+> final image/OS build or special/unknown license gates. See [ROUND2.md](ROUND2.md)
+> for current evidence; original audit results and matrices remain unchanged.
+
 **Source/evidence audit, not release acceptance.** The [original snapshot](evidence/independent-task-coverage.json) remains unchanged: SHA-256 `9e8c4e3633c5094f0efac615c5ce78854e725efe85aaf6047af681c53961d0ca`. The [latest matrix](evidence/independent-task-coverage-latest.json) preserves **107 IDs, 196 implementation clauses, 335 acceptance clauses and the original dependency graph**. Seven P2 tasks remain unstarted. Central `PROGRESS.json` was not edited.
 
 ## Verified engineering closure

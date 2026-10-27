@@ -10,6 +10,19 @@ spec.loader.exec_module(check)
 
 
 class DependencyChecks(unittest.TestCase):
+    def test_summary_does_not_double_count_subtests_or_hide_skips(self):
+        events = [
+            {"Package": "example/app", "Test": "TestParent", "Action": "pass"},
+            {"Package": "example/app", "Test": "TestParent/child", "Action": "pass"},
+            {"Package": "example/app", "Test": "TestOptional", "Action": "skip"},
+            {"Package": "example/app", "Test": "TestParent/optional", "Action": "skip"},
+            {"Package": "example/app", "Action": "pass"},
+        ]
+        summary = check.test_summary(events)
+        self.assertEqual(summary["top_level"], {"pass": 1, "fail": 0, "skip": 1})
+        self.assertEqual(len(summary["skipped_tests"]), 2)
+        self.assertEqual(check.test_summary([])["top_level"], {"pass": 0, "fail": 0, "skip": 0})
+
     def test_requires_run_and_pass_for_every_exact_name(self):
         events = [
             {"Package": "example/internal/" + package, "Test": name, "Action": action}
