@@ -4,7 +4,9 @@
 
 已在独立工作目录实现宿主扩展、补齐逐条审计发现的应用代码缺口，并完成本轮冻结源码的本地回归。**这是可继续本地测试和二次开发的源码开发版，不是完整 V1 已验收、开箱安装包或生产上线证明。**
 
-目标仓库是 `https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector`。代码基于固定宿主 `514c70f666cb04e3e72cbfb967fac74d9f350747`，本地分支 `feat/video-knowledge-v1`；原宿主没有被推送修改。完整源码的 GitHub 同步仍等待已提出的一次性导入工作流授权，远端目前只有初始化说明，不能把本地通过说成已推送或远端 CI 通过。
+完整源码已发布到目标仓库的 [feat/video-knowledge-v1 分支](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/tree/feat/video-knowledge-v1)，首个完整发布提交为 [cf2aad9c5926500bfaae7bb39e48316ccd192269](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/cf2aad9c5926500bfaae7bb39e48316ccd192269)。代码基于固定宿主 `514c70f666cb04e3e72cbfb967fac74d9f350747`；原宿主未被推送修改，目标 `main` 仍保留初始化提交，未合并开发分支。
+
+发布核验覆盖 5,738 个文件的路径、权限模式和 Git blob 哈希；其中 5,697 个源码文件另经归档 SHA-256 核验，41 个保留生成物经逐项 SHA-256 核验。[导入校验运行](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40468402790)成功，一次性工作流已在 [e387b717](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/e387b717c29c934248bfe619c1e85af61589d18d) 移除。**源码同步完成不等于应用 CI 或完整 V1 验收通过。** 后续工程收尾的当前状态及证据入口见 [ROUND2.md](ROUND2.md)。
 
 ## 本轮实现
 
@@ -20,7 +22,9 @@
 
 具体接口、状态机和边界见 [CONTRACTS.md](CONTRACTS.md)、[ARCHITECTURE.md](ARCHITECTURE.md) 与 [GAP-CLOSURE.md](GAP-CLOSURE.md)。
 
-## 实际验证
+## 首轮冻结源码的实际验证
+
+下表是随首次源码发布保留的历史执行结果，不自动适用于后续改动。第二轮的实际提交、执行范围与结果单独记录在 [ROUND2.md](ROUND2.md)，不回写或覆盖历史测试证据。
 
 | 范围 | 最终结果 | 边界 |
 |---|---|---|
@@ -50,7 +54,9 @@
 
 Excel 已回填 2/88/10/7 状态，原六表、323 个公式、要求、验证和样式保留，678 项独立状态/计算核对通过。原件的逐字节副本也在 `spec/tasks.baseline.xlsx`，不依赖本开发目录。没有声称已用原生 Excel/LibreOffice 操作验收。
 
-## 明确未完成的外部条件
+## 尚需闭合的工程与业务条件
+
+以下清单不全部依赖业务凭据：镜像构建、CI、浏览器/Redis 验证属于工程收尾；行业、合法样本和业务签收是独立条件。第二轮若完成某项工程验证，以 [ROUND2.md](ROUND2.md) 中绑定实际提交的结果为准，不推导其他条款自动通过。
 
 - 首发行业、5–10 个真实业务问题、行业术语、复核人和发布负责人；不能以仓库名推断。
 - 合法 B站/抖音来源、使用范围/期限、独立人工金标和真实双平台采集结果。
@@ -62,7 +68,7 @@ Excel 已回填 2/88/10/7 状态，原六表、323 个公式、要求、验证�
 
 ## 本地接手
 
-1. 下载并解压源码包，先读根 `README.md`、本页和 [RUNBOOK.md](RUNBOOK.md)。包内 `SOURCE-MANIFEST.json` 给出逐文件 SHA-256、基线和排除说明。若文件名含 `Source-Only`，必须先按 [SOURCE_ONLY.md](SOURCE_ONLY.md) 重建省略的付款插件和主程序，再继续启动步骤。
+1. 从上述开发分支克隆，或在该分支页面选择 `Code → Download ZIP`；不要从仍只有初始化说明的 `main` 下载。先读根 `README.md`、本页和 [RUNBOOK.md](RUNBOOK.md)。先前单独交付的源码包含 `SOURCE-MANIFEST.json`，给出逐文件 SHA-256、基线和排除说明；GitHub 自动生成的 ZIP 不保证含这一归档专用文件。若使用文件名含 `Source-Only` 的精简包，必须先按 [SOURCE_ONLY.md](SOURCE_ONLY.md) 重建省略的付款插件和主程序，再继续启动步骤。
 2. 安装文档指定的开发依赖，使用 `.env.flow.example` 与 `deploy/flow/video.env.example` 配置本地环境。视频默认关闭；模型、对象存储、DTK 和授权来源必须由您配置，密钥不要放入聊天或 Git。
 3. 先执行本地测试/合成夹具闭环，再接授权的小样本；不要直接对公网开放或把样例当成正式行业 profile。
 4. 原生方法采用“审核→源码导出→构建→运行宿主确认→工作区 CAS 安装”；源码变更后重跑适用检查。
@@ -77,4 +83,4 @@ Excel 已回填 2/88/10/7 状态，原六表、323 个公式、要求、验证�
 
 归档没有 Git 元数据，重建命令显式使用 `GOFLAGS=-buildvcs=false`。正常模块完整性校验保留；不建议关闭 checksum 验证。源码精简分发的验证只补充分发可重建性，不替代前述真实平台/行业/部署验收。
 
-完整 GitHub 同步和任何生产部署均需分别完成相应授权；本次没有暗中发布镜像、合并分支或上线。
+完整 GitHub 同步已经获得授权并完成。生产部署、合并 `main` 和发布镜像均不属于已完成的源码导入；本轮工程验证不代表获准执行这些操作。

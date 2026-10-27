@@ -1,5 +1,11 @@
 # Independent verification — 2026-10-26
 
+> Historical test report. The working-tree description below records the state at
+> execution time, not the present publication state. The complete source was later
+> published as [`cf2aad9`](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/cf2aad9c5926500bfaae7bb39e48316ccd192269).
+> Publication verified file parity; it did not rerun these tests. Subsequent checks
+> and unresolved boundaries are tracked separately in [ROUND2.md](ROUND2.md).
+
 This report concerns the **uncommitted implementation working tree**, based on host commit
 `514c70f666cb04e3e72cbfb967fac74d9f350747`, branch `feat/video-knowledge-v1`.
 It is not a release, deployment, live-platform certification, model-quality evaluation or
