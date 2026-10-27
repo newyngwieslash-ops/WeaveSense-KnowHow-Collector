@@ -73,7 +73,7 @@ cd ../../web && bun run typecheck && bun run lint && bun test && bun run build
 
 Go ↔ Loom 实际跨层用例需 `FLOW_VIDEO_CROSSLAYER_TEST=1` 与 Loom npm 依赖。完整宿主还需 Pi runtime 依赖及实际 PostgreSQL/Redis。部分测试缺依赖会跳过，必须阅读测试输出，不以退出码零推断所有路径执行。
 
-首轮本地环境中 Chromium 和 Redis Unix socket 被沙箱拒绝，历史报告保留该结果，不回写为通过。第二轮在具备依赖的 CI 环境逐项验证，当前状态以 [ROUND2.md](ROUND2.md) 中对应提交的实际结果为准；其他 UI 的 Chrome 检查不能代替视频闭环验收。CI 文件存在不代表远端 CI 已执行。合成视频与实际 Whisper/Tesseract 只证明管线可运行，不能证明真实行业内容质量。
+首轮本地环境中 Chromium 和 Redis Unix socket 被沙箱拒绝，历史报告保留该结果，不回写为通过。第二轮候选 `5ac12630` 的 CI 已通过必选 Redis/PG、5 项真实 Chromium 交互和严格 Flow 零跳过门禁，结果与跳过名单见 [ROUND2.md](ROUND2.md)。Chromium 使用明确合成 HTTP 边界，不代替真实平台/Go 登录/视频行业闭环；其他 UI 的 Chrome 检查也不能代替视频闭环验收。本轮独立 ASR profile 仍有 1 项 image-level Whisper 条件跳过，不把历史推理结果冒充当前执行。合成视频与推理烟测均不能证明真实行业内容质量。
 
 ## 5. 方法版本：生成源文件不等于已部署
 

@@ -6,6 +6,8 @@
 
 完整源码已发布到目标仓库的 [feat/video-knowledge-v1 分支](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/tree/feat/video-knowledge-v1)，首个完整发布提交为 [cf2aad9c5926500bfaae7bb39e48316ccd192269](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/cf2aad9c5926500bfaae7bb39e48316ccd192269)。代码基于固定宿主 `514c70f666cb04e3e72cbfb967fac74d9f350747`；原宿主未被推送修改，目标 `main` 仍保留初始化提交，未合并开发分支。
 
+第二轮工程收尾发布在 [feat/knowhow-release-hardening](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/tree/feat/knowhow-release-hardening) 与 [Draft PR #1](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/pull/1)。应用候选 `5ac12630` 的三项 CI 工作流、12 个 job 全部成功，含真实 Chromium、必选 Redis/PG 和两个容器的隔离构建；后续仅文档提交的状态以 PR 当前 head Checks 为准。接手本轮工程成果应使用此工程分支，逐项结果及明确跳过见 [ROUND2.md](ROUND2.md)。这不改变业务台账，也不是生产上线授权。
+
 发布核验覆盖 5,738 个文件的路径、权限模式和 Git blob 哈希；其中 5,697 个源码文件另经归档 SHA-256 核验，41 个保留生成物经逐项 SHA-256 核验。[导入校验运行](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40468402790)成功，一次性工作流已在 [e387b717](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/e387b717c29c934248bfe619c1e85af61589d18d) 移除。**源码同步完成不等于应用 CI 或完整 V1 验收通过。** 后续工程收尾的当前状态及证据入口见 [ROUND2.md](ROUND2.md)。
 
 ## 本轮实现
@@ -62,13 +64,13 @@ Excel 已回填 2/88/10/7 状态，原六表、323 个公式、要求、验证�
 - 合法 B站/抖音来源、使用范围/期限、独立人工金标和真实双平台采集结果。
 - 实际模型配置、费用授权、硬件和质量校准；当前不填写虚构准确率。
 - 首轮浏览器环境拒绝启动及原生 Redis Unix IPC 拒绝的历史记录保留；第二轮 CI 的逐项状态见 [ROUND2.md](ROUND2.md)，未将其他 Chrome 检查冒充视频业务闭环。付费 DDCat 等原宿主可选测试也未擅自调用。
-- 两个 Linux amd64 backup/worker 镜像已在 `7166e466` 实际构建并通过无网络 smoke，三个备份基础镜像 pin 已提供；但整栈部署、完整 OS/应用构建闭包、漏洞/许可审查和持续试点仍未完成。当前包级 SPDX 为部分清单，不能冒充完整 SBOM，详见 [ROUND2.md](ROUND2.md)。
+- 两个 Linux amd64 backup/worker 镜像已在 `5ac12630` 实际构建并通过无网络 smoke，三个备份基础镜像 pin 已提供；但整栈部署、完整 OS/应用构建闭包、漏洞/许可审查和持续试点仍未完成。当前包级 SPDX 为部分清单，不能冒充完整 SBOM，详见 [ROUND2.md](ROUND2.md)。
 - 供应商外部存储物理擦除回执：所选 DTK 的 cancel API 不证明文件/备份删除，未知外部写入/执行仍保留 pending，不能称全部擦除。
 - 第三方许可边界：根 MIT 不覆盖所有 Web/WASM/字体/Live2D/预编译组件；逐项已知和未知证据见 [DEPENDENCIES.md](DEPENDENCIES.md)，未作商业许可清算承诺。
 
 ## 本地接手
 
-1. 从上述开发分支克隆，或在该分支页面选择 `Code → Download ZIP`；不要从仍只有初始化说明的 `main` 下载。先读根 `README.md`、本页和 [RUNBOOK.md](RUNBOOK.md)。先前单独交付的源码包含 `SOURCE-MANIFEST.json`，给出逐文件 SHA-256、基线和排除说明；GitHub 自动生成的 ZIP 不保证含这一归档专用文件。若使用文件名含 `Source-Only` 的精简包，必须先按 [SOURCE_ONLY.md](SOURCE_ONLY.md) 重建省略的付款插件和主程序，再继续启动步骤。
+1. 从 [feat/knowhow-release-hardening 工程分支](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/tree/feat/knowhow-release-hardening) 克隆，或在该分支页面选择 `Code → Download ZIP`；不要从仍只有初始化说明的 `main` 下载。先读根 `README.md`、本页和 [RUNBOOK.md](RUNBOOK.md)。先前单独交付的源码包含 `SOURCE-MANIFEST.json`，给出逐文件 SHA-256、基线和排除说明；GitHub 自动生成的 ZIP 不保证含这一归档专用文件。若使用文件名含 `Source-Only` 的精简包，必须先按 [SOURCE_ONLY.md](SOURCE_ONLY.md) 重建省略的付款插件和主程序，再继续启动步骤。
 2. 安装文档指定的开发依赖，使用 `.env.flow.example` 与 `deploy/flow/video.env.example` 配置本地环境。按 [LOCAL_QUICKSTART.md](LOCAL_QUICKSTART.md) 运行只读配置预检；视频默认关闭，试点必须显式设置工作区白名单。模型、对象存储、DTK 和授权来源必须由您配置，密钥不要放入聊天或 Git。
 3. 先执行本地测试/合成夹具闭环，再接授权的小样本；不要直接对公网开放或把样例当成正式行业 profile。
 4. 原生方法采用“审核→源码导出→构建→运行宿主确认→工作区 CAS 安装”；源码变更后重跑适用检查。

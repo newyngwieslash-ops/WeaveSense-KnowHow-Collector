@@ -20,29 +20,60 @@
 
 先前源代码精简包的重建边界见 [SOURCE_ONLY.md](SOURCE_ONLY.md) 和 [source-only-rebuild.json](source-only-rebuild.json)。它们与上述远端文件一致性一起补充源码交付证据，不替代镜像、运行环境和业务验收。
 
-## 本轮执行记录
+## 本轮执行记录：已验证工程候选
 
-下面只记录已经观察到的结果。提交 `7166e466` 的 CI 已完成，但 browser、Flow 严格不跳过门禁和质量工作流的 SHA 比较失败，正在修正，**本轮尚不能标记整体通过**；后续改动必须重新检查对应 head SHA，不能将首轮本地测试数量或较早提交的成功搬作最终结果。
+**[应用候选提交 5ac12630778d054b90742a5fed3fc9163c400a57](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/5ac12630778d054b90742a5fed3fc9163c400a57) 的三项工作流、12 个 job 全部成功。** 本页及机器可读 [round2-ci.json](evidence/round2-ci.json) 是其仅文档后续提交：记录绑定已执行的应用提交，不把后续提交的 SHA 冒充该次运行源码。交付时另检查 [Draft PR #1 的当前 head / Checks](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/pull/1/checks)，不递归创建只为写入自身 SHA 的提交。
 
-| 检查 | 当前可作出的结论 | 完成证据要求 |
+| 工作流 | 实际结果 | 运行 |
 | --- | --- | --- |
-| 发布文档一致性 | 已修正 GitHub 同步仍待授权的旧描述；历史报告加边界说明 | 文档差异、链接与事实核对 |
-| 固定提交应用 CI | `7166e466` 的 host、media、Web 类型/规则/测试/构建及 ledger 通过；Flow 为 200 通过、3 跳过，严格门禁正确阻断 | [集成运行 40523705384](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40523705384)；补齐隔离视频 PostgreSQL/恢复 opt-in 后须重跑 |
-| Chromium / Redis | `7166e466` 的必选 PostgreSQL/Redis 后端门禁通过；新增视频 Chromium 5 项因 HTTP fixture 误拦截 Vite 源码模块失败，尚未通过 | [质量运行 40523704785](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40523704785)；质量 Web 失败另因合成 merge SHA 与 head checkout 不符 |
-| Linux amd64 backup / worker 构建 | 提交 `7166e466` 的容器 job 成功；两个镜像实际构建并执行无网络运行时 smoke | [运行 40523705285](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40523705285)；只覆盖两个镜像，不是整栈部署 |
-| 只读配置预检 | 已加入 build/pilot 模式与拒绝测试；上述容器 job 执行构建输入预检 | [LOCAL_QUICKSTART.md](LOCAL_QUICKSTART.md)、`scripts/video-doctor.py`；静态/只读通过不证明服务可用 |
-| 镜像系统/应用包清单 | 已采集 backup 438、worker 303 个包条目的部分 SPDX 清单 | 许可 `NOASSERTION`；不是完整文件级 SBOM、漏洞扫描或许可清算 |
+| Quality checks | backend、Loom、Web、对象恢复、付款插件共 5 job 成功 | [40526996302](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996302) |
+| Video knowledge integration | ledger、flow、host、media、web、browser 共 6 job 成功 | [40526996341](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996341) |
+| Video container validation | build-and-inspect 成功，不发布镜像 | [40526996199](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996199) |
 
-待验证修正：浏览器只拦截 pathname 以 `/api/` 开始的 HTTP 请求；格式检查显式比较 checkout 的 head；视频 PG 测试使用一次性 CI 数据库、非超级用户 CREATEDB role 与恢复 opt-in，不放宽跳过门禁。预检与 Compose 一致采用进程环境优先（包括空值），拒绝空白/带首尾空格的秘密及无效独立日志标识。本地 37 项 `test_video*.py`、6 项 Flow 门禁测试已通过；这些结果不能替代修正提交的远端 CI。
+| 检查 | 实际结果 | 边界 |
+| --- | --- | --- |
+| Flow + 真实 PostgreSQL | **203 通过、0 失败、0 跳过**；TAP 门禁再次本地复核通过 | 一次性 CI 数据库、非超级用户 FORCE RLS，含并发/进程终止、required embedding、备份恢复和独立日志屏障 |
+| Go 宿主全量 | **1,951 顶层通过、0 失败、5 跳过**；33 测试包通过，另 19 包无测试文件 | 不重复累计子测试；必选 PostgreSQL/Redis 8 项均实际运行并通过；跳过名单见下文 |
+| Chromium 视频 UI | **5/5 通过**，33.4 秒 | 真实 Vite/React 路由与浏览器；明确合成 HTTP 边界，不是实际 Go 登录或真实平台 E2E |
+| Web | 类型检查、规则检查、构建及 **2,530 测试通过、0 失败** | 333 文件；另有 Previs P0 Chrome **65/65 断言通过**，不累计成业务验收数 |
+| Python 视频执行 | **46 测试通过** | 合成 provider / model 与实际 HTTP、SQLite、FFmpeg 边界分别保留 |
+| 独立宿主 ASR profile | **7 通过、1 跳过** | 未安装 faster-whisper 的 image-level 模型测试跳过；本轮不声称真实 Whisper 推理通过 |
+| 台账 / 配置 / 门禁 | 37 项 `test_video*.py`、6 项 Flow 门禁测试、2 项 Go 门禁测试通过；build 预检通过 | 预检不联网、不生成秘密、不初始化日志，`production_ready=false` |
+| 其他既有门禁 | MinIO 备份恢复、保留期/告警检查、付款插件 amd64/arm64 smoke 通过 | 付款包构建不是付费交易；无业务账号或真实付费模型调用 |
+
+### 如实披露的跳过
+
+Go 顶层 5 项跳过：
+
+- `TestDDCatLiveImageRoundTrip`：未提供明确启用付费验证的 API key；本轮不调用付费服务。
+- `TestGeneratedAssetBrowserIdentity`：未配置其独立外部 Node runner；新的 5 项 Chromium 测试不冒充这个不同用例。
+- `TestVideoReleaseCompiledChild`、`TestVideoQALoomReleaseCompiledChild`：只在隔离构建归档内执行。父测试 `TestVideoReleaseIsolatedBuildAndRunningRegistry` 与 `TestVideoQALoomExportBuildAndRunningRegistry` 均通过，日志明确记录两个 child 在对应子进程 `PASS`；顶层计数仍保留 skip，不重复累计。
+- `TestRPCProviderRejectsIncompatibleFallbackBinary`：Linux 使用同包另一个可执行启动失败分类测试覆盖该分支，保留原条件跳过。
+
+另有 Python `test_real_whisper_when_installed` 条件跳过，原因见上表。没有把被跳过或未运行的测试改名为通过，也没有被跳过的 CI job。
+
+### 原始产物与哈希
+
+以下 ZIP 均由对应工作流生成，已下载并按 Actions digest 复核；host/Flow 原始结果重新通过门禁，Chromium JSON 报告确认为 5 通过、0 跳过/失败/不稳定重试。保留期限由 GitHub artifact 策略决定。
+
+| 产物 | Artifact ID | ZIP SHA-256 |
+| --- | --- | --- |
+| [Host JSONL](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996341/artifacts/12743669159) | `12743669159` | `62cf8e3a049ec96937dc977753cf49c28d1becd62bc0e1f54e3443a196c7848d` |
+| [Flow TAP](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996341/artifacts/12743953864) | `12743953864` | `289d000704a17697cc359444b4afb3a481767cd9d7ac2fb67379ede926b51f21` |
+| [Chromium report](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996341/artifacts/12745091774) | `12745091774` | `417684463d67abc39b810730e285fac880c68c010e25b5f6ab397a4c90826d4c` |
+| [容器构建 / smoke / 包清单](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40526996199/artifacts/12743762711) | `12743762711` | `ab79bd2ffba167b64c2bfa899ea32d02ede2924af9569ea7412684c61f3e4a68` |
 
 ### 容器证据的精确边界
 
-- 源码：[7166e4665e408fd548aa75ae4e99975f8d5fbbbd](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/7166e4665e408fd548aa75ae4e99975f8d5fbbbd)。镜像构建及 smoke 针对 Linux amd64，在隔离 runner 执行，smoke 使用 `--network none`，未上传镜像或部署服务。
-- backup image config ID：`sha256:475d9420b7f93abb2c56a9bb7ce164eade50d69fdd4684b74954ab18489105a5`。
-- worker image config ID：`sha256:1ab32d263dc58c18530469275ad52c930ca2f313a7da483d58000deae670e822`。
-- 上述 ID 是实际本地镜像配置摘要，不是已发布 registry manifest digest。保留构建日志、运行时版本、包清单与 source commit 的 artifact ID 为 `12742304350`，artifact digest 为 `sha256:76396f315e2b624493b79b6961baca848680374c5ece406c772f774a92c374bd`；从对应 Actions 运行下载，其保留期限受 GitHub artifact 策略限制。
-- 固定输入见 [video-image-lock.json](../../deploy/flow/backup/video-image-lock.json) 与 [video-images.env](../../deploy/flow/backup/video-images.env)。这些输入 pin 不等于 apt/npm/Python 的完整可重复构建闭包。
-- 中间提交 `32447d1` 的对象恢复、付款插件双架构与 Web Previs Chrome 检查有通过记录，但质量门禁发现 16 个 Go 文件格式问题；`7166e466` 已修正格式。较早成功与修正不自动构成整个第二轮验收通过。
+- 构建及 smoke 针对上述 `5ac12630` 的 Linux amd64，在隔离 runner 执行；smoke 使用 `--network none`，未上传镜像或部署服务。只覆盖 backup/worker，不是整栈 Compose 部署。
+- backup image config ID：`sha256:ce8532f7753ed75be6eb17fb83bfa496491e9a4df2e3454dd05eb10b5df94cf1`；438 个已安装包条目。
+- worker image config ID：`sha256:2c5e5c982acff37308c40b7a67027cbe32dd02116b1afed9da19339711b00771`；303 个已安装包条目。
+- 上述 ID 是本地镜像配置摘要，不是已发布 registry manifest digest。部分 SPDX 清单的许可字段为 `NOASSERTION`，不是完整文件级 SBOM、漏洞扫描或许可清算。实际 mc 二进制报告 GNU AGPLv3，不能以项目 MIT 代替其授权审查。
+- 固定输入见 [video-image-lock.json](../../deploy/flow/backup/video-image-lock.json) 与 [video-images.env](../../deploy/flow/backup/video-images.env)。输入 pin 不等于 apt/npm/Python 的完整可重复构建闭包。
+
+### 已闭合的中间失败
+
+16 个 Go 文件仅格式修正；格式门禁使用实际 checkout head 而非未取回的合成 merge SHA。浏览器 fixture 只拦截 pathname `/api/` 前缀，避免误拦截 `/src/services/api/` 模块，并显式提供存储用量 fixture；未知 API 与 pageerror 仍失败。视频 PostgreSQL/恢复 opt-in 已接入一次性 CI 数据库，没有放宽零跳过门禁。预检与 Compose 一致采用进程环境优先（包括空值），拒绝空白/带首尾空格的秘密及无效独立日志标识。旧失败运行保留，最终通过只引用上述实际候选提交。
 
 ## 供应链与许可待补证清单
 
