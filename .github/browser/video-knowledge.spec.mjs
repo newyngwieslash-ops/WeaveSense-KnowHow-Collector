@@ -23,6 +23,7 @@ async function fixtures(page, options = {}) {
     if (path === '/model-catalog') return send({ source: 'system', models: [], channels: [] });
     if (path === '/user-data/snapshot') return send({ assets: [], projects: [] });
     if (path === '/assets') return send({ assets: [], total: 0, hasMore: false });
+    if (path === '/resources/storage-usage' && method === 'GET') return send({ usage: { usedBytes: 0, totalBytes: 1073741824 } });
     if (path === '/canvas-projects') return send({ projects: [], total: 0, hasMore: false });
     if (path === '/asset-folders') return send({ folders: [] });
     if (path === '/plugins') return send({ plugins: [], states: {} });
