@@ -1,0 +1,91 @@
+# Flow 实现状态与证据入口
+
+2026-10-23最新整体盘点见[开发进度与完整后续任务](flow/2026-10-23-095706-project-progress-prd-handoff.md)及[196项逐行映射](flow/2026-10-23-095706-prd-196-matrix.md)。当前HEAD8de18f8a、25个本地归档、0活跃，不代表发布通过；最新U03合法编辑仅本地保存、云端未同步待查，旧Web40失败/2错误未重跑或解决。下面的9fbcf028等为历史验证基线，不是本轮全量结果。
+
+## 当前口径
+
+本地能力已覆盖 P0–P5 主干，以及报告 PDF/DOCX、原始 HTTP 字节归档、OpenAI 兼容 Embedding/混合检索、媒体二进制代理/预签名、analyst、复合外键、情报交接画布、低代码 DAG、MCP 缓存和画布 Agent 建模。Outbox 所有权及错误传播修复已本地归档，细节见[服务合同](flow/service-contracts.md)。这些是实现状态，不表示真实 UI、PG、多实例、恢复、实采或远端发布通过。
+
+本轮自动检查基线为 `9fbcf028`，实际通过、跳过与环境见[基线证据账](flow/2026-10-20-current-baseline-evidence.md)；发布前仍按[待验收清单](flow/pending-acceptance.md)及[路线图](flow/roadmap.md)逐项收口。旧 W1/W2/D1 已有归档，不再作为待开发功能。
+
+当前可追溯需求来源是仓库的 196 项审计明细和现行 OpenSpec；尚未找到独立的 Flow PRD v2 完整原文，旧 Loom `/prd` 页面不能替代。用户保留的 `prd-audit-9.md` 表头为 Y176/D9/E7/O4，但本轮逐行复算为 **Y177/D8/E7/O4 = 196**。后续增量的 **185 Y / 1 D / 7 E / 3 O** 仅作历史实现映射，不是当前测试通过率；原审计快照未修改。原产品 861 个未勾选项是历史验收登记，不是 861 个待开发功能。
+
+## 历史分轮记录与代码映射
+
+下表沿用各分轮的证据名称；历史测试和 CI 未在本轮逐项重跑。原更新时间为 2026-10-15（Asia/Shanghai），Round 7/8/9 的日期、SHA 和验证结果详见 [delivery-report](flow/delivery-report.md)。表中 done 表示已有实现，不能自动提升为当前真实环境验收通过。
+
+**A file existing does not mean the feature has passed:** the evidence column says what was actually exercised.
+
+| PRD section | Status | Code | Evidence |
+|---|---|---|---|
+| §1.2/§17 upstream lock and licenses | done | `third_party/upstreams.lock.json`, `THIRD_PARTY_UPSTREAMS.md` | review only |
+| §3 architecture: two logical databases | done | `backend/internal/flow`, `services/loom-engine/flow` | Go + Node tests |
+| §5.2 states, 202, notifications | done | `retry_wait` / `reconciliation_required` (`billing.go`, `model_tasks.go`, `mcp_idem.go`, `notify.go`); email and webhook delivery with `delivery_id`, HMAC, retries and idempotency (`notify.go`, `routes_notify.go`) | `notify_test.go` (httptest webhook, fake mailer); **no real SMTP/webhook endpoint exercised** |
+| §6.2 leases, fencing, idempotency | done | engine 0001 / `lease.go` | `reliability.test.ts`, A05–A07 |
+| §6.2 job state machine | done; stored as `queued`, reported as `job_state: "pending"` in operation job rows | engine `0012_job_states_misfire.sql`, `engine.ts` (`queued→leased→running→succeeded/partial/failed`, `retry_wait` with backoff and `max_attempts`, `cancel_requested→cancelled`, `reconciliation_required` + `reconcile()`), heartbeat | `gaps5.test.ts` (PGlite + PG17 in CI) |
+| §6.1 schedules: cron, timezone, misfire_policy | done | `cron.ts`, `dueWindows` (`coalesce`/`skip`/`catch_up`, max 3 catch-up windows, 120 s grace) | `gaps5.test.ts` |
+| §6.4 enrichment, OCR, media | done (OCR live only with tesseract) | `enrichment.ts` `ocrClient`, `workers/ocr`, `engine.retryMedia` / `ocrTick` | `gaps2.test.ts`; worker unit tests; the real-tesseract test runs in CI |
+| §7.3 Chinese term dictionary and aliases | done | `flow/terms/zh-industry.json`, `flow/terms.ts`, `flow_term_aliases` | `gaps1.test.ts` |
+| §8.1 run-chain interfaces | done for every agent run (canvas and intelligence) | `flow/runchain.go` (`ScopeResolver`, `ContextProvider`, `ToolProvider`, `ToolExecutor`, `UsageRecorder`); adapters: `flow.IntelRunChain` and the canvas adapter `app/cloud_agent_runchain.go`. The runtime picks one with `agentRunChain`. Canvas admission (ownership), Pi canvas context, the tool table, checkpoint writes, batched reads, approved media dispatch and auto media submission all call the chain | `app/cloud_agent_runchain_test.go`: a probe wraps all five interfaces. It shows a canvas run calling scope/tools/exec (read and write) and context. A refusing executor blocks the canvas write. Intel runs use the intel adapter |
+| §8.3 tools | done | 18 `intel_*` tools (round 9 adds `intel_save_topic`; every tool has a cost basis), including `intel_list_sources` and `intel_compare_evidence` | `routes_contract_test.go`, tool tests |
+| §9.2 industry packs | done (export) | `industry-packs/*` (manifest, schemas, evals) generated from `backend/internal/flow/skillpacks/*.json` | `TestIndustryPackExport` (drift check); eval sets are review cases, not an automated grader |
+| §9.3 MCP Gateway | done; real server acceptance deferred (A19) | `mcp*.go` (incl. `MCPToolListCache` keyed by `(tenant_id, connection_id, secret_ref, schema_hash, policy_version)` with automatic invalidation on approve/revoke/schema drift); tenant-saved credentials `mcp_secrets.go` (AES-256-GCM envelope, per-secret data key wrapped by `FLOW_SECRETS_KEK`, AAD binds tenant/workspace/id; referenced as `secret:<id>`, never returned by the API); `/api/mcp/connections` and `/api/mcp/secrets` aliases | A14/A16 tests, `TestMCPToolCacheCompositeKeyAndInvalidation`, `mcp_secrets_test.go` |
+| §9.4 research sub-tasks | done; Eino/OpenCode executor not wired (optional) | `tools_p3.go`, `reports.ts` | tests |
+| §10.3 RLS | done (v65 adds the capability snapshot tables under tenant RLS and the provider account tables under system-only RLS, see `TestRLSCapabilityAndProviderTables`); the platform agent runtime still runs in system context internally | engine 0006 + every new table; `flow_rls.go` (incl. `flow_mcp_secrets`) | `pg.test.ts` on PG17 in CI; platform `TestFlowRLSPostgres` / `TestRuntimeRLSBlocksUnfilteredHandlerQueries` / `TestBackgroundWorkIsTenantScoped` run in CI as non-superuser `flow_app` (PR #34) |
+| §10.4 private objects and tenant-scoped media keys | done | `connectors.ts` `SCOPED_MEDIA_KEY`, telethon `media_object_key`, `tools/media-keys.ts` | `gaps2.test.ts`, `test_history.py` |
+| §11 API contract | done | `routes_contract.go`, engine `server.ts`: PATCH sources with `expected_revision`, document revisions, research start (202) and cancel, evidence compare, terms | `routes_contract_test.go`, `gaps1.test.ts` |
+| §12 billing_account.owner_type | done | schema v63 backfill (`personal`/`organization`) | migration tests |
+| §12 usage, price_version | done | `usage.go` (all usage types, `FLOW_PRICE_BOOK`), `price_version` on reservations, gateway headers | `notify_test.go` / usage tests |
+| §13.3 legacy import, PG version | done | `flow/tools/legacy-import.ts` (`flow_legacy_id_map`, `flow_legacy_archive`: sources, items, analyses, notes, disabled schedules, object mapping; keywords skipped by default or imported as monitor previews with `importKeywords` / `--import-keywords`); PG17 in every compose file and in CI | `legacy-import.test.ts`, `legacy-import-full.test.ts`, `gaps9.test.ts` (PGlite + real PG17 FORCE RLS); **not run against a real legacy production dump** |
+| §14 profiles and monitoring | done (config) | `docker-compose.flow.yml` profiles core / telegram / wechat / subtitles / extract / research / monitoring (`COMPOSE_PROFILES=core` in `.env.flow.example`); `/metrics`, `/metrics/flow`, `deploy/flow/monitoring/*` | `ops.test.ts`, `metrics_test.go`; `docker compose config` validated for every profile; **full stack boot not run** |
+| A08 / A10 / A18 / A20 direct tests | done | `app/flow_acceptance_test.go` (A08, A10), `pg.test.ts` (A18 backup), `flow/a20.test.ts` | Go + Node tests |
+| A19 live acceptance (Telegram, WeChat, MCP, OAuth) | deferred to user | `docs/flow/local-acceptance.md` | — |
+
+Round 9 additions (2026-10-15, audit-8 gaps; details in `docs/flow/delivery-report.md` "Round 9"):
+
+| PRD section | Status | Code | Evidence |
+|---|---|---|---|
+| §5.2 saved topics | done | `flow/topics.go`, `intel_save_topic`, `topics-panel.tsx` | `TestSavedTopicsCRUDAndTool` |
+| §5.2 / §10.3 report export (md/html/json/pdf/docx) | done (incl. PDF `%PDF-1.7` CJK & OpenXML DOCX) | `gaps9.ts renderReport`, `gaps9.go` | `gaps9.test.ts`, `TestGaps9RoutesForwardAndRender` |
+| §10.4 verified media download | done (streaming proxy up to 512 MiB + short-lived scoped `presign` mode); **not run against a real MinIO** | `gaps9.ts downloadMedia/presignGet`, `gaps9.go` | `gaps9.test.ts`, `TestGaps9MediaStreamAndPresignModes` |
+| §10.3 RLS on topics, event inbox, projections, billing accounts, skill pins, command outbox | done (v66–v67) | `flow_rls.go` | `TestFlowRLSPostgres` (PG17 non-superuser) |
+| §5.1 structured plan, cost estimate, budget, re-approval | done | `engine.ts`, `plan-card.tsx`, `monitor-editor.tsx` | `gaps9.test.ts`, Go route tests |
+| §7.3 snippet hash + URL | done | engine `0016`, `reports.ts`, `citations.go` | `gaps9.test.ts`, `TestCitationSnippetHashAndURL` |
+| §6.3 raw item + digest + raw HTTP response archive | done（规范化条目与原始 HTTP bytes；直接保存原始字节，不额外 gzip；`0017_raw_response_archive.sql`） | `engine.ts execute`, `gaps9.ts archiveRawResponse/downloadRawResponse` | `gaps9.test.ts`；真实对象存储待验收 |
+| §6.4 / §7.3 embed / analyze jobs & hybrid vector search | done (`none`/`hash`/`openai` embedders + optional hybrid FTS + cosine similarity search) | `gaps9.ts derivedTick/openaiEmbedder`, `engine.ts searchDocuments` | `gaps9.test.ts` |
+| §11.1 cancel/retry projection | done | `events.go` | `TestProjectionCancelAndRetryEvents` |
+| §11.3 manual command outbox + async dispatcher | done (`flow_command_outbox` v67 + `CommandDispatcher` + `RunCommandDispatcher`) | `command_outbox.go`, `routes.go`, `routes_contract.go`, `tools.go` | `command_outbox_test.go` |
+| §10.1 workspace roles (`owner/admin/analyst/editor/viewer`) | done (`analyst` supported in `CreateInvite`, `SetMemberRole`, `ListMembers`, `ScopesForRole`) | `scope.go`, `orgs.go`, `p7.go` | `TestP7MembersRoleEditing` |
+| §5.2 / §6.3 / §7.2 7-state `prd_status` & composite scope FKs | done (`prdOperationStatus` / `PRDOperationStatus` + `0018_composite_keys_and_fk.sql`) | `engine.ts`, `events.go`, `0018_composite_keys_and_fk.sql` | `gaps9.test.ts`, `TestPRDOperationStatus` |
+| §8.3 cost basis | done | `zz_cost_basis.go` | `TestEveryToolHasCostBasis` |
+
+## Known deviations
+- Directory layout: everything lives under `backend/internal/flow/` rather than `intelligence/`, `mcpgateway/` and `tenant/`. Workers live under `services/loom-engine/workers/`.
+- `web/.prettierignore` no longer excludes source files. The former snippet tests use format-normalized source contracts (`web/test/helpers/source-contract.ts`); they are not rendering tests.
+- §8.1 `UsageRecorder`: both adapters carry `flow.DefaultUsageRecorder`. Usage lines are written by the gateways (model tasks, MCP, notifications, engine usage events) through it. The Pi run loop itself writes no per-run usage line for either adapter. Canvas media is billed through the existing credit/task ledger, not the flow usage ledger.
+- §8.1: canvas media admission, approval and credit reservation still run in the runtime before the dispatch reaches the canvas `ToolExecutor`.
+- §6.2: the job state is stored as `queued` (it matches the §5.2 user-facing status). Operation job rows add `job_state` with the §6.2 name `pending`.
+- Eino/OpenCode research executor: not integrated (optional in the PRD).
+
+Round 7 additions (2026-10-15):
+
+| PRD section | Status | Code | Evidence |
+|---|---|---|---|
+| §12 schedule budgets, provider limits, 402 → blocked | done | engine `0013`, `billing.go` provider layer, `routes_p5.go` budget routes | `gaps6.test.ts`, `gaps6_test.go` |
+| §6.2 per-tenant fair claim | done | `engine.ts` claim, `flow_tenant_limits` | `gaps6.test.ts` |
+| §7 event time | done | `documents.event_occurred_at` | `gaps6.test.ts` |
+| §9.1 capability snapshots | done; tenant FORCE RLS (schema v65) | `flow/capability.go` | `gaps6_test.go`, `cloud_agent_capability_test.go` |
+| §6.4 ASR | done (live only with the faster-whisper model) | `workers/asr`, engine `0014` | `workers/asr/test_server.py`, `gaps6.test.ts` |
+| §12 canvas usage in the flow ledger | done as a mirror (`Charge=false`); the debit stays on the canvas billing order | `app/cloud_agent_flow_usage.go` | Go tests |
+| §15 intelligence tabs and empty-state reasons | done | `web/src/pages/intelligence/views.tsx`, `empty-reason.ts` | `intelligence-empty-reason.test.ts` |
+| A18 object restore | in CI | `deploy/flow/backup/objects-test.sh`, quality.yml `object-restore` | CI |
+
+Round 8 additions (2026-10-15, audit-6 gaps):
+
+| PRD section | Status | Code | Evidence |
+|---|---|---|---|
+| §9.2 capability snapshot enforcement | done: tool table **and** model route enforced, fail-closed (no snapshot / empty table rejects), freeze failure fails the run | `flow/capability.go` (`CheckRunModel`, `CheckRunTool`), `app/cloud_agent.go`, `app/cloud_agent_pi_model.go`, `flow/tools_p3.go` | `TestRunCapabilityEnforcesModelRouteAndFailsClosed`, `runchain_test.go` |
+| §9.4 producer draft → host Reviewer | done: support / conflict / uncertainty checks on research drafts, model briefs and model synthesis; unsupported claims rejected with reasons | engine `reports.ts` (`review`), `flow/reviewer.go` | `flow/gaps7.test.ts`, `reviewer_test.go` |
+| §9.4 / A15 cancel propagation | done: a cancelled parent run cancels its queued and running child research (`POST /v1/research-runs/cancel-children`) during durable cleanup | `reports.ts` (`cancelChildren`), `app/cloud_agent_recovery.go` | `gaps7.test.ts` (A15), `TestCancelIntelRunPropagatesToChildResearch` |
+| §14 alerts | done: + budget, MCP errors, citation/Reviewer rejections, duplicate delivery, oldest queued job; metrics emitted | `deploy/flow/monitoring/alerts.yml`, `flow/ops_counters.go`, `flow/metrics.go`, engine `metrics.ts` | `promtool check/test rules` in CI, `TestMetricsEmitAlertSignals`, `gaps7ops.test.ts` |
+| §14 daily backup | done: compose profile `backup` (DB + objects, retention) | `deploy/flow/backup/daily.sh`, `docker-compose.flow.yml` | `daily-test.sh` on PG17 in CI |

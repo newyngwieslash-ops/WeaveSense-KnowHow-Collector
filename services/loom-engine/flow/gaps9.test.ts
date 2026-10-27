@@ -1,0 +1,342 @@
+// Audit-8 gaps: monitor plan/budget/re-approval, evidence snippet hash + URL, raw digests,
+// embed/analyze jobs, extraction completeness, report export, scoped media download.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { pgliteDb, migrate } from "./db.ts";
+import { Engine, prdOperationStatus, PRD_OPERATION_STATUSES, type FeedItem } from "./engine.ts";
+import { Reports } from "./reports.ts";
+import { derivedTick, hashEmbedder, openaiEmbedder, embedderFromEnv, downloadMedia, downloadRawResponse, presignGet, presignPut, monitorExpansion, snippetHash } from "./gaps9.ts";
+import { importLegacy } from "./tools/legacy-import.ts";
+
+const A = { tenant_id: "tn_a", workspace_id: "ws_a" };
+const B = { tenant_id: "tn_b", workspace_id: "ws_b" };
+let feeds: Record<string, FeedItem[]> = {};
+const item = (id: string, body: string): FeedItem => ({ external_id: id, title: `Doc ${id}`, body, url: `https://one.example/${id}`, published_at: "2026-10-12T12:00:00Z" });
+async function setup() {
+  const db = await pgliteDb(); await migrate(db);
+  const eng = new Engine(db, async (url) => feeds[url] ?? [], () => new Date("2026-10-13T00:00:00Z"));
+  const s1 = await eng.createSource(A, { url: "https://one.example/f" });
+  const s2 = await eng.createSource(A, { url: "https://two.example/f" });
+  const collect = async (src: any, k: string) => { await eng.requestCollection(A, k, { source_ids: [src.id] }); while (await eng.workOnce("w")); };
+  return { db, eng, rp: new Reports(eng), s1, s2, collect };
+}
+
+test("§5.1 preview is a structured plan with extraction method, cost estimate, budget and targets; apply binds the budget", async () => {
+  const { db, eng, s1 } = await setup();
+  const pv: any = await eng.previewMonitor(A, { keywords: ["锂"], source_ids: [s1.id], interval_seconds: 3600, timezone: "Asia/Shanghai",
+    notification_target_ids: ["nt_1"], price: { version: "price_v9", per_source_run_micro: { rss: 1500 } } });
+  assert.equal(pv.cost_estimate.per_window_micro, 1500);
+  assert.equal(pv.cost_estimate.per_day_micro, 1500 * 24);
+  assert.equal(pv.cost_estimate.price_version, "price_v9");
+  assert.equal(pv.budget_micro_per_window, 1500, "budget defaults to the estimate");
+  assert.match(pv.extraction_method, /feed_summary/);
+  assert.deepEqual(pv.notification_target_ids, ["nt_1"]);
+  assert.equal(pv.sources[0].id, s1.id);
+  assert.equal(pv.requires_approval, true);
+  const got: any = await eng.getMonitorPreview(A, pv.preview_id);
+  assert.equal(got.cost_estimate.per_window_micro, 1500);
+  await assert.rejects(eng.getMonitorPreview(B, pv.preview_id), (e: any) => e.status === 404);
+  const { monitor } = await eng.applyMonitor(A, "user:u", "p1", { preview_id: pv.preview_id, approval_id: "ap_1", idempotency_key: "k1" });
+  assert.equal(Number(monitor.budget_micro_per_window), 1500);
+  const sch = (await db.query(`SELECT budget_micro_per_window FROM flow_schedules WHERE id=$1`, [monitor.schedule_id])).rows[0];
+  assert.equal(Number(sch.budget_micro_per_window), 1500, "schedule reserves the approved budget per window");
+});
+
+test("§5.1 monitor update: narrowing applies, widening sources/budget/frequency/targets needs re-approval", async () => {
+  const { db, eng, s1, s2 } = await setup();
+  const pv: any = await eng.previewMonitor(A, { keywords: ["锂"], source_ids: [s1.id], interval_seconds: 3600, budget_micro_per_window: 1000 });
+  const { monitor } = await eng.applyMonitor(A, "user:u", "p1", { preview_id: pv.preview_id, approval_id: "ap_1", idempotency_key: "k1" });
+  const narrowed: any = await eng.updateMonitor(A, "user:u", monitor.id, { keywords: ["锂", "碳酸锂"], budget_micro_per_window: 500, expected_version: 1 });
+  assert.deepEqual(narrowed.expansion, []);
+  assert.equal(narrowed.version, 2);
+  for (const change of [{ source_ids: [s1.id, s2.id] }, { budget_micro_per_window: 5000 }, { interval_seconds: 600 }, { notification_target_ids: ["nt_x"] }]) {
+    await assert.rejects(eng.updateMonitor(A, "user:u", monitor.id, change as any), (e: any) => e.status === 409 && /reapproval_required/.test(e.message));
+  }
+  await assert.rejects(eng.updateMonitor(A, "user:u", monitor.id, { keywords: ["x"], expected_version: 1 }), (e: any) => e.status === 409);
+  const widened: any = await eng.updateMonitor(A, "user:u", monitor.id, { source_ids: [s1.id, s2.id], budget_micro_per_window: 2000, approval_id: "ap_2" });
+  assert.deepEqual(widened.expansion, ["sources", "budget"]);
+  const sch = (await db.query(`SELECT source_ids, budget_micro_per_window FROM flow_schedules WHERE id=$1`, [monitor.schedule_id])).rows[0];
+  assert.equal(sch.source_ids.length, 2);
+  assert.equal(Number(sch.budget_micro_per_window), 2000);
+  // Agent path: a preview of an existing monitor carries the expansion and applies as an approved update.
+  const pv2: any = await eng.previewMonitor(A, { monitor_id: monitor.id, keywords: ["锂"], source_ids: [s1.id, s2.id], interval_seconds: 3600, budget_micro_per_window: 9000 });
+  assert.deepEqual(pv2.expansion, ["budget"]);
+  const r: any = await eng.applyMonitor(A, "agent:a", "p1", { preview_id: pv2.preview_id, approval_id: "ap_3", idempotency_key: "k3" });
+  assert.equal(r.monitor.id, monitor.id);
+  const revs = await eng.listMonitorRevisions(A, monitor.id);
+  assert.deepEqual(revs.map((x: any) => [x.version, x.expanded, x.approval_id]), [[1, true, "ap_1"], [2, false, null], [3, true, "ap_2"], [4, true, "ap_3"]]);
+  await assert.rejects(eng.updateMonitor(B, "user:b", monitor.id, { keywords: ["x"] }), (e: any) => e.status === 404);
+  assert.deepEqual(monitorExpansion({ source_ids: ["a"], budget_micro_per_window: 1, interval_seconds: 300, notification_target_ids: [] },
+    { source_ids: ["a"], budget_micro_per_window: 1, interval_seconds: 600, notification_target_ids: [] }), []);
+});
+
+test("§7.3 evidence stores snippet hash + URL; tampered quote or moved URL fails citation checks", async () => {
+  const { db, eng, rp, s1, collect } = await setup();
+  feeds = { "https://one.example/f": [item("1", "cobalt output falls 10 percent")] };
+  await collect(s1, "c1");
+  const r: any = await rp.startResearch(A, "k1", { parent_run_id: "run_r", question: "cobalt" });
+  const cite = r.output.claims[0].citations[0];
+  const [ev]: any = await rp.resolveEvidence(A, [cite.evidence_id]);
+  assert.equal(ev.snippet_hash, snippetHash(ev.quote));
+  assert.equal(ev.url, "https://one.example/1");
+  assert.equal(ev.snippet_ok && ev.url_ok, true);
+  await assert.rejects(rp.saveReport(A, "u", "r0", { title: "x", claims: [{ text: "t", kind: "source_statement", citations: [{ ...cite, snippet_hash: "0".repeat(64) }] }] }), (e: any) => e.status === 422);
+  await assert.rejects(rp.saveReport(A, "u", "r0b", { title: "x", claims: [{ text: "t", kind: "source_statement", citations: [{ ...cite, url: "https://evil.example/" }] }] }), (e: any) => e.status === 422);
+  assert.ok((await rp.saveReport(A, "u", "r1", { title: "ok", claims: [{ text: "t", kind: "source_statement", citations: [{ ...cite, snippet_hash: ev.snippet_hash, url: ev.url }] }] })).report_id);
+  await db.query(`UPDATE flow_evidence SET quote='cobalt output RISES' WHERE id=$1`, [cite.evidence_id]);
+  const [bad]: any = await rp.resolveEvidence(A, [cite.evidence_id]);
+  assert.equal(bad.snippet_ok, false);
+  await assert.rejects(rp.saveReport(A, "u", "r2", { title: "x", claims: [{ text: "t", kind: "source_statement", citations: [cite] }] }), (e: any) => e.status === 422 && /snippet hash/.test(e.message));
+  await db.query(`UPDATE flow_evidence SET quote=$2, snippet_hash=$3 WHERE id=$1`, [cite.evidence_id, ev.quote, ev.snippet_hash]);
+  await db.query(`UPDATE flow_documents SET url='https://moved.example/1' WHERE id=$1`, [cite.document_id ?? ev.document_id]);
+  await assert.rejects(rp.saveReport(A, "u", "r3", { title: "x", claims: [{ text: "t", kind: "source_statement", citations: [cite] }] }), (e: any) => e.status === 422 && /url mismatch/.test(e.message));
+});
+
+test("§6.3 raw item + digest per revision and per run; raw HTTP response byte archiving; §5 content library shows source and extraction completeness", async () => {
+  const { db, eng, s1, collect } = await setup();
+  const bucket = new Map<string, { bytes: Buffer; content_type: string }>();
+  eng.objectStorePut = async (key, bytes, content_type) => { bucket.set(key, { bytes, content_type }); };
+  eng.objectStore = async (key) => {
+    const v = bucket.get(key);
+    if (!v) throw Object.assign(new Error("not found"), { status: 404 });
+    return v;
+  };
+  const rawXml = `<?xml version="1.0"?><rss><channel><item><guid>1</guid><title>Doc 1</title><description>lithium</description></item></channel></rss>`;
+  eng.fetcher = async () => ({
+    items: [item("1", "lithium")],
+    collector: "rss",
+    mode: "fixture",
+    raw_response: { status: 200, content_type: "application/rss+xml; charset=utf-8", headers: { etag: `"v1"` }, body: rawXml },
+  });
+  await collect(s1, "c1");
+  const rv = (await db.query(`SELECT raw_item, raw_digest, extraction FROM flow_document_revisions`)).rows[0];
+  const raw = typeof rv.raw_item === "string" ? JSON.parse(rv.raw_item) : rv.raw_item;
+  assert.equal(raw.external_id, "1");
+  assert.match(rv.raw_digest, /^[0-9a-f]{64}$/);
+  assert.equal(rv.extraction, "feed");
+  const run = (await db.query(`SELECT id, raw_digest, raw_items, raw_response_key, raw_response_sha256, raw_response_bytes FROM flow_collection_runs`)).rows[0];
+  assert.match(run.raw_digest, /^[0-9a-f]{64}$/);
+  assert.equal(run.raw_items, 1);
+  assert.match(run.raw_response_key, /^tenants\/tn_a\/workspaces\/ws_a\/raw-runs\//);
+  assert.equal(run.raw_response_bytes, Buffer.byteLength(rawXml));
+  const dl: any = await downloadRawResponse(db, eng.objectStore, A, { run_id: run.id });
+  assert.equal(Buffer.from(dl.data_base64, "base64").toString("utf8"), rawXml);
+  assert.equal(dl.sha256, run.raw_response_sha256);
+  assert.equal(dl.content_type, "application/rss+xml; charset=utf-8");
+  // Cross-tenant download must be 404
+  await assert.rejects(downloadRawResponse(db, eng.objectStore, B, { run_id: run.id }), (e: any) => e.status === 404);
+  // Tampered bytes in object storage must fail SHA-256 verification with 502
+  bucket.set(run.raw_response_key, { bytes: Buffer.from("<rss>tampered</rss>"), content_type: "application/rss+xml" });
+  await assert.rejects(downloadRawResponse(db, eng.objectStore, A, { run_id: run.id }), (e: any) => e.status === 502);
+  const putUrl = presignPut({ endpoint: "minio:9000", bucket: "flow-intel", key: run.raw_response_key, accessKey: "ak", secretKey: "sk", now: new Date("2026-10-13T00:00:00Z") });
+  assert.match(putUrl, /^http:\/\/minio:9000\/flow-intel\/tenants\/tn_a\/workspaces\/ws_a\/raw-runs\/.*X-Amz-Signature=[0-9a-f]{64}$/);
+  const [d]: any = await eng.listDocuments(A, {});
+  assert.equal(d.source_title !== undefined && d.source_kind, "rss");
+  assert.equal(d.extraction.level, "feed_summary");
+  assert.equal(d.extraction.complete, false);
+});
+
+test("§6.4 embed and analyze are separate jobs, once per content hash; embedding provider is pluggable", async () => {
+  const { db, eng, s1, collect } = await setup();
+  const pv: any = await eng.previewMonitor(A, { keywords: ["lithium"], source_ids: [s1.id], interval_seconds: 3600 });
+  await eng.applyMonitor(A, "user:u", "p", { preview_id: pv.preview_id, approval_id: "ap", idempotency_key: "k" });
+  feeds = { "https://one.example/f": [item("1", "lithium price up 10% in Q3")] };
+  await collect(s1, "c1");
+  await collect(s1, "c2"); // unchanged body: nothing new queued
+  const jobs = (await db.query(`SELECT kind, status FROM flow_derived_jobs ORDER BY kind`)).rows;
+  assert.deepEqual(jobs.map((j: any) => [j.kind, j.status]), [["analyze", "queued"], ["embed", "queued"]]);
+  assert.equal(await derivedTick(db, null), 2);
+  const after = (await db.query(`SELECT kind, status, provider, error FROM flow_derived_jobs ORDER BY kind`)).rows;
+  assert.deepEqual(after.map((j: any) => [j.kind, j.status]), [["analyze", "succeeded"], ["embed", "skipped"]]);
+  assert.match(after[1].error, /vector search disabled/);
+  const [doc]: any = await eng.listDocuments(A, {});
+  const { getAnalysis } = await import("./gaps9.ts");
+  const an: any = await getAnalysis(db, A, doc.id);
+  assert.deepEqual(an.analysis.matched_keywords, ["lithium"]);
+  assert.deepEqual(an.analysis.numeric_facts, [{ value: 10, unit: "%" }]);
+  await assert.rejects(getAnalysis(db, B, doc.id), (e: any) => e.status === 404);
+  // Body changes → a new revision → new embed/analyze jobs; hash embedder writes vectors.
+  feeds = { "https://one.example/f": [item("1", "lithium price up 12% in Q3 (revised)")] };
+  await collect(s1, "c3");
+  assert.equal(await derivedTick(db, hashEmbedder(16)), 2);
+  const vec = (await db.query(`SELECT provider, dims, array_length(vector, 1) AS n FROM flow_document_embeddings WHERE revision=2`)).rows[0];
+  assert.deepEqual([vec.provider, vec.dims, vec.n], ["hash-16", 16, 16]);
+  assert.equal(await derivedTick(db, hashEmbedder(16)), 0, "frequent ticks do not re-spend");
+  // OpenAI-compatible HTTP embedder + hybrid vector search (semantic recall, provider isolation & cross-tenant isolation)
+  const seenCalls: { url: string; body: any }[] = [];
+  const oai = embedderFromEnv(
+    { EMBED_PROVIDER: "openai", EMBED_BASE_URL: "https://emb.example/v1", EMBED_API_KEY: "sk-test", EMBED_MODEL: "bge-m3", EMBED_DIMS: "4" },
+    (async (url: any, init: any) => {
+      const b = JSON.parse(String(init?.body ?? "{}"));
+      seenCalls.push({ url: String(url), body: b });
+      const data = (b.input as string[]).map((txt: string, idx: number) => ({
+        index: idx,
+        embedding: /cathode|正极|battery/i.test(txt) ? [3, 4, 0, 0] : [0, 0, 1, 0],
+      }));
+      return new Response(JSON.stringify({ data }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as any,
+  )!;
+  assert.equal(oai.name, "openai:bge-m3");
+  assert.equal(oai.dims, 4);
+  feeds = { "https://one.example/f": [item("1", "lithium price up 12% in Q3 (revised)"), item("2", "LFP cathode capacity expands rapidly")] };
+  await collect(s1, "c4");
+  assert.equal(await derivedTick(db, oai), 2);
+  assert.equal(seenCalls[0].url, "https://emb.example/v1/embeddings");
+  assert.equal(seenCalls[0].body.model, "bge-m3");
+  // Without vector search, querying "正极材料" does not match English "LFP cathode capacity expands rapidly"
+  const ftsOnly = await eng.searchDocuments(A, { query: "正极材料", vector: false });
+  assert.equal(ftsOnly.items.length, 0);
+  // With hybrid vector search enabled on oai embedder, semantic similarity recalls item("2")
+  eng.embedder = oai;
+  const hybrid = await eng.searchDocuments(A, { query: "正极材料", vector: true });
+  assert.equal(hybrid.vector_used, true);
+  assert.equal(hybrid.embed_provider, "openai:bge-m3");
+  assert.equal(hybrid.items.length, 1);
+  assert.match(hybrid.items[0].snippet, /LFP cathode/);
+  assert.ok(hybrid.items[0].vector_score > 0.99);
+  // Cross-tenant isolation: tenant B never sees tenant A's vector embeddings
+  const foreignHybrid = await eng.searchDocuments(B, { query: "正极材料", vector: true });
+  assert.equal(foreignHybrid.items.length, 0);
+  // Provider/model switch isolation: switching to a different model does not mix old provider vectors
+  eng.embedder = hashEmbedder(16);
+  const switchedModel = await eng.searchDocuments(A, { query: "正极材料", vector: true });
+  assert.equal(switchedModel.items.length, 0);
+});
+
+test("§5.2/§10.3 report export (md/html/json/pdf/docx) is tenant-scoped (A02)", async () => {
+  const { eng, rp, s1, collect } = await setup();
+  feeds = { "https://one.example/f": [item("1", "cobalt output falls 10 percent")] };
+  await collect(s1, "c1");
+  const r: any = await rp.startResearch(A, "k1", { parent_run_id: "run_r", question: "cobalt" });
+  const saved: any = await rp.saveReport(A, "u", "rep", { title: "Cobalt 钴周报 <weekly>", body: "钴产量摘要 summary", claims: [{ text: "Cobalt 产量下降 10%", kind: "source_statement", citations: [r.output.claims[0].citations[0]] }] });
+  const md: any = await rp.exportReport(A, saved.report_id, "md");
+  assert.equal(md.content_type, "text/markdown; charset=utf-8");
+  assert.match(md.content, /^# Cobalt 钴周报 <weekly>/);
+  assert.match(md.content, /\*\*\[source_statement\]\*\* Cobalt 产量下降 10%/);
+  assert.match(md.content, /rev 1 · evidence ev_/);
+  const html: any = await rp.exportReport(A, saved.report_id, "html");
+  assert.match(html.content, /<h1>Cobalt 钴周报 &lt;weekly&gt;<\/h1>/);
+  const js: any = await rp.exportReport(A, saved.report_id, "json");
+  assert.equal(JSON.parse(js.content).id, saved.report_id);
+  const pdf: any = await rp.exportReport(A, saved.report_id, "pdf");
+  assert.equal(pdf.content_type, "application/pdf");
+  assert.match(pdf.filename, /\.pdf$/);
+  const pdfBuf = Buffer.from(pdf.content_base64, "base64");
+  assert.equal(pdfBuf.subarray(0, 8).toString("ascii"), "%PDF-1.7");
+  assert.match(pdfBuf.toString("utf8"), /Cobalt 钴周报 <weekly>/);
+  assert.match(pdfBuf.toString("utf8"), /STSong-Light/);
+  assert.match(pdfBuf.toString("utf8"), /%%EOF\s*$/);
+  const docx: any = await rp.exportReport(A, saved.report_id, "docx");
+  assert.equal(docx.content_type, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  assert.match(docx.filename, /\.docx$/);
+  const docxBuf = Buffer.from(docx.content_base64, "base64");
+  assert.equal(docxBuf.readUInt32LE(0), 0x04034b50, "ZIP local file header PK\\x03\\x04");
+  const docxStr = docxBuf.toString("utf8");
+  assert.match(docxStr, /word\/document\.xml/);
+  assert.match(docxStr, /Cobalt 钴周报 &lt;weekly&gt;/);
+  assert.match(docxStr, /\[source_statement\] Cobalt 产量下降 10%/);
+  await assert.rejects(rp.exportReport(A, saved.report_id, "exe"), (e: any) => e.status === 400);
+  await assert.rejects(rp.exportReport(B, saved.report_id, "md"), (e: any) => e.status === 404, "A02: guessed foreign report id is not exportable");
+  await assert.rejects(rp.exportReport(B, saved.report_id, "pdf"), (e: any) => e.status === 404);
+  await assert.rejects(rp.exportReport(B, saved.report_id, "docx"), (e: any) => e.status === 404);
+  void eng;
+});
+
+test("§10.4 media download: verify scope + reference first, then proxy from the private bucket", async () => {
+  const key = "tenants/tn_a/workspaces/ws_a/telegram/chan/9";
+  const db = await pgliteDb(); await migrate(db);
+  const bytes = Buffer.from("PNGDATA");
+  const sha = (await import("node:crypto")).createHash("sha256").update(bytes).digest("hex");
+  const eng = new Engine(db, (async () => ({ collector: "telethon", mode: "fixture", items: [{ external_id: "9", title: "图", body: "图片", url: "https://t.me/chan/9", published_at: "2026-10-12T00:00:00Z",
+    media: [{ url: key, type: "image", status: "stored", reason: "", content_type: "image/png", sha256: sha }, { url: "tenants/tn_a/workspaces/ws_a/telegram/chan/10", type: "image", status: "failed", reason: "x" }] }] })) as any,
+    () => new Date("2026-10-13T00:00:00Z"));
+  const s = await eng.createSource(A, { kind: "telegram", config: { handle: "chan_abc" } });
+  await eng.requestCollection(A, "k", { source_ids: [s.id] }); while (await eng.workOnce("w"));
+  const [d]: any = await eng.listDocuments(A, {});
+  assert.equal(d.extraction.media_total, 2);
+  assert.equal(d.extraction.media_missing, 1);
+  const fetched: string[] = [];
+  const store = async (k: string) => { fetched.push(k); return { bytes, content_type: "application/octet-stream" }; };
+  const got: any = await downloadMedia(db, store, A, { document_id: d.id, object_key: key });
+  assert.equal(Buffer.from(got.data_base64, "base64").toString(), "PNGDATA");
+  assert.equal(got.content_type, "image/png");
+  assert.equal(got.sha256, sha);
+  for (const [sc, k] of [[B, key], [A, "tenants/tn_b/workspaces/ws_b/telegram/chan/9"], [A, "tenants/tn_a/workspaces/ws_a/telegram/chan/10"], [A, "tenants/tn_a/workspaces/ws_a/../ws_x/a"]] as const) {
+    await assert.rejects(downloadMedia(db, store, sc, { document_id: d.id, object_key: k }), (e: any) => e.status === 404);
+  }
+  assert.equal(fetched.length, 1, "unauthorised requests never reach the object store");
+  await assert.rejects(downloadMedia(db, async () => ({ bytes: Buffer.from("tampered"), content_type: "" }), A, { document_id: d.id, object_key: key }), (e: any) => e.status === 502);
+  await assert.rejects(downloadMedia(db, null, A, { document_id: d.id, object_key: key }), (e: any) => e.status === 503);
+  const url = presignGet({ endpoint: "minio:9000", bucket: "flow-intel", key, accessKey: "ak", secretKey: "sk", now: new Date("2026-10-13T00:00:00Z") });
+  assert.match(url, /^http:\/\/minio:9000\/flow-intel\/tenants\/tn_a\/workspaces\/ws_a\/telegram\/chan\/9\?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ak%2F20261013%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261013T000000Z&X-Amz-Expires=60&X-Amz-SignedHeaders=host&X-Amz-Signature=[0-9a-f]{64}$/);
+  // Scoped presign mode: verifies scope + document reference without fetching bytes, signs short-lived URL
+  const presignEnv = { MINIO_ENDPOINT: "minio:9000", MINIO_PUBLIC_ENDPOINT: "https://s3.example.com", MINIO_BUCKET: "flow-intel", MINIO_ACCESS_KEY: "ak", MINIO_SECRET_KEY: "sk" };
+  const signed: any = await downloadMedia(db, null, A, { document_id: d.id, object_key: key, mode: "presign", expires: 45, presign_env: presignEnv, now: new Date("2026-10-13T00:00:00Z") });
+  assert.equal(signed.mode, "presign");
+  assert.equal(signed.expires_in, 45);
+  assert.equal(signed.expected_sha256, sha);
+  assert.match(signed.presigned_url, /^https:\/\/s3\.example\.com\/flow-intel\/tenants\/tn_a\/workspaces\/ws_a\/telegram\/chan\/9\?.*X-Amz-Expires=45/);
+  for (const [sc, k] of [[B, key], [A, "tenants/tn_b/workspaces/ws_b/telegram/chan/9"], [A, "tenants/tn_a/workspaces/ws_a/telegram/chan/10"], [A, "tenants/tn_a/workspaces/ws_a/../ws_x/a"]] as const) {
+    await assert.rejects(downloadMedia(db, null, sc, { document_id: d.id, object_key: k, mode: "presign", presign_env: presignEnv }), (e: any) => e.status === 404);
+  }
+  // Streaming mode supports > 25 MiB without base64 bloat, while legacy non-streaming rejects > 25 MiB with 413
+  const bigKey = "tenants/tn_a/workspaces/ws_a/telegram/chan/big";
+  const bigBytes = Buffer.alloc(26 * 1024 * 1024, 0x41);
+  const bigSha = (await import("node:crypto")).createHash("sha256").update(bigBytes).digest("hex");
+  await db.query(`UPDATE flow_documents SET media=$1::jsonb WHERE id=$2`, [
+    JSON.stringify([{ url: bigKey, type: "video", status: "stored", reason: "", content_type: "video/mp4", sha256: bigSha }]),
+    d.id,
+  ]);
+  const bigStore = async () => ({ bytes: bigBytes, content_type: "video/mp4" });
+  await assert.rejects(downloadMedia(db, bigStore, A, { document_id: d.id, object_key: bigKey }), (e: any) => e.status === 413);
+  const streamed: any = await downloadMedia(db, bigStore, A, { document_id: d.id, object_key: bigKey, stream: true });
+  assert.equal(streamed.size, 26 * 1024 * 1024);
+  assert.equal(streamed.sha256, bigSha);
+  assert.equal(Buffer.isBuffer(streamed.bytes), true);
+  assert.equal("data_base64" in streamed, false);
+});
+
+test("§5.2 / §6.3 / §7.2 / §13.3: 7-state prd_status, composite FKs, and opt-in legacy keyword import", async () => {
+  const { db, eng, s1, collect } = await setup();
+  feeds["https://one.example/f"] = [item("k-1", "储能电池招标公告")];
+  const req = await eng.requestCollection(A, "c3-op-1", { source_ids: [s1.id] });
+  const opQueued: any = await eng.getOperation(A, req.operation_id);
+  assert.equal(opQueued.prd_status, "queued");
+  assert.equal(opQueued.jobs[0].prd_status, "queued");
+  await collect(s1, "c3-op-1");
+  const opDone: any = await eng.getOperation(A, req.operation_id);
+  assert.equal(opDone.status, "succeeded");
+  assert.equal(opDone.prd_status, "completed");
+  assert.equal(opDone.jobs[0].prd_status, "completed");
+  assert.deepEqual(PRD_OPERATION_STATUSES, ["queued", "running", "retrying", "completed", "partial", "failed", "cancelled"]);
+  assert.equal(prdOperationStatus("retry_wait"), "retrying");
+  assert.equal(prdOperationStatus("leased"), "running");
+  assert.equal(prdOperationStatus("cancel_requested"), "running");
+  const completedJobs = await eng.listJobs(A, { status: "completed" });
+  assert.equal(completedJobs.length, 1);
+  assert.equal(completedJobs[0].prd_status, "completed");
+
+  // §7.2 composite scope foreign key blocks cross-workspace/cross-tenant parent reference
+  await assert.rejects(
+    db.query(`INSERT INTO flow_documents (id, tenant_id, workspace_id, source_id, external_id, url, title) VALUES ('doc_bad','tn_a','ws_other',$1,'ext_bad','https://x','bad')`, [s1.id]),
+    /foreign key|violates/i,
+  );
+
+  // §13.3 opt-in legacy keyword import creates monitor preview and maps old_id -> preview_id
+  const legacy = await pgliteDb();
+  await legacy.query(`CREATE TABLE sources (id text primary key, platform text not null, name text not null, handle text not null default '', url text not null default '',
+      feed_url text not null default '', enabled boolean not null default true, adapter text not null default 'rss', created_at timestamptz not null default now())`);
+  await legacy.query(`CREATE TABLE items (id text primary key, source_id text not null, platform text not null, external_id text not null, title text not null default '',
+      body text not null default '', url text not null default '', published_at timestamptz)`);
+  await legacy.query(`CREATE TABLE keywords (id text primary key, phrase text not null)`);
+  await legacy.query(`INSERT INTO sources (id, platform, name, feed_url, adapter) VALUES ('ls1','rss','Feed','https://legacy.example/rss.xml','rss')`);
+  await legacy.query(`INSERT INTO keywords VALUES ('kw1','固态电池')`);
+  const rep = await importLegacy(legacy, db, A, { apply: true, importKeywords: true });
+  assert.deepEqual(rep.counts.keywords, { imported: 1 });
+  const kwEntry = rep.entries.find((e) => e.table === "keywords" && e.old_id === "kw1");
+  assert.ok(kwEntry?.new_id?.startsWith("mpv_"));
+  const pv = await eng.getMonitorPreview(A, kwEntry!.new_id!);
+  assert.deepEqual(pv.keywords, ["固态电池"]);
+  await legacy.close();
+});
+

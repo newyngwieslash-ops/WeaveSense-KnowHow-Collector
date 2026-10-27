@@ -1,0 +1,21 @@
+.next
+node_modules
+dist
+build
+coverage
+bun.lock
+*.log
+*.ico
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+# third-party / static assets (minified vendor bundles, generated pages)
+public/
+# Source-text contract tests (test/*.test.ts) assert exact source snippets in these files.
+# No source-snippet exclusions remain (2026-10-14): the last 12 files were
+# reformatted; their snippet tests now compare whitespace/format-normalized
+# source (test/helpers/source-contract.ts). They are still source contracts,
+# not rendering tests.

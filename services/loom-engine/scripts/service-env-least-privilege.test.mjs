@@ -1,0 +1,155 @@
+#!/usr/bin/env node
+/**
+ * 2026-09-21 加固的守护测试：确认"每个服务只拿到它需要的凭据"这条性质不会
+ * 在后续编辑里被悄悄破坏。
+ *
+ * 背景：加固时最初给所有服务挂了同一个 env 文件，实测发现 MinIO 容器因此也
+ * 拿到了 PostgreSQL 口令与 CRON_SECRET。`env_file` 会把文件里**全部**变量注入
+ * 引用它的服务，所以"最小权限"必须靠**每服务一个文件**来保证，而这很容易被
+ * 下一次图省事的编辑合并回去。
+ *
+ * 这里断言两件事：
+ *   1. compose 里每个服务的 env_file 指向它自己的 env/<service>.env；
+ *   2. 公开模板只声明该服务需要的凭据和明确列出的非敏感设置。
+ *
+ * 纯文本断言，只读仓库公开模板，不打开真实凭据文件，不连服务。
+ */
+
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+import { SERVICE_VARS } from "./write-service-envs.mjs";
+
+const compose = readFileSync(new URL("../docker-compose.yml", import.meta.url), "utf8");
+
+/** Split the compose text into service blocks keyed by name. */
+function serviceBlocks(text) {
+  const blocks = {};
+  let current = null;
+  for (const line of text.split(/\r?\n/)) {
+    if (/^[a-z-]+:/.test(line) && line !== "services:") break;
+    const top = /^ {2}([a-z-]+):\s*$/.exec(line);
+    if (top) {
+      current = top[1];
+      blocks[current] = [];
+      continue;
+    }
+    if (current) blocks[current].push(line);
+  }
+  return blocks;
+}
+
+test("each service reads its own least-privilege env file", () => {
+  const blocks = serviceBlocks(compose);
+  for (const service of Object.keys(SERVICE_VARS)) {
+    const body = blocks[service];
+    assert.ok(body, `${service} must exist in docker-compose.yml`);
+    const expected = `env/${service}.env`;
+    // env_file 列表项带缩进，所以按子串匹配，不做整行相等比较。
+    assert.ok(
+      body.some((line) => line.includes(expected)),
+      `${service} must read F:/loom-backups/env/${service}.env ` +
+        "(a shared file would leak every other service's secrets)",
+    );
+  }
+});
+
+test("no service reads a single shared credentials file", () => {
+  // env_file 会注入文件里的全部变量；合并的凭据文件正是最小权限的反面。
+  // 只看真正生效的配置行，跳过解释它为什么被禁止的注释。
+  const effective = compose.split(/\r?\n/).filter((line) => !/^\s*#/.test(line));
+  assert.ok(
+    !effective.some((line) => line.includes("loom-prod.env")),
+    "compose must not reference the combined loom-prod.env outside of comments",
+  );
+});
+
+test("credential variables are not interpolated from the command line", () => {
+  // Interpolated credentials are what caused the T24 incident: `compose up` injects
+  // command-line variables into every related service. They must come from env_file.
+  for (const name of ["POSTGRES_PASSWORD", "MINIO_ROOT_PASSWORD", "CRON_SECRET", "WECHAT_GATEWAY_TOKEN"]) {
+    assert.ok(
+      !new RegExp(`\\$\\{${name}[:?]`).test(compose),
+      `${name} must not be interpolated (use env_file)`,
+    );
+  }
+});
+
+test("public templates declare only service credentials and allowed settings", () => {
+  const optionalSettings = { app: ["ARTICLE_READER_ENABLED", "ARTICLE_READER_ALLOWED_HOSTS", "SUBTITLE_ENABLED", "SUBTITLE_SERVICE_TOKEN"] };
+  for (const [service, names] of Object.entries(SERVICE_VARS)) {
+    const text = readFileSync(new URL(`../env-templates/${service}.env`, import.meta.url), "utf8");
+    const declared = text.split(/\r?\n/)
+      .map((line) => /^([A-Z_][A-Z0-9_]*)=/.exec(line)?.[1])
+      .filter(Boolean);
+    assert.deepEqual(declared.sort(), [...names, ...(optionalSettings[service] ?? [])].sort(),
+      `${service} public template must contain exactly its credential and setting allowlist`);
+    if (service === "app") {
+      assert.match(text, /^ARTICLE_READER_ENABLED=false$/m);
+      assert.match(text, /^ARTICLE_READER_ALLOWED_HOSTS=$/m);
+      assert.match(text, /^SUBTITLE_ENABLED=false$/m);
+    }
+  }
+});
+
+test("no credential appears in the repository tree", () => {
+  // 凭据必须留在 F:/loom-backups。这里只看 compose 是否引用了仓库内路径，
+  // 不扫描文件内容（避免把一次性误读变成常态）。
+  const repoLocal = /- \.\/[^:\n]*\.env/.exec(compose);
+  assert.equal(repoLocal, null, `compose must not reference a repo-local env file: ${repoLocal?.[0]}`);
+});
+
+test("optional OpenCode runtime has only task credentials and an isolated network", () => {
+  const blocks = serviceBlocks(compose);
+  const runtime = blocks["opencode-runtime"].join("\n");
+  for (const text of ['profiles: ["opencode"]', 'networks: ["opencode-runtime"]', 'user: "1000:1000"', "read_only: true", 'cap_drop: ["ALL"]', 'security_opt: ["no-new-privileges:true"]', "mem_limit: 768m"]) {
+    assert.ok(runtime.includes(text), `runtime requires ${text}`);
+  }
+  // A pid cap is required. 64 aborts the bun child during boot (documented in
+  // docker-compose.yml), so the bound is "present and at most 1024".
+  const pids = Number(/^\s+pids_limit:\s*(\d+)\s*$/m.exec(runtime)?.[1]);
+  assert.ok(pids > 0 && pids <= 1024, `runtime requires a pids_limit in (0, 1024], got ${pids}`);
+  assert.ok(!/^\s+(?:ports|volumes|env_file|extra_hosts):/m.test(runtime));
+  for (const secret of ["AGENT_MODEL_API_KEY", "XAI_API_KEY", "AGENT_DATA_TOKEN", "AGENT_SERVICE_TOKEN", "OPENCODE_WORKER_TOKEN", "OPENCODE_BRIDGE_CONTROL_TOKEN", "DATABASE_URL"]) {
+    assert.ok(!runtime.includes(secret), `runtime must not receive ${secret}`);
+  }
+  assert.ok(runtime.includes("OPENCODE_MAX_OUTPUT_TOKENS: ${AGENT_ASSISTANT_MAX_OUTPUT_TOKENS:-1800}"));
+  const names = [...runtime.matchAll(/^ {6}([A-Z_]+):/gm)].map(match => match[1]);
+  assert.deepEqual(names.sort(), ["OPENCODE_RUNTIME_TOKEN", "OPENCODE_BRIDGE_URL", "OPENCODE_MODEL_NAME", "OPENCODE_MAX_OUTPUT_TOKENS"].sort()); // output cap is a non-secret tuning value
+  assert.match(compose, /networks:\s*\n {2}opencode-runtime:\s*\n {4}internal: true\s*\n {4}driver_opts:\s*\n {6}com\.docker\.network\.bridge\.gateway_mode_ipv4: isolated/);
+});
+
+test("trusted OpenCode controls hold no supplier key and services stay disabled by default", () => {
+  const blocks = serviceBlocks(compose);
+  for (const service of ["agent-bridge", "opencode-worker"]) {
+    const body = blocks[service].join("\n");
+    assert.ok(body.includes('profiles: ["opencode"]'));
+    assert.ok(!/^\s+(?:ports|volumes|env_file):/m.test(body));
+    assert.ok(body.includes('networks: ["default", "opencode-runtime"]'));
+    assert.ok(body.includes("read_only: true"));
+  }
+  const worker = blocks["opencode-worker"].join("\n");
+  for (const secret of ["AGENT_MODEL_API_KEY", "XAI_API_KEY", "AGENT_DATA_TOKEN", "DATABASE_URL"]) assert.ok(!worker.includes(secret));
+  const app = blocks.app.join("\n");
+  assert.ok(app.includes("AGENT_RESEARCH_RUNTIME: ${AGENT_RESEARCH_RUNTIME:-eino}"));
+  assert.ok(app.includes("AGENT_OPENCODE_WORKER_ENABLED: ${AGENT_OPENCODE_WORKER_ENABLED:-false}"));
+  assert.ok(app.includes("AGENT_ASYNC_RESEARCH_ENABLED: ${AGENT_ASYNC_RESEARCH_ENABLED:-false}"));
+});
+
+test("subtitle optional profile has isolated worker and private raw bucket", () => {
+  const blocks=serviceBlocks(compose);
+  const worker=blocks["subtitle-worker"].join("\n"), egress=blocks["subtitle-egress"].join("\n");
+  for (const block of [worker,egress]) {
+    assert.match(block,/profiles: \["subtitles"\]/); assert.match(block,/read_only: true/);
+    assert.match(block,/cap_drop: \["ALL"\]/); assert.match(block,/size=32m/);
+    assert.doesNotMatch(block,/ports:|volumes:|privileged:|MINIO_|DATABASE_URL|LOOM_EGRESS_CIDRS/);
+  }
+  assert.match(worker,/networks: \["subtitle-internal"\]/); assert.match(worker,/dns: \["127\.0\.0\.1"\]/);
+  assert.match(egress,/networks: \["default", "subtitle-internal"\]/);
+  assert.doesNotMatch(blocks.app.join("\n"),/subtitle-internal/);
+  assert.match(blocks["minio-init"].join("\n"),/mc mb --ignore-existing local\/loom-subtitles && mc anonymous set none local\/loom-subtitles \|\| exit 1/);
+  for(const name of ["subtitle-worker","subtitle-egress"]) {
+    const declared=readFileSync(new URL(`../env-templates/${name}.env`,import.meta.url),'utf8').trim().split(/\r?\n/).map(x=>x.split('=')[0]);
+    assert.deepEqual(declared,["SUBTITLE_SERVICE_TOKEN","SUBTITLE_PROXY_TOKEN"]);
+  }
+});
