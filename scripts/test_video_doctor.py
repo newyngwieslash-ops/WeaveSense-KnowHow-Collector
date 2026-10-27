@@ -93,6 +93,32 @@ class DoctorTests(unittest.TestCase):
             self.assertFalse(output["production_ready"])
             self.assertNotIn("private-secret", process.stdout + process.stderr)
 
+    def test_cli_exported_empty_allowlist_overrides_file_like_compose(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / ".env"
+            p.write_text("\n".join(f"{key}={value}" for key, value in self.valid().items()))
+            process = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/video-doctor.py"), "--env-file", str(p)],
+                env={"FLOW_VIDEO_WORKSPACES": ""}, capture_output=True, text=True,
+            )
+            self.assertEqual(process.returncode, 1)
+            output = json.loads(process.stdout)
+            self.assertFalse(output["static_preflight_passed"])
+            self.assertIn("PILOT_ALLOWLIST", {c["code"] for c in output["checks"] if c["status"] == "fail"})
+            self.assertNotIn("private-secret", process.stdout + process.stderr)
+
+    def test_cli_exported_valid_value_overrides_invalid_file_like_compose(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = self.valid(); env["FLOW_VIDEO_WORKSPACES"] = ""
+            p = Path(d) / ".env"
+            p.write_text("\n".join(f"{key}={value}" for key, value in env.items()))
+            process = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/video-doctor.py"), "--env-file", str(p)],
+                env={"FLOW_VIDEO_WORKSPACES": "ws_a"}, capture_output=True, text=True,
+            )
+            self.assertEqual(process.returncode, 0)
+            self.assertTrue(json.loads(process.stdout)["static_preflight_passed"])
+
     def test_complete_asr_lock_and_missing_config(self):
         env = self.valid(); env.update(ASR_ENABLED="true", ASR_SERVICE_TOKEN="a" * 32)
         with tempfile.TemporaryDirectory() as d:
@@ -115,6 +141,16 @@ class DoctorTests(unittest.TestCase):
     def test_model_price_and_long_placeholder_rejected(self):
         env = self.valid(); env.update(VIDEO_MODEL_ENABLED="true", VIDEO_SERVICE_TOKEN="change-me-" + "x" * 40)
         self.assertTrue({"MODEL_PRICE", "VIDEO_SERVICE_TOKEN"} <= self.failures(env))
+
+    def test_whitespace_and_padded_placeholders_rejected(self):
+        for value in (" " * 32, "  changeme-" + "x" * 32, " valid-" + "x" * 32, "x" * 32 + " "):
+            env = self.valid(); env["VIDEO_SERVICE_TOKEN"] = value
+            self.assertIn("VIDEO_SERVICE_TOKEN", self.failures(env))
+
+    def test_invalid_journal_identity_rejected_without_docker(self):
+        env = self.valid(); env["VIDEO_DELETION_JOURNAL_ID"] = "not valid / id"
+        env["VIDEO_DELETION_JOURNAL_VOLUME"] = "../not-a-volume"
+        self.assertTrue({"JOURNAL_ID_FORMAT", "JOURNAL_VOLUME_FORMAT"} <= self.failures(env))
 
 
 if __name__ == "__main__": unittest.main()

@@ -10,6 +10,8 @@
 
 ## 2. 开发环境
 
+Windows WSL2 / Linux 的第二轮只读预检和隔离镜像构建步骤见 [LOCAL_QUICKSTART.md](LOCAL_QUICKSTART.md)，实际执行结果与提交绑定见 [ROUND2.md](ROUND2.md)。预检不创建凭据、不初始化日志、不启用视频功能；通过预检也不等于生产就绪。
+
 本轮实际使用 Go 1.25.14、Node 24.22.1、Bun 1.4.4、PostgreSQL 17.11/pgvector 0.8.0。现有宿主依赖保持其锁文件；Python 依赖见各服务的 requirements 与锁定说明。视频执行还需要 FFmpeg、Tesseract；本地 ASR 是独立依赖环境及只读模型目录，不与视频 API 的轻量依赖混装。
 
 在仓库根目录安装开发依赖：
@@ -54,7 +56,7 @@ docker compose --env-file .env.flow -f docker-compose.flow.yml -f docker-compose
 docker compose --env-file .env.flow -f docker-compose.flow.yml -f docker-compose.video.yml --profile core --profile video up -d --build
 ```
 
-按实际 profile 加 `extract`、`asr`、`research`；拆分角色时遵循宿主 `LOOM_SPLIT_ROLES` 配置，不能启动第二套独立调度。检查实际服务日志及健康状态后再对指定工作区开启视频。以上是操作模板，本轮未运行 Docker build/up，不是部署成功记录。
+按实际 profile 加 `extract`、`asr`、`research`；拆分角色时遵循宿主 `LOOM_SPLIT_ROLES` 配置，不能启动第二套独立调度。检查实际服务日志及健康状态后再对指定工作区开启视频。以上是整栈启动操作模板，不是部署成功记录。第二轮已在隔离 CI 构建 backup/worker 两个 Linux amd64 镜像并完成无网络 smoke，具体提交见 [ROUND2.md](ROUND2.md)；不能推导整栈 Compose up、真实服务或生产部署已通过。
 
 ## 4. 本地验证顺序
 
@@ -71,7 +73,7 @@ cd ../../web && bun run typecheck && bun run lint && bun test && bun run build
 
 Go ↔ Loom 实际跨层用例需 `FLOW_VIDEO_CROSSLAYER_TEST=1` 与 Loom npm 依赖。完整宿主还需 Pi runtime 依赖及实际 PostgreSQL/Redis。部分测试缺依赖会跳过，必须阅读测试输出，不以退出码零推断所有路径执行。
 
-本轮环境中 Chromium 和 Redis Unix socket 被沙箱拒绝；浏览器点击/截图验收和这两项原生 Redis 集成测试不能记为通过。已加入具备依赖的 CI 路径，但 CI 文件存在不代表远端 CI 已执行。合成视频与实际 Whisper/Tesseract 只证明管线可运行，不能证明真实行业内容质量。
+首轮本地环境中 Chromium 和 Redis Unix socket 被沙箱拒绝，历史报告保留该结果，不回写为通过。第二轮在具备依赖的 CI 环境逐项验证，当前状态以 [ROUND2.md](ROUND2.md) 中对应提交的实际结果为准；其他 UI 的 Chrome 检查不能代替视频闭环验收。CI 文件存在不代表远端 CI 已执行。合成视频与实际 Whisper/Tesseract 只证明管线可运行，不能证明真实行业内容质量。
 
 ## 5. 方法版本：生成源文件不等于已部署
 
@@ -90,7 +92,7 @@ CLI 校验冻结 hash、审批、scope、原生 base 与 pack，只输出方法 
 
 ## 6. 备份、恢复与回退
 
-视频 backup overlay 使用 `deploy/flow/backup/Dockerfile.video`，不能沿用没有 Node/维护脚本的 PostgreSQL Alpine 镜像冒充日志验证。构建需操作者核验的 Node22 Bookworm、PostgreSQL17 Bookworm、mc 镜像 digest；环境示例故意不填未经验证的 pin。镜像不自动上传。
+视频 backup overlay 使用 `deploy/flow/backup/Dockerfile.video`，不能沿用没有 Node/维护脚本的 PostgreSQL Alpine 镜像冒充日志验证。构建需核验的 Node22 Bookworm、PostgreSQL17 Bookworm、mc 镜像 digest；第二轮已提供 [Linux amd64 镜像输入锁](../../deploy/flow/backup/video-image-lock.json) 和 [公开构建变量](../../deploy/flow/backup/video-images.env)，按 [LOCAL_QUICKSTART.md](LOCAL_QUICKSTART.md) 审阅并复制到私有配置，不覆盖现有值。其他架构必须另行核验，不得假定此锁适用。镜像不自动上传。
 
 数据库/对象备份容器只读挂载独立日志，设置 `BACKUP_VIDEO_JOURNAL_REQUIRED=true`；checkpoint 验证失败就不能记备份成功。恢复必须先停所有日志客户端，验证快照 checkpoint，恢复对象再恢复数据库，再重放最新独立日志，最后确认跨服务清理收据。日志卷不包含在数据库/对象备份或回退中。
 

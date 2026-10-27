@@ -287,7 +287,9 @@ jobs:
       - name: Check formatting
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: bun scripts/check-changed-formatting.mjs
+        # A PR event's GITHUB_SHA is the synthetic merge, but checkout above is
+        # deliberately the reviewed head. Compare exactly the checked source.
+        run: GITHUB_SHA="$(git rev-parse HEAD)" bun scripts/check-changed-formatting.mjs
       - name: Typecheck
         run: bun run typecheck
       - name: Lint retired Ant Design APIs

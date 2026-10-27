@@ -51,7 +51,7 @@ def check(env, mode="pilot", root=ROOT, check_local=False):
 
     def required(key, minimum=1):
         value = env.get(key, "")
-        ok = len(value) >= minimum and not any(value.lower().startswith(p) for p in PLACEHOLDERS) and not re.search(r"<[^>]+>", value)
+        ok = value == value.strip() and len(value) >= minimum and not any(value.lower().startswith(p) for p in PLACEHOLDERS) and not re.search(r"<[^>]+>", value)
         add(key, ok, f"{key}: required non-placeholder value ({minimum}+ characters); value withheld")
         return ok
 
@@ -72,6 +72,8 @@ def check(env, mode="pilot", root=ROOT, check_local=False):
         required(key, 32)
     for key in ("VIDEO_OBJECT_ACCESS_KEY", "VIDEO_OBJECT_SECRET_KEY", "VIDEO_DELETION_JOURNAL_ID", "VIDEO_DELETION_JOURNAL_VOLUME"):
         required(key)
+    add("JOURNAL_ID_FORMAT", bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}", env.get("VIDEO_DELETION_JOURNAL_ID", ""))), "Journal ID must match the runtime identifier format; value withheld")
+    add("JOURNAL_VOLUME_FORMAT", bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", env.get("VIDEO_DELETION_JOURNAL_VOLUME", ""))), "External journal volume must be a Docker volume name; value withheld")
     required("FLOW_MODEL_GATEWAY_EMBEDDING_MODEL")
     for key in ("FLOW_MODEL_GATEWAY_EMBEDDING_MICRO_PER_1K_TOKENS", "FLOW_MODEL_GATEWAY_EMBEDDING_DIMENSIONS"):
         add(key, bool(re.fullmatch(r"[1-9][0-9]*", env.get(key, ""))), f"{key}: positive integer required for embedding-ready profiles")
@@ -162,15 +164,16 @@ def docker_checks(env):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env-file", type=Path, help="Literal dotenv file; overrides same keys from process environment")
+    parser.add_argument("--env-file", type=Path, help="Literal dotenv defaults; process environment takes precedence, as in Docker Compose")
     parser.add_argument("--mode", choices=("pilot", "build"), default="pilot")
     parser.add_argument("--check-local-files", action="store_true")
     parser.add_argument("--check-docker", action="store_true", help="Read-only daemon/external-volume checks; no Docker mutation")
     args = parser.parse_args()
-    env = dict(os.environ)
     try:
-        if args.env_file:
-            env.update(parse_env(args.env_file))
+        env = parse_env(args.env_file) if args.env_file else {}
+        # Compose interpolation gives exported variables (including empty values)
+        # precedence. Checking different values could approve a global allowlist.
+        env.update(os.environ)
         checks = check(env, args.mode, check_local=args.check_local_files)
         if args.check_docker:
             checks.extend(docker_checks(env))

@@ -10,7 +10,8 @@ const features = { welcomeEnabled: false, taskCenterEnabled: false, creditsEnabl
 async function fixtures(page, options = {}) {
   const state = { authenticated: options.authenticated !== false, profileFailure: false, writes: [], unknown: [], errors: [], profiles: [profile] };
   page.on('pageerror', error => state.errors.push(error.message));
-  await page.route('**/api/**', async route => {
+  // Match the HTTP API prefix, not Vite's /src/services/api/*.ts modules.
+  await page.route(url => url.pathname.startsWith('/api/'), async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname.replace(/^\/api/, '');
     const method = request.method();

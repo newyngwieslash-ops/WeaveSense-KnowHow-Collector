@@ -22,15 +22,27 @@
 
 ## 本轮执行记录
 
-本节由执行负责人在实际运行后补充提交、运行链接、通过/失败/跳过数及原因。当前不能将首轮本地测试数量搬作第二轮结果。
+下面只记录已经观察到的结果。提交 `7166e466` 的 CI 已完成，但 browser、Flow 严格不跳过门禁和质量工作流的 SHA 比较失败，正在修正，**本轮尚不能标记整体通过**；后续改动必须重新检查对应 head SHA，不能将首轮本地测试数量或较早提交的成功搬作最终结果。
 
 | 检查 | 当前可作出的结论 | 完成证据要求 |
 | --- | --- | --- |
 | 发布文档一致性 | 已修正 GitHub 同步仍待授权的旧描述；历史报告加边界说明 | 文档差异、链接与事实核对 |
-| 固定提交应用 CI | 尚无本轮终态结果 | 实际 head SHA、运行链接、各 job 结果；不得用导入校验替代 |
-| Chromium / Redis | 首轮环境受阻的历史结果保留；本轮待执行 | 实际浏览器交互、Redis 必选测试不跳过；失败/跳过原因公开 |
-| 干净构建 / 配置预检 | 本轮待实现并执行验证 | 固定基础镜像、构建日志/摘要、预检正反例；区分静态检查与运行检查 |
-| 最终 OS / 应用依赖 | 现有来源清单不等于最终镜像 SBOM | 绑定实际构建的系统包、应用依赖和产物清单 |
+| 固定提交应用 CI | `7166e466` 的 host、media、Web 类型/规则/测试/构建及 ledger 通过；Flow 为 200 通过、3 跳过，严格门禁正确阻断 | [集成运行 40523705384](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40523705384)；补齐隔离视频 PostgreSQL/恢复 opt-in 后须重跑 |
+| Chromium / Redis | `7166e466` 的必选 PostgreSQL/Redis 后端门禁通过；新增视频 Chromium 5 项因 HTTP fixture 误拦截 Vite 源码模块失败，尚未通过 | [质量运行 40523704785](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40523704785)；质量 Web 失败另因合成 merge SHA 与 head checkout 不符 |
+| Linux amd64 backup / worker 构建 | 提交 `7166e466` 的容器 job 成功；两个镜像实际构建并执行无网络运行时 smoke | [运行 40523705285](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40523705285)；只覆盖两个镜像，不是整栈部署 |
+| 只读配置预检 | 已加入 build/pilot 模式与拒绝测试；上述容器 job 执行构建输入预检 | [LOCAL_QUICKSTART.md](LOCAL_QUICKSTART.md)、`scripts/video-doctor.py`；静态/只读通过不证明服务可用 |
+| 镜像系统/应用包清单 | 已采集 backup 438、worker 303 个包条目的部分 SPDX 清单 | 许可 `NOASSERTION`；不是完整文件级 SBOM、漏洞扫描或许可清算 |
+
+待验证修正：浏览器只拦截 pathname 以 `/api/` 开始的 HTTP 请求；格式检查显式比较 checkout 的 head；视频 PG 测试使用一次性 CI 数据库、非超级用户 CREATEDB role 与恢复 opt-in，不放宽跳过门禁。预检与 Compose 一致采用进程环境优先（包括空值），拒绝空白/带首尾空格的秘密及无效独立日志标识。本地 37 项 `test_video*.py`、6 项 Flow 门禁测试已通过；这些结果不能替代修正提交的远端 CI。
+
+### 容器证据的精确边界
+
+- 源码：[7166e4665e408fd548aa75ae4e99975f8d5fbbbd](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/7166e4665e408fd548aa75ae4e99975f8d5fbbbd)。镜像构建及 smoke 针对 Linux amd64，在隔离 runner 执行，smoke 使用 `--network none`，未上传镜像或部署服务。
+- backup image config ID：`sha256:475d9420b7f93abb2c56a9bb7ce164eade50d69fdd4684b74954ab18489105a5`。
+- worker image config ID：`sha256:1ab32d263dc58c18530469275ad52c930ca2f313a7da483d58000deae670e822`。
+- 上述 ID 是实际本地镜像配置摘要，不是已发布 registry manifest digest。保留构建日志、运行时版本、包清单与 source commit 的 artifact ID 为 `12742304350`，artifact digest 为 `sha256:76396f315e2b624493b79b6961baca848680374c5ece406c772f774a92c374bd`；从对应 Actions 运行下载，其保留期限受 GitHub artifact 策略限制。
+- 固定输入见 [video-image-lock.json](../../deploy/flow/backup/video-image-lock.json) 与 [video-images.env](../../deploy/flow/backup/video-images.env)。这些输入 pin 不等于 apt/npm/Python 的完整可重复构建闭包。
+- 中间提交 `32447d1` 的对象恢复、付款插件双架构与 Web Previs Chrome 检查有通过记录，但质量门禁发现 16 个 Go 文件格式问题；`7166e466` 已修正格式。较早成功与修正不自动构成整个第二轮验收通过。
 
 ## 供应链与许可待补证清单
 

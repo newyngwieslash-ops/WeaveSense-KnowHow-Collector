@@ -9,6 +9,9 @@ def verify(text):
         "A18: backup/restore dump",
         "RLS: HTTP API end-to-end on real Postgres as non-superuser",
         "legacy import (real PostgreSQL, FORCE RLS app role)",
+        "QA PostgreSQL: real independent connections serialize claims, preserve restart fence and enforce video FORCE RLS",
+        "QA K017 PostgreSQL: coordinator required embedding gates FTS, vectors and ready event on verified host receipt",
+        "QA R25/K025 PostgreSQL: pre-erasure backup cannot resurrect data before latest external journal replay",
     )
     if not re.search(r"^# fail 0$", text, re.M) or not re.search(r"^# skipped 0$", text, re.M):
         raise ValueError("Flow TAP must report zero failures and zero skips")

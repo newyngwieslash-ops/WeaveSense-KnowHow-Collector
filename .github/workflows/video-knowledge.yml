@@ -53,6 +53,9 @@ jobs:
     env:
       FLOW_TEST_PG_ADMIN_URL: postgres://postgres:synthetic@127.0.0.1:5432/postgres
       FLOW_TEST_PG_APP_ROLE: flow_app:synthetic
+      # Disposable CI service only: the video restore fixture owns this database.
+      FLOW_VIDEO_TEST_PG_URL: postgres://flow_app:synthetic@127.0.0.1:5432/video_qa
+      FLOW_VIDEO_RESTORE_TEST: "1"
     services:
       postgres:
         image: pgvector/pgvector:pg17
@@ -88,7 +91,10 @@ jobs:
           sudo apt-get install -y postgresql-client-17
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
       - name: Create non-superuser Flow role
-        run: psql "$FLOW_TEST_PG_ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE flow_app LOGIN PASSWORD 'synthetic' NOSUPERUSER NOBYPASSRLS CREATEDB"
+        run: |
+          psql "$FLOW_TEST_PG_ADMIN_URL" -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE flow_app LOGIN PASSWORD 'synthetic' NOSUPERUSER NOBYPASSRLS CREATEDB" \
+            -c "CREATE DATABASE video_qa OWNER flow_app"
       - run: python -m pip install -r services/video-knowledge/requirements.txt
       - run: npm ci --ignore-scripts
         working-directory: services/loom-engine

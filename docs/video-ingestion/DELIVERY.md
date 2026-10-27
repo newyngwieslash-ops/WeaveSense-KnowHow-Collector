@@ -61,15 +61,15 @@ Excel 已回填 2/88/10/7 状态，原六表、323 个公式、要求、验证�
 - 首发行业、5–10 个真实业务问题、行业术语、复核人和发布负责人；不能以仓库名推断。
 - 合法 B站/抖音来源、使用范围/期限、独立人工金标和真实双平台采集结果。
 - 实际模型配置、费用授权、硬件和质量校准；当前不填写虚构准确率。
-- 浏览器环境拒绝启动及原生 Redis Unix IPC 拒绝两项验证；未绕过限制。付费 DDCat 等原宿主可选测试也未擅自调用。
-- Docker 镜像实际构建、三个备份基础镜像 digest、最终 OS/应用构建依赖闭包、真实部署和持续试点。
+- 首轮浏览器环境拒绝启动及原生 Redis Unix IPC 拒绝的历史记录保留；第二轮 CI 的逐项状态见 [ROUND2.md](ROUND2.md)，未将其他 Chrome 检查冒充视频业务闭环。付费 DDCat 等原宿主可选测试也未擅自调用。
+- 两个 Linux amd64 backup/worker 镜像已在 `7166e466` 实际构建并通过无网络 smoke，三个备份基础镜像 pin 已提供；但整栈部署、完整 OS/应用构建闭包、漏洞/许可审查和持续试点仍未完成。当前包级 SPDX 为部分清单，不能冒充完整 SBOM，详见 [ROUND2.md](ROUND2.md)。
 - 供应商外部存储物理擦除回执：所选 DTK 的 cancel API 不证明文件/备份删除，未知外部写入/执行仍保留 pending，不能称全部擦除。
 - 第三方许可边界：根 MIT 不覆盖所有 Web/WASM/字体/Live2D/预编译组件；逐项已知和未知证据见 [DEPENDENCIES.md](DEPENDENCIES.md)，未作商业许可清算承诺。
 
 ## 本地接手
 
 1. 从上述开发分支克隆，或在该分支页面选择 `Code → Download ZIP`；不要从仍只有初始化说明的 `main` 下载。先读根 `README.md`、本页和 [RUNBOOK.md](RUNBOOK.md)。先前单独交付的源码包含 `SOURCE-MANIFEST.json`，给出逐文件 SHA-256、基线和排除说明；GitHub 自动生成的 ZIP 不保证含这一归档专用文件。若使用文件名含 `Source-Only` 的精简包，必须先按 [SOURCE_ONLY.md](SOURCE_ONLY.md) 重建省略的付款插件和主程序，再继续启动步骤。
-2. 安装文档指定的开发依赖，使用 `.env.flow.example` 与 `deploy/flow/video.env.example` 配置本地环境。视频默认关闭；模型、对象存储、DTK 和授权来源必须由您配置，密钥不要放入聊天或 Git。
+2. 安装文档指定的开发依赖，使用 `.env.flow.example` 与 `deploy/flow/video.env.example` 配置本地环境。按 [LOCAL_QUICKSTART.md](LOCAL_QUICKSTART.md) 运行只读配置预检；视频默认关闭，试点必须显式设置工作区白名单。模型、对象存储、DTK 和授权来源必须由您配置，密钥不要放入聊天或 Git。
 3. 先执行本地测试/合成夹具闭环，再接授权的小样本；不要直接对公网开放或把样例当成正式行业 profile。
 4. 原生方法采用“审核→源码导出→构建→运行宿主确认→工作区 CAS 安装”；源码变更后重跑适用检查。
 5. 改动任务状态只改 `PROGRESS.json`，运行台账导出和 Excel 同步。完整发布门槛仍应阻断，直到原任务和业务验收真正满足。
