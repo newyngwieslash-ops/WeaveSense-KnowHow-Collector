@@ -12,7 +12,7 @@
 
 Windows WSL2 / Linux 的第二轮只读预检和隔离镜像构建步骤见 [LOCAL_QUICKSTART.md](LOCAL_QUICKSTART.md)，实际执行结果与提交绑定见 [ROUND2.md](ROUND2.md)。预检不创建凭据、不初始化日志、不启用视频功能；通过预检也不等于生产就绪。
 
-本轮实际使用 Go 1.25.14、Node 24.22.1、Bun 1.4.4、PostgreSQL 17.11/pgvector 0.8.0。现有宿主依赖保持其锁文件；Python 依赖见各服务的 requirements 与锁定说明。视频执行还需要 FFmpeg、Tesseract；本地 ASR 是独立依赖环境及只读模型目录，不与视频 API 的轻量依赖混装。
+首轮本地验证环境使用 Go 1.25.14、Node 24.22.1、Bun 1.4.4、PostgreSQL 17.11/pgvector 0.8.0；第二轮 CI 的具体环境以各工作流和运行日志为准，不沿用历史版本作为当前测量值。现有宿主依赖保持其锁文件；Python 依赖见各服务的 requirements 与锁定说明。视频执行还需要 FFmpeg、Tesseract；本地 ASR 是独立依赖环境及只读模型目录，不与视频 API 的轻量依赖混装。
 
 在仓库根目录安装开发依赖：
 
