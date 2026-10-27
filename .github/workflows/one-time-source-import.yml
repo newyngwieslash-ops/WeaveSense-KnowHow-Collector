@@ -39,12 +39,21 @@ jobs:
           test "$(git rev-parse "$upstream_sha^{tree}")" = 49e6bb2483857fbc86770a2b7e980e52b4850050
           git fetch --depth=1 "$target" refs/heads/main
           test "$(git rev-parse FETCH_HEAD)" = "$expected_main"
-          test -z "$(git ls-remote --heads "$target" "refs/heads/$branch")"
           git read-tree "$upstream_sha^{tree}"
           # Workflow files are restored separately through the authorized connector.
           # No upstream workflow or project program is executed during this import.
           git rm -q --cached -r --ignore-unmatch .github/workflows
           tree=$(git write-tree)
+          existing=$(git ls-remote --heads "$target" "refs/heads/$branch" | cut -f1)
+          if [ -n "$existing" ]; then
+            git fetch --depth=2 "$target" "refs/heads/$branch"
+            test "$(git rev-parse FETCH_HEAD)" = "$existing"
+            test "$(git rev-parse "$existing^{tree}")" = "$tree"
+            test "$(git rev-parse "$existing^1")" = "$expected_main"
+            printf 'Verified existing baseline commit: %s\nFiles: ' "$existing"
+            git ls-tree -r --name-only "$existing" | wc -l
+            exit 0
+          fi
           commit=$(printf 'chore(knowhow): import pinned upstream source snapshot\n\nUpstream: %s\nWorkflows excluded pending connector restoration.\n' "$upstream_sha" | git commit-tree "$tree" -p "$expected_main")
           git update-ref "refs/heads/$branch" "$commit"
           auth=$(printf 'x-access-token:%s' "$GH_IMPORT_TOKEN" | base64 -w0)
@@ -53,7 +62,7 @@ jobs:
           export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
           export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"
           git push "$target" "refs/heads/$branch:refs/heads/$branch"
-          unset GH_IMPORT_TOKEN GIT_CONFIG_VALUE_0 auth
+          unset GH_IMPORT_TOKEN GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 auth
           printf 'Imported commit: %s\nImported tree: %s\n' "$commit" "$tree"
           printf 'Imported files: '
           git ls-tree -r --name-only "$commit" | wc -l
