@@ -4,7 +4,6 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { runInNewContext } from "node:vm";
 
 const cwd = fileURLToPath(new URL("../", import.meta.url));
 
@@ -32,11 +31,22 @@ test("Bun executes a real module through a file URL containing spaces and Chines
         const entry = join(dir, "入口.ts");
         const modulePath = fileURLToPath(new URL("../src/lib/canvas/agent-launcher-position.ts", import.meta.url));
         writeFileSync(entry, `export { clampAgentLauncherPosition } from ${JSON.stringify(modulePath)};`);
-        const build = await Bun.build({ entrypoints: [fileURLToPath(pathToFileURL(entry))], target: "browser", format: "cjs" });
-        expect(build.success).toBe(true);
-        const module = { exports: {} as Record<string, (...args: unknown[]) => unknown> };
-        runInNewContext(await build.outputs[0].text(), { module, exports: module.exports });
-        expect(module.exports.clampAgentLauncherPosition({ right: -1, bottom: -1 }, { width: 1280, height: 800 })).toEqual({ right: 20, bottom: 20 });
+        // Bun 1.3.9 can retain the temporary entry's missing tsconfig after build,
+        // breaking later @/ imports in this process. Keep that build isolated.
+        const script = `
+            import { fileURLToPath } from "node:url";
+            import { runInNewContext } from "node:vm";
+            const build = await Bun.build({ entrypoints: [fileURLToPath(${JSON.stringify(pathToFileURL(entry).href)})], target: "browser", format: "cjs" });
+            if (!build.success) throw new AggregateError(build.logs, "Unicode-path build failed");
+            const module = { exports: {} };
+            runInNewContext(await build.outputs[0].text(), { module, exports: module.exports });
+            process.stdout.write(JSON.stringify(module.exports.clampAgentLauncherPosition({ right: -1, bottom: -1 }, { width: 1280, height: 800 })));
+        `;
+        const result = spawnSync(process.execPath, ["--eval", script], { cwd, encoding: "utf8", timeout: 20_000 });
+        if (result.status !== 0) throw new Error(result.error?.message || result.stderr);
+        expect(JSON.parse(result.stdout)).toEqual({ right: 20, bottom: 20 });
+        const alias = "@/lib/asset-category";
+        expect((await import(alias)).normalizeAssetCategory("weapon")).toBe("prop");
     } finally {
         expect(dirname(dir)).toBe(resolve(tmpdir()));
         expect(basename(dir)).toStartWith("canvas-entry-");

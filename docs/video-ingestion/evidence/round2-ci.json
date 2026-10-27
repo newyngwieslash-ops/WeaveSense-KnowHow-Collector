@@ -6,7 +6,7 @@
   "repository": "newyngwieslash-ops/WeaveSense-KnowHow-Collector",
   "pull_request": 1,
   "branch": "feat/knowhow-release-hardening",
-  "docs_only_successor": "This checkpoint pins the tested application commit. Verify the current PR head checks separately; do not relabel these runs with a later commit SHA.",
+  "successor_scope": "This checkpoint pins the tested commit. Later changes update documentation and isolate one Bun build regression test in a child process; application source is unchanged. Verify current PR head checks separately, and do not relabel these runs with a later commit SHA.",
   "workflow_runs": [
     {
       "id": 40526996302,

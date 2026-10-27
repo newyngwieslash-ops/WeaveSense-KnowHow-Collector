@@ -6,7 +6,7 @@
 
 完整源码已发布到目标仓库的 [feat/video-knowledge-v1 分支](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/tree/feat/video-knowledge-v1)，首个完整发布提交为 [cf2aad9c5926500bfaae7bb39e48316ccd192269](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/cf2aad9c5926500bfaae7bb39e48316ccd192269)。代码基于固定宿主 `514c70f666cb04e3e72cbfb967fac74d9f350747`；原宿主未被推送修改，目标 `main` 仍保留初始化提交，未合并开发分支。
 
-第二轮工程收尾发布在 [feat/knowhow-release-hardening](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/tree/feat/knowhow-release-hardening) 与 [Draft PR #1](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/pull/1)。应用候选 `5ac12630` 的三项 CI 工作流、12 个 job 全部成功，含真实 Chromium、必选 Redis/PG 和两个容器的隔离构建；后续仅文档提交的状态以 PR 当前 head Checks 为准。接手本轮工程成果应使用此工程分支，逐项结果及明确跳过见 [ROUND2.md](ROUND2.md)。这不改变业务台账，也不是生产上线授权。
+第二轮工程收尾发布在 [feat/knowhow-release-hardening](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/tree/feat/knowhow-release-hardening) 与 [Draft PR #1](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/pull/1)。应用候选 `5ac12630` 的三项 CI 工作流、12 个 job 全部成功，含真实 Chromium、必选 Redis/PG 和两个容器的隔离构建；后续文档及测试隔离修正的状态以 PR 当前 head Checks 为准，应用源码不变。接手本轮工程成果应使用此工程分支，逐项结果及明确跳过见 [ROUND2.md](ROUND2.md)。这不改变业务台账，也不是生产上线授权。
 
 发布核验覆盖 5,738 个文件的路径、权限模式和 Git blob 哈希；其中 5,697 个源码文件另经归档 SHA-256 核验，41 个保留生成物经逐项 SHA-256 核验。[导入校验运行](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40468402790)成功，一次性工作流已在 [e387b717](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/e387b717c29c934248bfe619c1e85af61589d18d) 移除。**源码同步完成不等于应用 CI 或完整 V1 验收通过。** 后续工程收尾的当前状态及证据入口见 [ROUND2.md](ROUND2.md)。
 

@@ -22,7 +22,7 @@
 
 ## 本轮执行记录：已验证工程候选
 
-**[应用候选提交 5ac12630778d054b90742a5fed3fc9163c400a57](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/5ac12630778d054b90742a5fed3fc9163c400a57) 的三项工作流、12 个 job 全部成功。** 本页及机器可读 [round2-ci.json](evidence/round2-ci.json) 是其仅文档后续提交：记录绑定已执行的应用提交，不把后续提交的 SHA 冒充该次运行源码。交付时另检查 [Draft PR #1 的当前 head / Checks](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/pull/1/checks)，不递归创建只为写入自身 SHA 的提交。
+**[应用候选提交 5ac12630778d054b90742a5fed3fc9163c400a57](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/5ac12630778d054b90742a5fed3fc9163c400a57) 的三项工作流、12 个 job 全部成功。** 本页及机器可读 [round2-ci.json](evidence/round2-ci.json) 记录绑定该次已执行提交；后续仅更新文档及修正一项测试进程隔离，不改应用源码，也不把后续 SHA 冒充该次运行源码。交付时另检查 [Draft PR #1 的当前 head / Checks](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/pull/1/checks)，不递归创建只为写入自身 SHA 的提交。
 
 | 工作流 | 实际结果 | 运行 |
 | --- | --- | --- |
@@ -74,6 +74,8 @@ Go 顶层 5 项跳过：
 ### 已闭合的中间失败
 
 16 个 Go 文件仅格式修正；格式门禁使用实际 checkout head 而非未取回的合成 merge SHA。浏览器 fixture 只拦截 pathname `/api/` 前缀，避免误拦截 `/src/services/api/` 模块，并显式提供存储用量 fixture；未知 API 与 pageerror 仍失败。视频 PostgreSQL/恢复 opt-in 已接入一次性 CI 数据库，没有放宽零跳过门禁。预检与 Compose 一致采用进程环境优先（包括空值），拒绝空白/带首尾空格的秘密及无效独立日志标识。旧失败运行保留，最终通过只引用上述实际候选提交。
+
+后续文档提交 `14cdd8f` 的 [质量运行 40529962877](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40529962877) 暴露既有 Bun 1.3.9 测试顺序问题：在主测试进程以临时目录 entry 调用 `Bun.build` 后，后续真实模块的 `@/` 路径解析失效。同一顺序在本地可复现，不按偶发网络问题忽略。修正仅把该真实构建/执行移到子进程并保留 Unicode 路径断言，增加构建后主进程别名导入回归；原来失败的三文件有序组已 44/44 通过。此后继测试修正仍须以 PR 当前 head 的完整 CI 为准，未降低用例或门禁。
 
 ## 供应链与许可待补证清单
 
