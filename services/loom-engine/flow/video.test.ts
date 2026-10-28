@@ -462,6 +462,57 @@ test("COL002 shared text extracts exactly one platform HTTPS URL without persist
   for (const value of ["https://b23.tv/a https://b23.tv/b", "http://b23.tv/a", "https://127.0.0.1/private", "https://user:secret@b23.tv/a", "x".repeat(4097)]) assert.throws(() => normalizeVideoURL("bilibili", value));
 });
 
+test("COL002 Douyin modal links preserve exact string identity and reject personal or ambiguous video inputs", () => {
+  const id = "7352875763441388834", canonical = `https://www.douyin.com/video/${id}`;
+  const modal = `https://www.douyin.com/user/self?from_tab_name=main&modal_id=${id}&showSubTab=compilation&showTab=favorite_collection`;
+  assert.equal(normalizeVideoURL("douyin", modal), canonical);
+  assert.equal(normalizeVideoURL("douyin", `https://douyin.com/user/self/?modal_id=${id}`), canonical);
+  assert.equal(normalizeVideoURL("douyin", `分享 ${modal} 。`), canonical);
+  assert.equal(normalizeVideoURL("douyin", `${canonical}?modal_id=${id}&tracking=discard`), canonical);
+  assert.equal(normalizeVideoURL("douyin", canonical), canonical);
+  assert.equal(normalizeVideoURL("douyin", "https://v.douyin.com/ABC123/?tracking=discard"), "https://v.douyin.com/ABC123/");
+  assert.equal(normalizeVideoURL("douyin", "https://www.douyin.com/user/synthetic-account?tracking=discard", "account"), "https://www.douyin.com/user/synthetic-account");
+  assert.equal(normalizeVideoURL("bilibili", "https://www.bilibili.com/video/BV1Zgaa6qEHQ/?spm_id_from=tracking&vd_source=tracking"), "https://www.bilibili.com/video/BV1Zgaa6qEHQ/");
+  assert.equal(normalizeVideoURL("bilibili", "https://www.bilibili.com/video/BVfixture?p=2&tracking=discard"), "https://www.bilibili.com/video/BVfixture?p=2");
+  const invalid = [
+    "https://www.douyin.com/user/self", "https://www.douyin.com/user/self?showTab=favorite_collection",
+    "https://www.douyin.com/user/synthetic-account", "https://www.douyin.com/%75ser/self",
+    `https://www.douyin.com/user/synthetic-account?modal_id=${id}`, `https://www.douyin.com/?modal_id=${id}`,
+    `https://v.douyin.com/ABC123/?modal_id=${id}`, `https://www.douyin.com.evil.invalid/user/self?modal_id=${id}`,
+    `https://www.douyin.com/video/7352875763441388835?modal_id=${id}`,
+    ...["", "0", "01", "-1", "+1", "1e19", "７３５２", "1".repeat(21), "123%2F456", "%ZZ"].map(value => `https://www.douyin.com/user/self?modal_id=${value}`),
+    `https://www.douyin.com/user/self?modal_id=${id}&modal_id=${id}`,
+    `https://www.douyin.com/user/self?modal_id=${id}&modal_id=7352875763441388835`,
+    `https://www.douyin.com/user/self?modal_id=${id}&%6dodal_id=7352875763441388835`,
+  ];
+  for (const url of invalid) assert.throws(() => normalizeVideoURL("douyin", url), (e: any) => e.status === 400 && e.reason === "INVALID_VIDEO_URL", url);
+  for (const url of [modal, "https://www.douyin.com/user/self", "https://www.douyin.com/user/self/"]) {
+    assert.throws(() => normalizeVideoURL("douyin", url, "account"), (e: any) => e.reason === "INVALID_VIDEO_URL");
+  }
+});
+
+test("COL002 normalized Douyin modal sources retain identity and reject mismatched starts before provider execution", async t => {
+  const f = await setup(t), id = "7352875763441388834";
+  const url = `https://www.douyin.com/user/self?modal_id=${id}&showTab=favorite_collection`;
+  const config = { source_type: "video", native_id: id, profile_id: f.profile.id, profile_version: 1, usage_basis: "synthetic parser fixture; no platform request", allowed_uses: ["knowledge"] };
+  let providerCalls = 0;
+  f.provider.submit = async () => { providerCalls++; throw new Error("must not dispatch in parser test"); };
+  const countBefore = (await f.db.query("SELECT count(*) AS n FROM flow_sources")).rows[0].n;
+  await assert.rejects(f.engine.createSource(S, { kind: "douyin", url: "https://www.douyin.com/user/self", title: "invalid personal page", config }), (e: any) => e.reason === "INVALID_VIDEO_URL");
+  assert.equal((await f.db.query("SELECT count(*) AS n FROM flow_sources")).rows[0].n, countBefore);
+  const source = await f.engine.createSource(S, { kind: "douyin", url, title: "synthetic modal identity", config });
+  assert.equal(source.url, `https://www.douyin.com/video/${id}`);
+  assert.equal(source.config.native_id, id);
+  assert.equal(source.config.submitted_url_sha256, sha(url));
+  await assert.rejects(f.engine.video.start(S, "wrong-modal-identity", { source_id: source.id, native_id: "7352875763441388835" }), (e: any) => e.reason === "ASSET_IDENTITY_MISMATCH");
+  assert.equal(Number((await f.db.query("SELECT count(*) AS n FROM flow_video_jobs")).rows[0].n), 0);
+  const first = await f.engine.video.start(S, "modal-first", { source_id: source.id, native_id: id });
+  const replay = await f.engine.video.start(S, "modal-canonical-replay", { source_id: source.id, native_id: id, canonical_url: `https://www.douyin.com/video/${id}` });
+  assert.equal(first.video_job_id, replay.video_job_id);
+  assert.equal((await f.engine.video.job(S, first.video_job_id)).input.canonical_url, source.url);
+  assert.equal(providerCalls, 0);
+});
+
 test("K015 narrow numeric conflict candidates preserve actual audio/OCR sides and never assert truth", () => {
   const audio = { text: "速度: 50 km/h", start_ms: 0, end_ms: 200, kind: "asr" as const };
   const ocr = { text: "速度: 30 km/h", start_ms: 100, end_ms: 100, kind: "ocr" as const, frame_ref: "frame-key" };

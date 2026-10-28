@@ -57,6 +57,16 @@ export function normalizeVideoURL(platform: string, value: string, type: "video"
   try { u = new URL(value); } catch { throw videoError(400, "INVALID_VIDEO_URL"); }
   const hosts = platform === "bilibili" ? ["www.bilibili.com", "bilibili.com", "space.bilibili.com", "b23.tv"] : ["www.douyin.com", "douyin.com", "v.douyin.com"];
   if (u.protocol !== "https:" || !hosts.includes(u.hostname.toLowerCase()) || u.username || u.password || u.port) throw videoError(400, "INVALID_VIDEO_URL");
+  if (platform === "douyin") {
+    const modal = u.searchParams.getAll("modal_id"), direct = u.hostname === "www.douyin.com" || u.hostname === "douyin.com";
+    const video = u.pathname.match(/^\/video\/([^/]+)\/?$/), self = /^\/user\/self\/?$/.test(u.pathname);
+    if (modal.length) {
+      // A selected video in a personal-page URL is not permission to ingest that page.
+      // Keep the opaque decimal ID as a string: real IDs exceed JS safe integers.
+      if (!direct || type !== "video" || modal.length !== 1 || !/^[1-9]\d{0,19}$/.test(modal[0]) || (!self && !video) || video && video[1] !== modal[0]) throw videoError(400, "INVALID_VIDEO_URL");
+      u.hostname = "www.douyin.com"; u.pathname = `/video/${modal[0]}`;
+    } else if (direct && (self || type === "video" && !video)) throw videoError(400, "INVALID_VIDEO_URL");
+  }
   const part = u.searchParams.get("p");
   if (part !== null && (!/^[1-9]\d*$/.test(part) || !Number.isSafeInteger(Number(part)) || Number(part) > 10000)) throw videoError(400, "INVALID_PART_ID");
   u.hash = ""; u.search = "";

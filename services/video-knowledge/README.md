@@ -142,6 +142,14 @@ pool 中某个人的身份选择。没有真实账号调用验收。
 通过 DTK `/parse` 已接受任务取得真实 native/part/canonical 身份，保存解析任务/
 路由/hash provenance；无 native 的短链接先 discover，再使用解析结果 start。
 多链接、userinfo、错误平台、HTTP/本机/私网地址均拒绝，worker 自己不跟任意 URL。
+抖音个人页选中视频链接仅接受 `douyin.com` / `www.douyin.com` 的
+`/user/self?modal_id=<id>`（可有末尾 `/`）：Loom 在清除追踪参数前将其改为
+`https://www.douyin.com/video/<id>`。`modal_id` 必须唯一、为 1–20 位无前导零的
+十进制字符串，绝不转浮点数；空值、重复参数、格式错误、与 `/video/<id>` 路径
+冲突或放在其他路径/短链域的 modal 参数均拒绝。未明确选中视频的个人页不能作为
+单视频输入，`/user/self` 也不能用作账号订阅；正常显式作者订阅与抖音短链不变。
+这仅规范化所选视频身份，不访问个人页、收藏列表或证明内容使用授权。公开标准
+视频链接、冻结领域版本、用途依据、有效的 scoped DTK 连接仍是实际采集的前置条件。
 时序对齐还可输出精确“标签:数值+单位”不一致候选：只比较相同归一标签和单位，
 保留两侧原文/时间/hash，标记 unreviewed/not_asserted；不把普通数字或单位换算差异
 自动宣判成矛盾。大段原文/候选数量限制在 conflict_scan 中明示。
