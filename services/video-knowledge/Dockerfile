@@ -3,8 +3,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /data && chown 65534:65534 /data
 WORKDIR /app
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements.lock NOTICE ./
+RUN pip install --no-cache-dir --only-binary=:all: --require-hashes -r requirements.lock \
+    && pip check
 COPY core.py dtk.py media.py runtime.py synthesis.py server.py ./
 USER 65534:65534
 ENV VIDEO_EXECUTION_DB=/data/executions.sqlite3 VIDEO_PORT=8799

@@ -282,6 +282,13 @@ func (t Tools) Invoke(ctx context.Context, conv model.FlowAgentConversation, ss 
 		if name == "intel_search_knowledge" || name == "intel_read_knowledge" || name == "intel_research_video_materials" {
 			return t.execute(ctx, prior, spec, ss, userID, args, "")
 		}
+		if name == "intel_load_skill" {
+			// A frozen version is not a perpetual authorization grant. Replaying
+			// its tool receipt must still check the durable pin, deployed method,
+			// required tools and current evidence authority.
+			out, err := spec.local(t, context.WithValue(ctx, callKeyCtx{}, "tool:"+conv.ID+":"+callID), conv, ss, userID, args)
+			return t.finish(prior, localResult(prior, spec, out, err), args)
+		}
 		r := storedResult(prior)
 		if prior.Status == "unknown" && spec.local != nil {
 			// Unknown outcome: re-enter the executor, which reconciles before any retry.

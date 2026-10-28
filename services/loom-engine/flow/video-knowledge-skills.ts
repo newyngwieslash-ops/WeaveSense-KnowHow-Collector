@@ -100,7 +100,16 @@ export class VideoKnowledgeSkills {
       if (!["draft", "evaluation_running"].includes(row.state)) fail("evaluation_not_requestable", 409);
       await this.dependencies(ctx, row.proposal.knowledge_releases, row.proposal.evidence, q);
       await q.query(`UPDATE flow_video_skill_candidates SET state='evaluation_running',eval_result=$4,updated_at=now() WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [ctx.tenant_id, ctx.workspace_id, id, JSON.stringify({ grant_actor: actor(ctx), requested_at: this.k.e.now().toISOString() })]);
-      await q.query(`UPDATE flow_video_skill_eval_tasks SET state=CASE WHEN task_id IS NULL THEN 'queued' ELSE 'submitted' END,result=NULL,next_poll_at=now(),lease_owner=NULL,lease_expires_at=NULL,fencing_token=fencing_token+1 WHERE tenant_id=$1 AND workspace_id=$2 AND candidate_id=$3 AND state='blocked'`, [ctx.tenant_id, ctx.workspace_id, id]);
+      // A new paid dispatch is allowed only after a confirmed failed/cancelled
+      // result. Uncertain outcomes must poll the same task with the same key.
+      await q.query(`UPDATE flow_video_skill_eval_tasks SET
+        attempt_history=CASE WHEN result->>'model_status' IN ('failed','cancelled') THEN attempt_history || jsonb_build_array(jsonb_build_object('generation',generation,'task_id',task_id,'result',result,'request_key',model_request->>'key','request_hash',request_hash,'retried_at',now(),'requested_by',$4::text)) ELSE attempt_history END,
+        generation=CASE WHEN result->>'model_status' IN ('failed','cancelled') THEN generation+1 ELSE generation END,
+        state=CASE WHEN result->>'model_status' IN ('failed','cancelled') OR task_id IS NULL THEN 'queued' ELSE 'submitted' END,
+        task_id=CASE WHEN result->>'model_status' IN ('failed','cancelled') THEN NULL ELSE task_id END,
+        model_request=CASE WHEN result->>'model_status' IN ('failed','cancelled') THEN NULL ELSE model_request END,
+        result=NULL,next_poll_at=now(),lease_owner=NULL,lease_expires_at=NULL,fencing_token=fencing_token+1
+        WHERE tenant_id=$1 AND workspace_id=$2 AND candidate_id=$3 AND state='blocked'`, [ctx.tenant_id, ctx.workspace_id, id, actor(ctx)]);
       for (const c of row.proposal.eval_spec.cases) for (const variant of ["base", "without_skill", "candidate"]) {
         await q.query(`INSERT INTO flow_video_skill_eval_tasks(tenant_id,workspace_id,candidate_id,case_id,variant,request_hash) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
           [ctx.tenant_id, ctx.workspace_id, id, c.id, variant, knowledgeHash({ candidate_hash: row.candidate_hash, case: c, variant, model_config: row.proposal.eval_spec.model_config })]);

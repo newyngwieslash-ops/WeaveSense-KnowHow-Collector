@@ -107,6 +107,36 @@ test("COL020 retry of a closed parent reserves only remaining frozen cumulative 
   assert.equal(job.budget_reservation_id, "new-parent"); assert.equal(Number(job.budget_consumed_prior_micro), 17);
 });
 
+test("COL019 retry cannot resurrect cancellation or mutate its budget after an in-flight check", async t => {
+  for (const boundary of ["budget", "provider"] as const) await t.test(boundary, async t => {
+    const f = await setup(t, { budget_micro: 100 });
+    const started = await f.engine.video.start(S, `cancel-during-${boundary}`, f.input);
+    await f.engine.video.workOnce("original-worker");
+    await f.db.query(`UPDATE flow_video_jobs SET state='failed',budget_reservation_id='old-parent' WHERE id=$1`, [started.video_job_id]);
+    await f.db.query(`UPDATE flow_video_stages SET state='failed',lease_owner=NULL,lease_expires_at=NULL WHERE video_job_id=$1`, [started.video_job_id]);
+    let reached!: () => void, resume!: () => void;
+    const waiting = new Promise<void>(resolve => { reached = resolve; });
+    const gate = new Promise<void>(resolve => { resume = resolve; });
+    f.engine.video.budgetStatus = async () => {
+      if (boundary === "budget") { reached(); await gate; }
+      return { reservation_id: "old-parent", status: "settled", consumed_micro: 17, allocated_micro: 0, remaining_micro: 83, open_children: 0, unknown_children: 0 };
+    };
+    f.provider.retry = async () => ({ task_id: "external_fixture", state: "pending" });
+    f.provider.poll = async () => { if (boundary === "provider") { reached(); await gate; } return { task_id: "external_fixture", state: "failed" }; };
+    const retry = f.engine.video.retry(S, started.video_job_id);
+    const rejected = assert.rejects(retry, (error: any) => error.reason === "RETRY_STATE_CHANGED");
+    await waiting;
+    await f.engine.video.cancel(S, started.video_job_id, "cancel wins before retry commit");
+    resume(); await rejected;
+    const current = await f.engine.video.job(S, started.video_job_id);
+    assert.equal(current.state, "cancelled"); assert.equal(current.budget_reservation_id, "old-parent");
+    assert.equal(Number(current.budget_generation), 0); assert.equal(Number(current.budget_consumed_prior_micro), 0);
+    assert.equal((await f.db.query(`SELECT state FROM flow_video_stages WHERE video_job_id=$1`, [started.video_job_id])).rows[0].state, "cancelled");
+    assert.notEqual((await f.db.query(`SELECT state FROM flow_video_submission_intents WHERE video_job_id=$1`, [started.video_job_id])).rows[0].state, "resume_requested");
+    assert.equal(await f.engine.video.claim("must-not-restart"), null);
+  });
+});
+
 test("COL029 intermediate inventory requires verified delete receipts before execution erase", async t => {
   const f = await setup(t); let confirmed = false, erasures = 0;
   const a = await f.engine.video.start(S, "cleanup", f.input), job = await f.engine.video.job(S, a.video_job_id);
@@ -416,7 +446,7 @@ test("G15 expired same-owner reclaim obeys provider, source and workspace caps",
 
 test("K013 visual metadata rejects inference relabeling, forged frames and fabricated alignment", () => {
   const key = "scoped-frame", media = sha("synthetic-media"), frameHash = sha("synthetic-frame");
-  const record = { type: "model_inference", text: "Synthetic model claim, not source truth", derived: true, frame_ids: ["f1"], frame_refs: [key], start_ms: 100, end_ms: 100, media_sha256: media, review_status: "unreviewed", provenance: { model_tasks: [{ task_id: "fixture-model", usage_ref: "fixture-cost" }] } };
+  const record = { type: "model_inference", text: "Synthetic model claim, not source truth", derived: true, frame_ids: ["f1"], frame_refs: [key], start_ms: 100, end_ms: 100, media_sha256: media, review_status: "unreviewed", provenance: { model_tasks: [{ task_id: "fixture-model", usage_ref: "model_task:fixture-model", model_config_hash: "f".repeat(64) }] } };
   const encode = (value: any) => Buffer.from(JSON.stringify({ records: [{ ...value, record_id: canonicalHash(value) }] }));
   const manifest = { frames: [{ frame_id: "f1", object_key: key, sha256: frameHash, timestamp_ms: 100, media_sha256: media }], media_sha256: media, coverage: { duration_ms: 1000 } } as VideoManifest;
   const part = (bytes: Uint8Array) => ({ object_key: "fixture-part", sha256: sha(bytes), bytes: bytes.length, content_type: "application/json", record_count: 1, start_ms: 100, end_ms: 100 });

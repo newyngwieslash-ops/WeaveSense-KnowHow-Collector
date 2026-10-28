@@ -18,7 +18,6 @@ import (
 // RegisterAgentRoutes mounts the server-side conversation directory and the
 // intel tool bridge endpoints. Tenant/workspace/role are re-resolved per request.
 func RegisterAgentRoutes(api gin.IRouter, db *gorm.DB, engine EngineCaller, user UserFunc) {
-	convs := Conversations{DB: db}
 	tools := Tools{DB: db, Engine: engine}
 	// §8.1 run chain (intelligence_workspace / topic adapter).
 	chain := IntelRunChain(tools, nil)
@@ -31,6 +30,7 @@ func RegisterAgentRoutes(api gin.IRouter, db *gorm.DB, engine EngineCaller, user
 		return u, true
 	}
 	loadConv := func(c *gin.Context, u *model.User) (model.FlowAgentConversation, SubjectScope, bool) {
+		convs := Conversations{DB: reqDB(c, db)}
 		conv, ss, err := convs.Get(u.ID, c.Param("id"))
 		if err != nil {
 			if errors.Is(err, ErrVideoProjectionUnavailable) {

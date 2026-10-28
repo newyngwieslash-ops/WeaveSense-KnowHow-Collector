@@ -4,6 +4,7 @@
 !services/loom-engine/
 !services/loom-engine/package.json
 !services/loom-engine/package-lock.json
+!services/loom-engine/LICENSE
 !services/loom-engine/flow/
 !services/loom-engine/flow/**
 !services/loom-engine/src/

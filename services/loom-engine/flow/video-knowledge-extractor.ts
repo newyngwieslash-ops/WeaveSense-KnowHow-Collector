@@ -36,13 +36,13 @@ export class VideoKnowledgeExtractor {
   }
   async get(ctx: ExecutionContext, id: string) {
     await this.k.authorize(ctx, "intel.knowledge.research");
-    const row = (await this.db.query(`SELECT id,video_job_id,document_id,revision,profile_id,profile_version,state,input_hash,external_task_id,candidate_ids,error,created_at,updated_at FROM flow_video_knowledge_runs WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [ctx.tenant_id, ctx.workspace_id, id])).rows[0];
+    const row = (await this.db.query(`SELECT id,video_job_id,document_id,revision,profile_id,profile_version,state,input_hash,external_task_id,external_task_status,model_generation,model_attempt_history,candidate_ids,error,created_at,updated_at FROM flow_video_knowledge_runs WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [ctx.tenant_id, ctx.workspace_id, id])).rows[0];
     if (!row) fail("extraction_not_found", 404); return row;
   }
   async list(ctx: ExecutionContext, input: any) {
     await this.k.authorize(ctx, "intel.knowledge.research");
     const limit = Math.max(1, Math.min(100, Number(input.limit) || 25));
-    const rows = (await this.db.query(`SELECT id,video_job_id,document_id,revision,profile_id,profile_version,state,input_hash,external_task_id,candidate_ids,batch_cursor,error,created_at,updated_at
+    const rows = (await this.db.query(`SELECT id,video_job_id,document_id,revision,profile_id,profile_version,state,input_hash,external_task_id,external_task_status,model_generation,candidate_ids,batch_cursor,error,created_at,updated_at
       FROM flow_video_knowledge_runs WHERE tenant_id=$1 AND workspace_id=$2 AND ($3='' OR video_job_id=$3) AND id>$4 ORDER BY id LIMIT $5`,
       [ctx.tenant_id, ctx.workspace_id, input.video_job_id ?? "", input.cursor ?? "", limit + 1])).rows;
     return { items: rows.slice(0, limit), next_cursor: rows.length > limit ? rows[limit - 1].id : null };
@@ -65,8 +65,18 @@ export class VideoKnowledgeExtractor {
       if (!["blocked_auth", "blocked_budget", "failed", "reconciliation_required"].includes(row.state)) fail("extraction_not_retryable", 409);
       await this.k.authorize(this.context(row), "intel.knowledge.write");
       await this.k.resolveEvidence(ctx, evidenceRefs(row.frozen_input.evidence.slice(row.batch_cursor, row.batch_cursor + 100)), q);
-      await q.query(`UPDATE flow_video_knowledge_runs SET state=CASE WHEN external_task_id IS NULL THEN 'queued' ELSE 'submitted' END,error=NULL,next_poll_at=now(),fencing_token=fencing_token+1,lease_owner=NULL,lease_expires_at=NULL WHERE id=$1`, [id]);
-      return { id, accepted: true, resume_batch_cursor: row.batch_cursor, external_task_id: row.external_task_id, input_hash: row.input_hash };
+      // Only a confirmed terminal receipt permits another paid execution. An
+      // unknown outcome keeps both its task and idempotency key for reconciliation.
+      const replacement = row.state === "failed" && row.external_task_id && ["failed", "cancelled", "succeeded"].includes(row.external_task_status);
+      if (replacement && row.budget_closed_at) fail("extraction_budget_already_closed", 409);
+      const history = replacement ? [{ generation: row.model_generation, batch_cursor: row.batch_cursor, task_id: row.external_task_id,
+        status: row.external_task_status, request_key: row.model_request?.key ?? null, error: row.error, retry_actor: ctx.actor.id }] : [];
+      await q.query(`UPDATE flow_video_knowledge_runs SET state=CASE WHEN $2 OR external_task_id IS NULL THEN 'queued' ELSE 'submitted' END,
+        model_generation=model_generation+CASE WHEN $2 THEN 1 ELSE 0 END,model_attempt_history=model_attempt_history || $3::jsonb,
+        external_task_id=CASE WHEN $2 THEN NULL ELSE external_task_id END,external_task_status=CASE WHEN $2 THEN NULL ELSE external_task_status END,
+        model_request=CASE WHEN $2 THEN NULL ELSE model_request END,error=NULL,next_poll_at=now(),fencing_token=fencing_token+1,lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=$1`, [id, Boolean(replacement), JSON.stringify(history)]);
+      return { id, accepted: true, resume_batch_cursor: row.batch_cursor, external_task_id: replacement ? null : row.external_task_id,
+        model_generation: row.model_generation + (replacement ? 1 : 0), reconciliation_only: !replacement && Boolean(row.model_request), input_hash: row.input_hash };
     });
   }
   async modelAuthorization(ctx: ExecutionContext, id: string, purpose: string) {
@@ -121,15 +131,19 @@ export class VideoKnowledgeExtractor {
       const config = frozen.profile.config, model = config.knowledge_model_id ?? config.model_id;
       if (!model || !Number.isSafeInteger(config.knowledge_budget_micro) || config.knowledge_budget_micro <= 0) fail("knowledge_model_and_budget_required", 402);
       const batches = Math.ceil(frozen.evidence.length / 100);
-      const request = row.model_request ?? { key: `knowledge-extract:${row.id}:${row.batch_cursor}`, model_id: model,
+      const request = row.model_request ?? { key: `knowledge-extract:${row.id}:${row.batch_cursor}:generation:${row.model_generation}`, model_id: model,
         budget_micro: Math.min(20000000, Math.floor(config.knowledge_budget_micro / batches)), max_tokens: Math.min(16384, config.knowledge_max_tokens ?? 8000),
         input: { ...frozen, batch: { offset: row.batch_cursor, total: frozen.evidence.length }, evidence: evidence.map(({ body: _body, ...ev }) => ev) } };
       if (!row.model_request) await this.db.tx(async q => { await fence(q); await q.query(`UPDATE flow_video_knowledge_runs SET model_request=$2 WHERE id=$1`, [row.id, JSON.stringify(request)]); });
       const task = await hooks.modelTask(ctx, row.id, "video_knowledge_extract", request, row.external_task_id ?? undefined);
       if (!task.task_id || (row.external_task_id && row.external_task_id !== task.task_id)) fail("model_task_contract", 502);
+      if (!["queued", "running", "retry_wait", "succeeded", "failed", "cancelled", "reconciliation_required"].includes(task.status)) fail("model_task_contract", 502);
+      // Persist the receipt before output validation too. A successful provider
+      // response with invalid content must not be mistaken for an unsubmitted call.
+      await this.db.tx(async q => { await fence(q); await q.query(`UPDATE flow_video_knowledge_runs SET external_task_id=$2,external_task_status=$3 WHERE id=$1`, [row.id, task.task_id, task.status]); });
       if (task.status !== "succeeded") {
         const terminal = ["failed", "cancelled", "reconciliation_required"].includes(task.status);
-        await this.db.tx(async q => { await fence(q); await q.query(`UPDATE flow_video_knowledge_runs SET external_task_id=$2,state=$3,error=$4,lease_owner=NULL,lease_expires_at=NULL,next_poll_at=now()+interval '5 seconds',updated_at=now() WHERE id=$1`, [row.id, task.task_id, terminal ? task.status : "submitted", terminal ? `model_${task.status}` : null]); });
+        await this.db.tx(async q => { await fence(q); await q.query(`UPDATE flow_video_knowledge_runs SET external_task_id=$2,state=$3,error=$4,lease_owner=NULL,lease_expires_at=NULL,next_poll_at=now()+interval '5 seconds',updated_at=now() WHERE id=$1`, [row.id, task.task_id, task.status === "cancelled" ? "failed" : terminal ? task.status : "submitted", terminal ? `model_${task.status}` : null]); });
         return true;
       }
       assertKnowledgeModelReceipt(task, request.budget_micro);
@@ -150,7 +164,7 @@ export class VideoKnowledgeExtractor {
           ids.push(candidate.id);
         }
         const cursor = row.batch_cursor + evidence.length, done = cursor >= frozen.evidence.length;
-        await q.query(`UPDATE flow_video_knowledge_runs SET state=$2,external_task_id=$3,candidate_ids=candidate_ids || $4::text[],batch_cursor=$5,model_request=NULL,lease_owner=NULL,lease_expires_at=NULL,error=NULL,next_poll_at=now(),updated_at=now() WHERE id=$1`, [row.id, done ? "completed" : "queued", done ? task.task_id : null, ids, cursor]);
+        await q.query(`UPDATE flow_video_knowledge_runs SET state=$2,external_task_id=$3,external_task_status=CASE WHEN $2='completed' THEN 'succeeded' ELSE NULL END,candidate_ids=candidate_ids || $4::text[],batch_cursor=$5,model_request=NULL,lease_owner=NULL,lease_expires_at=NULL,error=NULL,next_poll_at=now(),updated_at=now() WHERE id=$1`, [row.id, done ? "completed" : "queued", done ? task.task_id : null, ids, cursor]);
         await this.k.e.emit(q, ctx, row.id, row.id, done ? "video.knowledge_curated" : "video.knowledge_curation_batch", { extraction_run_id: row.id, batch_offset: row.batch_cursor, candidate_ids: ids, model_task_id: task.task_id, usage_ref: task.usage_ref, method: frozen.method });
       });
     } catch (e: any) {

@@ -118,8 +118,10 @@ test("K021/022: exact evidence, UTF16, source provenance, unsupported numbers an
     await assert.rejects(create("number", { statement: "温度 99 °C" }), /unsupported_numeric_claim/);
     await assert.rejects(create("unit", { parameters: [{ name: "power", value: "20", unit: "MW", conditions: [] }] }), /unsupported_parameter/);
     const resolved = await k.resolveEvidence(A, [material.ref]); assert.equal(resolved[0].char_start, material.title.length + 2);
-    await db.query(`UPDATE flow_document_revisions SET material_type='model_summary' WHERE document_id=$1`, [material.doc]);
-    await assert.rejects(create("self-source"), /derived_conclusion_not_source/);
+    for (const type of ["model_summary", "visual_observation"]) {
+      await db.query(`UPDATE flow_document_revisions SET material_type=$2 WHERE document_id=$1`, [material.doc, type]);
+      await assert.rejects(create("self-source-" + type), /derived_conclusion_not_source/);
+    }
     await db.query(`UPDATE flow_document_revisions SET material_type='platform_subtitles' WHERE document_id=$1`, [material.doc]);
     await db.query(`UPDATE flow_evidence SET quote='tampered' WHERE id=$1`, [material.ref.evidence_id]);
     await assert.rejects(create("tamper"), /evidence_unavailable/);
@@ -312,6 +314,52 @@ test("K027 development profile is explicitly generic, zero-cost, and contains mi
   assert.equal(fixture.fixture_only, true); assert.equal(fixture.not_a_confirmed_industry_profile, true);
   assert.equal(fixture.config.knowledge_budget_micro, 0); assert.equal(fixture.config.review_policy.human_required, true);
   assert.equal(fixture.review_examples.length, 3); assert.ok(fixture.config.terms[0].aliases.length);
+});
+
+test("K022 explicit terminal model failure retries a new audited generation, while unknown only reconciles", async t => {
+  for (const terminal of ["failed", "cancelled"]) await t.test(terminal, async () => {
+  const { db, engine, material, unit } = await setup();
+  try {
+    await db.query(`UPDATE flow_video_profiles SET config=$1 WHERE id='profile'`, [JSON.stringify({ knowledge_model_id: "fixture-model", knowledge_budget_micro: 1000 })]);
+    await db.query(`INSERT INTO flow_video_jobs(id,operation_id,tenant_id,workspace_id,source_id,asset_id,profile_id,profile_version,fingerprint,input,state,grant_actor,policy_version,document_id,revision)
+      VALUES('retry_ready','retry_operation',$1,$2,$3,$4,'profile',1,'retry-fixture','{}','completed','user:reviewer','test-v1',$5,1)`, [A.tenant_id, A.workspace_id, material.source, material.asset, material.doc]);
+    const run = await db.tx(q => enqueueVideoKnowledgeReady(q, A, { video_job_id: "retry_ready", document_id: material.doc, revision: 1, profile_id: "profile", profile_version: 1, grant_actor: "user:reviewer" }));
+    const calls: { key: string; taskId?: string }[] = [];
+    let mode = "retry_wait";
+    configureVideoKnowledge(engine, { resolveBase: async () => ({ ...method, required_tools: [] }), modelTask: async (_ctx, id, _purpose, request, taskId) => {
+      assert.equal(id, run.id); assert.equal(request.budget_micro, 1000); calls.push({ key: request.key, taskId });
+      if (mode === "retry_wait") return { task_id: "confirmed-failure", status: "retry_wait" };
+      if (mode === "failed") return { task_id: "confirmed-failure", status: terminal };
+      if (mode === "unknown") return { task_id: "unknown-task", status: "reconciliation_required" };
+      return { task_id: taskId ?? "replacement-success", status: "succeeded", usage_ref: `model_task:${taskId ?? "replacement-success"}`, reservation_id: "same-parent-child", cost_micro: 1, input_hash: "b".repeat(64), model_config_hash: "c".repeat(64), output: { profile_id: "profile", profile_version: 1, relevance: "relevant", knowledge_units: [unit()] } };
+    } });
+    const extractor = new VideoKnowledgeExtractor(engine);
+    await extractor.workOnce("first");
+    let row = await extractor.get(A, run.id);
+    assert.equal(row.state, "submitted"); assert.equal(row.external_task_status, "retry_wait");
+    await db.query(`UPDATE flow_video_knowledge_runs SET next_poll_at=now() WHERE id=$1`, [run.id]);
+    mode = "failed"; await extractor.workOnce("poll-backoff");
+    row = await extractor.get(A, run.id);
+    assert.equal(calls[1].key, calls[0].key); assert.equal(calls[1].taskId, "confirmed-failure");
+    assert.equal(row.state, "failed"); assert.equal(row.external_task_id, "confirmed-failure"); assert.equal(row.external_task_status, terminal);
+    await assert.rejects(extractor.retry(A, run.id, "wrong-hash", { expected_hash: "stale" }), /extraction_version_conflict/);
+    const retried = await extractor.retry(A, run.id, "retry-failure", { expected_hash: row.input_hash });
+    assert.equal(retried.model_generation, 1); assert.equal(retried.external_task_id, null);
+    assert.deepEqual(await extractor.retry(A, run.id, "retry-failure", { expected_hash: row.input_hash }), retried);
+    mode = "unknown"; await extractor.workOnce("replacement");
+    row = await extractor.get(A, run.id);
+    assert.equal(row.state, "reconciliation_required"); assert.equal(row.model_attempt_history.length, 1);
+    assert.equal(row.model_attempt_history[0].task_id, "confirmed-failure");
+    assert.notEqual(calls[0].key, calls[2].key); assert.equal(calls[2].taskId, undefined);
+    await extractor.retry(A, run.id, "reconcile-only", { expected_hash: row.input_hash });
+    mode = "success"; await extractor.workOnce("reconciler");
+    row = await extractor.get(A, run.id);
+    assert.equal(row.state, "completed"); assert.equal(row.candidate_ids.length, 1);
+    assert.equal(calls[3].key, calls[2].key); assert.equal(calls[3].taskId, "unknown-task");
+    assert.equal(row.model_generation, 1); assert.equal(row.model_attempt_history.length, 1);
+    assert.equal((await db.query(`SELECT count(*)::int n FROM flow_outbox WHERE type='video.knowledge_curated'`)).rows[0].n, 1);
+  } finally { await db.close(); }
+  });
 });
 
 test("K026 run pins freeze published releases while current revocation still wins", async () => {

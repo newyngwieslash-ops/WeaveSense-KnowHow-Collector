@@ -3,13 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { ApiError, apiClient } from "../src/services/api/request";
 import { backfillVideoSource, cancelVideoJob, correctVideoTranscript, getVideoDiscovery, reconcileVideoJob, saveVideoProfile, setVideoScheduleEnabled, setVideoSourceStatus, startVideoJob } from "../src/services/api/video-knowledge";
-import { createVideoSkillCandidate, getVideoKnowledge, installVideoSkillCandidate, listKnowledgeExtractions, listVideoSkillCandidates, publishVideoKnowledge, reviewVideoKnowledge, searchPublishedKnowledge, type KnowledgeRecord, type SkillCandidate } from "../src/services/api/video-knowledge-review";
+import { createVideoSkillCandidate, getVideoKnowledge, installVideoSkillCandidate, listKnowledgeExtractions, listVideoSkillCandidates, publishVideoKnowledge, retryKnowledgeExtraction, reviewVideoKnowledge, searchPublishedKnowledge, type KnowledgeExtractionRun, type KnowledgeRecord, type SkillCandidate } from "../src/services/api/video-knowledge-review";
 import { evidenceHighlight, formatEvidenceTime, safeEvidenceSourceUrl, VideoEvidencePanel } from "../src/pages/intelligence/video-evidence";
 import { describeVideoError, VIDEO_STATE_LABEL, VideoLoadState } from "../src/pages/intelligence/video-common";
 import { connectionRecoveryHint } from "../src/pages/intelligence/video-connection-health";
 import { VideoKnowledgeReview } from "../src/pages/intelligence/video-knowledge-review";
 import { SKILL_STATE_LABEL } from "../src/pages/intelligence/video-skill-candidates";
-import { VideoExternalStageSummary } from "../src/pages/intelligence/video-ingestion-jobs";
+import { KnowledgeExtractionRecovery, VideoExternalStageSummary } from "../src/pages/intelligence/video-ingestion-jobs";
 import type { VideoStage } from "../src/services/api/video-knowledge";
 
 describe("COL024 external stage response is historical evidence, not local state inference", () => {
@@ -74,6 +74,15 @@ describe("video evidence uses immutable global UTF-16 coordinates", () => {
 });
 
 describe("honest host state projection", () => {
+    test("knowledge retry distinguishes explicit failure from unknown task reconciliation", () => {
+        const run = { id: "run", state: "failed", external_task_id: "task", external_task_status: "failed" } as KnowledgeExtractionRun;
+        const render = (value: KnowledgeExtractionRun, busy = false) => renderToStaticMarkup(<KnowledgeExtractionRecovery run={value} busy={busy} onRetry={() => {}} />);
+        expect(render(run)).toContain("恢复知识整理");
+        expect(render(run)).toContain("仍受原总预算限制");
+        expect(render({ ...run, state: "reconciliation_required", external_task_status: "reconciliation_required" })).toContain("核对整理结果");
+        expect(render({ ...run, state: "completed" })).toBe("");
+        expect(render(run, true)).toContain("disabled");
+    });
     test("all durable states are distinct and actionable", () => {
         expect(Object.keys(VIDEO_STATE_LABEL)).toHaveLength(11);
         expect(new Set(Object.values(VIDEO_STATE_LABEL)).size).toBe(11);
@@ -188,9 +197,11 @@ describe("host HTTP contract and guarded mutations", () => {
         try {
             await correctVideoTranscript("w", "job", { expected_revision: 4, expected_content_hash: "source-hash", reason: "typo", patches: [{ evidence_id: "e1", text: "校正😀" }] });
             await listKnowledgeExtractions("w", "job");
+            await retryKnowledgeExtraction("w", { id: "run/id", input_hash: "frozen-input" } as KnowledgeExtractionRun);
             expect(calls[0].data).toMatchObject({ expected_revision: 4, expected_content_hash: "source-hash" });
             expect(calls[0].data.patches[0]).toEqual({ evidence_id: "e1", text: "校正😀" });
             expect(calls[1]).toMatchObject({ method: "get", url: "/intelligence/knowledge/extractions", params: { video_job_id: "job", limit: 30 } });
+            expect(calls[2]).toMatchObject({ method: "post", url: "/intelligence/knowledge/extractions/run%2Fid/retry", data: { expected_hash: "frozen-input" } });
         } finally { apiClient.request = original; }
     });
 });

@@ -11,7 +11,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  timeout: 300000,
+  timeout: 600000,
   expect: { timeout: 30000 },
   outputDir: `test-results/fullstack-${phase}`,
   reporter: [['list'], ['json', { outputFile: `test-results/fullstack-${phase}-results.json` }]],

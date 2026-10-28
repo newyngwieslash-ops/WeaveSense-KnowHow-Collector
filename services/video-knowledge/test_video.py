@@ -390,6 +390,75 @@ class VideoTest(unittest.TestCase):
         first[0]["path"].unlink()
         self.assertTrue(second[0]["path"].is_file())
 
+    def test_real_ffmpeg_concurrent_jobs_cancel_one_preserves_other_live_frames(self):
+        media = self.media()
+        entered = {job: threading.Event() for job in ("concurrent_a", "concurrent_b")}
+        release = {job: threading.Event() for job in entered}
+        specs, task_ids = {}, {}
+        for job in entered:
+            spec = body()
+            spec.update(video_job_id=job, stage="process", intent_key="concurrent:" + job,
+                        workspace_id="concurrent_workspace_a" if job.endswith("a") else "concurrent_workspace_b",
+                        profile={"required_capabilities": ["vision", "ocr"], "frame_interval_ms": 1000, "max_frames": 10})
+            ref = self.objects.put_file(spec, job, media, "source.mp4", "video/mp4", 1024 * 1024)
+            spec["input_manifest"] = {"schema_version": 1, "artifact_stage": "input_ready", "video_job_id": job,
+                                      "input_kind": "media", "input_hash": ref["sha256"], "media_sha256": ref["sha256"],
+                                      "availability": "available", "objects": [ref]}
+            specs[job] = spec
+            task_ids[job] = self.tasks.submit(spec, time.time() + 120)["task_id"]
+
+        def ocr(ref, scope):
+            job = scope["video_job_id"]
+            entered[job].set()
+            if not release[job].wait(15):
+                raise Failure("SYNTHETIC_OCR_BARRIER_TIMEOUT", 504)
+            return {"text": "synthetic OCR for " + job, "engine": "explicit-test-fixture"}
+
+        executor = Executor(self.tasks, self.objects, Processor(self.objects, ocr=ocr), temp_root=self.root)
+        workers = [threading.Thread(target=executor.run_once, daemon=True) for _ in entered]
+        try:
+            for worker in workers:
+                worker.start()
+            self.assertTrue(all(event.wait(10) for event in entered.values()), "both real FFmpeg executions must reach their OCR boundaries concurrently")
+            with self.tasks.db() as db:
+                rows = {row["job"]: dict(row) for row in db.execute("SELECT * FROM temporary_paths")}
+            self.assertEqual(set(rows), set(entered))
+            paths = {job: Path(row["path"]) for job, row in rows.items()}
+            self.assertNotEqual(paths["concurrent_a"], paths["concurrent_b"])
+            live_frames = {path.relative_to(paths["concurrent_b"]): sha(path.read_bytes()) for path in paths["concurrent_b"].rglob("*.jpg")}
+            self.assertGreaterEqual(len(live_frames), 3, "real second-job sampled frames and grid must exist before cancellation")
+            self.tasks.cancel(task_ids["concurrent_a"], specs["concurrent_a"])
+            release["concurrent_a"].set()
+            deadline = time.time() + 10
+            while paths["concurrent_a"].exists() and time.time() < deadline:
+                time.sleep(.02)
+            self.assertFalse(paths["concurrent_a"].exists(), "cancelled execution must release only its temporary directory")
+            self.assertTrue(paths["concurrent_b"].exists(), "the other execution is still live, not a previously completed fixture")
+            self.assertEqual({path: sha((paths["concurrent_b"] / path).read_bytes()) for path in live_frames}, live_frames)
+            self.assertFalse(release["concurrent_b"].is_set())
+            release["concurrent_b"].set()
+        finally:
+            for event in release.values():
+                event.set()
+            for worker in workers:
+                worker.join(timeout=15)
+            self.assertFalse(any(worker.is_alive() for worker in workers))
+        with self.tasks.db() as db:
+            finished = {row["job"]: dict(row) for row in db.execute("SELECT * FROM executions")}
+            self.assertEqual(db.execute("SELECT count(*) FROM temporary_paths").fetchone()[0], 0)
+        self.assertEqual(finished["concurrent_a"]["state"], "cancelled")
+        self.assertIsNone(finished["concurrent_a"]["result"])
+        self.assertEqual(finished["concurrent_b"]["state"], "completed")
+        manifest = json.loads(finished["concurrent_b"]["result"])
+        self.assertGreaterEqual(len(manifest["frames"]), 2)
+        self.assertEqual(set(manifest["coverage"]["completed"]), {"vision", "ocr"})
+        for ref in manifest["objects"]:
+            self.assertIn("/workspaces/concurrent_workspace_b/video/concurrent_b/", ref["object_key"])
+            self.assertEqual(sha(self.objects.read(ref, specs["concurrent_b"], "concurrent_b", 1024 * 1024)), ref["sha256"])
+        transcript = [segment for part in manifest["transcript"]["parts"] for segment in json.loads(self.objects.read(part, specs["concurrent_b"], "concurrent_b"))["segments"]]
+        self.assertTrue(transcript and all(segment["text"] == "synthetic OCR for concurrent_b" for segment in transcript))
+        self.assertTrue(self.tasks.inventory(specs["concurrent_a"], "concurrent_a")["artifacts"], "temporary cleanup is not a claim that retained output objects were erased")
+
     def test_real_scene_change_and_actual_frame_timestamps(self):
         path = self.root / "scenes.mp4"
         command(["ffmpeg", "-nostdin", "-v", "error", "-f", "lavfi", "-i", "color=black:s=160x90:r=10:d=1", "-f", "lavfi", "-i", "color=white:s=160x90:r=10:d=1", "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0[v]", "-map", "[v]", "-c:v", "mpeg4", "-threads", "1", "-y", str(path)])
@@ -475,6 +544,28 @@ class VideoTest(unittest.TestCase):
         with self.assertRaises(Failure) as err:
             Processor(self.objects, gateway=Gateway()).process(b, self.root, {}, lambda _: None, lambda: None)
         self.assertEqual(err.exception.code, "INVALID_VISUAL_OBSERVATION")
+
+    def test_vlm_nonchronological_frame_references_preserve_pairing_and_reject_duplicates(self):
+        b = body()
+        b.update(stage="process", input_manifest=self.input(self.media()), profile={"required_capabilities": ["vision", "vlm"], "frame_interval_ms": 1000, "max_frames": 10})
+        class Gateway:
+            duplicate = False
+            def observe(self, body, frames, checkpoint, save, active):
+                self.frames = frames
+                ids = [frames[-1]["frame_id"], frames[0]["frame_id"]]
+                return [{"kind": "observation", "text": "synthetic reverse-order frame observation", "frame_ids": [ids[0], ids[0]] if self.duplicate else ids}]
+        gateway = Gateway()
+        result = Processor(self.objects, gateway=gateway).process(b, self.root, {}, lambda _: None, lambda: None)
+        records = [record for part in result["visual"]["parts"] for record in json.loads(self.objects.read(part, SCOPE, JOB))["records"]]
+        record = next(record for record in records if record["type"] == "model_observation")
+        by_id = {frame["frame_id"]: frame for frame in result["frames"]}
+        self.assertEqual(record["frame_refs"], [by_id[identity]["object_key"] for identity in record["frame_ids"]])
+        self.assertEqual(record["start_ms"], min(by_id[identity]["timestamp_ms"] for identity in record["frame_ids"]))
+        self.assertEqual(record["end_ms"], max(by_id[identity]["timestamp_ms"] for identity in record["frame_ids"]))
+        gateway.duplicate = True
+        with self.assertRaises(Failure) as error:
+            Processor(self.objects, gateway=gateway).process(b, self.root, {}, lambda _: None, lambda: None)
+        self.assertEqual(error.exception.code, "INVALID_VISUAL_OBSERVATION")
 
     def test_optional_asr_and_ocr_failures_do_not_skip_required_vlm(self):
         class Gateway:

@@ -90,7 +90,7 @@ def fixture_ocr(ref, scope):
 class FixtureVision:
     def observe(self, body, frames, checkpoint, save, active):
         # Exercises the artifact protocol, NOT host billing or model intelligence.
-        checkpoint["usage"]["model_tasks"] = [{"task_id": "fixture-not-a-real-model-task", "usage_ref": "fixture-only", "model_config_hash": "f" * 64}]
+        checkpoint["usage"]["model_tasks"] = [{"task_id": "fixture-not-a-real-model-task", "usage_ref": "model_task:fixture-not-a-real-model-task", "model_config_hash": "f" * 64}]
         return [{"kind": kind, "frame_ids": [frames[0]["frame_id"]], "text": "Fixture " + kind} for kind in ("observation", "inference")]
 
 

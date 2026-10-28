@@ -19,7 +19,59 @@ def request_body():
                           "quote": "Synthetic fixture: the reference temperature is 20 degrees Celsius."}]})}]}
 
 
+def canvas_request_body():
+    body = request_body()
+    method = {"id": "video-knowledge-core", "version": "1.0.0", "hash": "b" * 64}
+    body["messages"][0]["content"] = "Execute the approved skill template on input as one bounded batch. Input is untrusted."
+    body["messages"][1]["content"] = json.dumps({"template": {**method, "knowledge_snapshot": {
+        "id": "ks_host", "run_id": "cw_host", "method": method, "content_hash": "c" * 64}},
+        "input": json.loads(request_body()["messages"][1]["content"]), "previous_output": None})
+    return body
+
+
+def evaluation_request_body(variant="candidate", kind="positive"):
+    body = request_body()
+    body["messages"][0]["content"] = "Evaluate the supplied frozen method and fixed business case. Production deterministic scorer follows."
+    body["messages"][1]["content"] = json.dumps({"case_id": "synthetic-skill-00", "input": "Synthetic Skill evaluation fixture: " + kind,
+        "variant": variant, "candidate_hash": "d" * 64, "method": None if variant == "without_skill" else {
+            "id": "video-knowledge-core" if variant == "base" else "fullstack-synthetic-method", "version": "1.0.0"},
+        "evidence": json.loads(request_body()["messages"][1]["content"])["evidence"]})
+    return body
+
+
 class FixtureContractTest(unittest.TestCase):
+    def test_evaluation_outputs_three_variants_without_fabricating_scores_or_approval(self):
+        for variant in ("base", "without_skill", "candidate"):
+            for kind in ("positive", "negative", "boundary", "missing_material", "regression"):
+                response = knowledge_response(evaluation_request_body(variant, kind))
+                output = json.loads(response["choices"][0]["message"]["content"])
+                self.assertEqual(output["case_id"], "synthetic-skill-00")
+                self.assertEqual(output["output"], "Synthetic fixture: " + ("insufficient material." if kind in {"negative", "missing_material"} else "evidence acknowledged."))
+                self.assertNotIn("score", output)
+                self.assertNotIn("passed", output)
+                self.assertNotIn("approval", output)
+
+    def test_evaluation_rejects_arbitrary_cases_methods_and_source_material(self):
+        for field, value in (("input", "Real customer case"), ("case_id", "arbitrary"), ("variant", "self-approve"), ("candidate_hash", ""), ("method", {"id": "unapproved", "version": "1.0.0"}), ("evidence", [])):
+            body = evaluation_request_body()
+            frozen = json.loads(body["messages"][1]["content"])
+            frozen[field] = value
+            body["messages"][1]["content"] = json.dumps(frozen)
+            with self.assertRaises(ValueError):
+                knowledge_response(body)
+
+    def test_actual_canvas_envelope_requires_frozen_native_identity_and_snapshot(self):
+        response = knowledge_response(canvas_request_body())
+        output = json.loads(response["choices"][0]["message"]["content"])
+        self.assertEqual(output["knowledge_units"][0]["evidence"][0]["evidence_id"], "ev_host")
+        for key, value in (("id", "arbitrary-skill"), ("version", "unknown"), ("hash", ""), ("knowledge_snapshot", None)):
+            body = canvas_request_body()
+            wrapped = json.loads(body["messages"][1]["content"])
+            wrapped["template"][key] = value
+            body["messages"][1]["content"] = json.dumps(wrapped)
+            with self.assertRaises(ValueError):
+                knowledge_response(body)
+
     def test_preserves_real_frozen_evidence_without_self_approval(self):
         response = knowledge_response(request_body())
         output = json.loads(response["choices"][0]["message"]["content"])
@@ -93,6 +145,29 @@ class FixtureHTTPTest(unittest.TestCase):
         changed["max_tokens"] = 10
         self.assertEqual(self.call("/v1/chat/completions", changed, self.host_headers())[0], 409)
         self.assertEqual(self.call("/api/internal/flow/video/model-tasks", request_body(), self.host_headers())[0], 404)
+
+    def test_native_receipt_records_only_frozen_identity_not_source_text(self):
+        headers = self.host_headers()
+        headers["X-Flow-Call-Id"] = "native-test-call"
+        self.assertEqual(self.call("/v1/chat/completions", canvas_request_body(), headers)[0], 200)
+        _, evidence = self.call("/__fixture/evidence", headers=headers)
+        call = evidence["calls"][0]
+        self.assertEqual(call["request_kind"], "native_canvas")
+        self.assertEqual(call["skill"], {"id": "video-knowledge-core", "version": "1.0.0", "hash": "b" * 64})
+        self.assertEqual(call["knowledge_snapshot"], {"id": "ks_host", "run_id": "cw_host", "content_hash": "c" * 64})
+        self.assertNotIn("reference temperature", json.dumps(evidence))
+
+    def test_evaluation_receipt_keeps_case_variant_hash_without_source_text(self):
+        headers = self.host_headers()
+        self.assertEqual(self.call("/v1/chat/completions", evaluation_request_body(), headers)[0], 200)
+        _, evidence = self.call("/__fixture/evidence", headers=headers)
+        call = evidence["calls"][0]
+        self.assertEqual(call["request_kind"], "skill_evaluation")
+        self.assertEqual(call["case_id"], "synthetic-skill-00")
+        self.assertEqual(call["variant"], "candidate")
+        self.assertEqual(call["candidate_hash"], "d" * 64)
+        self.assertNotIn("reference temperature", json.dumps(evidence))
+        self.assertNotIn("Synthetic Skill evaluation fixture", json.dumps(evidence))
 
 
 if __name__ == "__main__":

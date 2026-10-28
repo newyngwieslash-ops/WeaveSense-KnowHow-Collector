@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "source": "official npm version metadata and published tarballs; read only, never installed or executed",
+  "license_approval": false,
+  "packages": [
+    {
+      "package": "@giscus/react",
+      "version": "3.1.0",
+      "metadata_url": "https://registry.npmjs.org/@giscus%2freact/3.1.0",
+      "metadata_sha256": "b232ceb73cfe437f832000629a9478fee0a0db14ca0b18eaeec1c519ef94f231",
+      "tarball_url": "https://registry.npmjs.org/@giscus/react/-/react-3.1.0.tgz",
+      "tarball_sha256": "1431736c77435b086f1cb0fb3f92fad93aabb84c2e44b6fd9e2286f337f0fbcb",
+      "registry_integrity": "sha512-0TCO2TvL43+oOdyVVGHDItwxD1UMKP2ZYpT6gXmhFOqfAJtZxTzJ9hkn34iAF/b6YzyJ4Um89QIt9z/ajmAEeg==",
+      "registry_integrity_matched": true,
+      "license_declared": null,
+      "repository": {
+        "url": "git+https://github.com/giscus/giscus-component.git",
+        "type": "git",
+        "directory": "react"
+      },
+      "git_head": "eba2a53fe392d86b86d46b4a99779b8576a9f5c1",
+      "notices": [],
+      "source_notices": [
+        {
+          "url": "https://raw.githubusercontent.com/giscus/giscus-component/eba2a53fe392d86b86d46b4a99779b8576a9f5c1/LICENSE",
+          "bytes": 1071,
+          "sha256": "fb3da8cdebdbbf3da4110173a1831ea47ab7960a1d11367072f5a1f0158e24cd",
+          "text": "MIT License\n\nCopyright (c) 2021-2022 laymonage\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+        }
+      ],
+      "matches_host_lock_integrity": true
+    },
+    {
+      "package": "@splinetool/runtime",
+      "version": "1.12.98",
+      "metadata_url": "https://registry.npmjs.org/@splinetool%2fruntime/1.12.98",
+      "metadata_sha256": "9caf60ff2cfdccfd86e5c374d62a01b9ec61e9d2800405470ad732f4a8cc8b7d",
+      "tarball_url": "https://registry.npmjs.org/@splinetool/runtime/-/runtime-1.12.98.tgz",
+      "tarball_sha256": "40c193c5e5e7cc8599c674dfb41daa9fb35f0b765f2f2ba1a96128c2f9b87934",
+      "registry_integrity": "sha512-UWZH/+4XtNgMMgmDiWhZS55WOwUDGuTj4uH6fiZV6Jol3d3v3z1RRBObspx8GMio0HajOYGg7FJ8TZdyBdpW4A==",
+      "registry_integrity_matched": true,
+      "license_declared": null,
+      "repository": {
+        "url": "git+https://github.com/splinetool/spline.git",
+        "type": "git",
+        "directory": "packages/runtime"
+      },
+      "git_head": "c4e7201e9bb9710d3051eb9cb5f860cc355262b2",
+      "notices": [],
+      "source_notices": [],
+      "source_notice_attempts": [
+        {
+          "url": "https://raw.githubusercontent.com/splinetool/spline/c4e7201e9bb9710d3051eb9cb5f860cc355262b2/LICENSE",
+          "result": "HTTPError"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/splinetool/spline/c4e7201e9bb9710d3051eb9cb5f860cc355262b2/LICENSE.md",
+          "result": "HTTPError"
+        }
+      ],
+      "matches_host_lock_integrity": true
+    },
+    {
+      "package": "tldraw",
+      "version": "5.2.5",
+      "metadata_url": "https://registry.npmjs.org/tldraw/5.2.5",
+      "metadata_sha256": "e50f6b0f9e611df9f17ea5cb245b594f568dd1b12a3d1a9dfb5970ca53d2ab50",
+      "tarball_url": "https://registry.npmjs.org/tldraw/-/tldraw-5.2.5.tgz",
+      "tarball_sha256": "c4df24f86baf2bc3e2668b55c9e7c8deccd6c7545bbc68bb283e441c34e7730a",
+      "registry_integrity": "sha512-bTnOkeZhi+RgdHXPjxp0/nG6kbXzLC8ZlwNMpmGjWjT2Oel6uaJWni7PxFPIK4p2zInmnRamdU06ArDStLvPag==",
+      "registry_integrity_matched": true,
+      "license_declared": "SEE LICENSE IN LICENSE.md",
+      "repository": {
+        "url": "https://github.com/tldraw/tldraw",
+        "type": "git"
+      },
+      "git_head": "32f526615477f3554b62ead28d26d0fd374fb346",
+      "notices": [
+        {
+          "path": "package/LICENSE.md",
+          "bytes": 104,
+          "sha256": "4575c72988945bb8fe9a205a096866cb1ccda2908b0fdee96a967c08e3bfd3dd",
+          "text": "This code is licensed under the [tldraw license](https://github.com/tldraw/tldraw/blob/main/LICENSE.md)\n"
+        }
+      ],
+      "source_notices": [
+        {
+          "url": "https://raw.githubusercontent.com/tldraw/tldraw/32f526615477f3554b62ead28d26d0fd374fb346/LICENSE.md",
+          "bytes": 4609,
+          "sha256": "9578fcddc20e404b6a29f44b6fea81d8b331698c0e7e9be34132d6f4394fa533",
+          "text": "# tldraw license\n\nThis License from tldraw, Inc. (“tldraw”) governs your use of the accompanying Software. By using the Software, you accept the terms of this License. The tldraw software is copyrighted by tldraw Inc.\n\nAlternative licenses are available from tldraw for commercial and non-commercial use. To get an alternative license or to learn more, visit https://tldraw.dev or contact sales@tldraw.com.\n\n## Definitions\n\n\"Production Environment\" means any production deployment of the Software that operates on servers, cloud platforms, web applications, or where the software is used to provide functionality to end users, customers, or the public. Production Environment excludes internal development.\n\n\"Development Environment\" means any internal hosting or deployment of the Software for development, testing, or staging purposes, operated by your organization and not accessible to end users, customers, or the public.\n\n\"License Key\" means the programmatically generated key that controls Software functionality and usage restrictions.\n\n## Permissions\n\nSubject to the following conditions, you are permitted to:\n\n- Use the Software in Development Environments.\n- Modify the Software to suit your needs.\n- Bundle the Software with your own projects.\n- Submit modifications of the Software to tldraw.\n\n## Conditions\n\nIn exchange for these permissions, you agree:\n\n- Not to use the Software in Production Environments.\n- Not to disable, change, or interfere with the Software's License Key enforcement.\n- Not to remove any copyright or other notices from the Software.\n- Not to make the Software available under a license that supersedes or negates the effect of this License.\n- Not to distribute the Software or modifications of the Software as a standalone product, but only as part of another application.\n- To include a verbatim copy of this License in any distribution of the Software.\n- To comply with tldraw's trademark policy.\n\n## Trial license\n\nIn the case that tldraw makes the Software available to you on a trial basis, you are permitted to use the Software in Production Environments for the specified period beginning from the date of the trial’s License Key issuance. Business units are limited to one trial period unless otherwise approved by tldraw in writing.\n\n## Commercial license\n\nIn the case that tldraw makes the Software available to you under the terms of a separate commercial agreement, you are permitted to use the Software in Production Environments for the specified period beginning from the date of the agreement’s License Key issuance.\n\n## Termination\n\nYour license to use the Software will terminate automatically if you breach any terms of this License or initiate a copyright, trade secret, or patent claim against tldraw, any of its affiliates, or any user of the Software (including as modified by you).\n\n## Technical enforcement\n\nThe Software includes technical measures to verify License Key validity, detect deployment environments, enforce usage restrictions based on license type, and ensure proper watermark display. The Software may collect and transmit usage data to tldraw for license compliance purposes.\n\n## Ownership of intellectual property\n\ntldraw retains all right, title, and interest in the Software, including all intellectual property rights therein. This Agreement grants you only the specific, limited rights expressly set forth herein, and tldraw reserves all rights not expressly granted.\n\n## Disclaimer of warranties\n\nThe Software is provided \"AS IS,\" without any warranties. This includes any implied warranties of merchantability, fitness for a particular purpose, or non-infringement. You must pass this disclaimer on whenever you distribute the Software or derivative works.\n\n## Limitation of liability\n\ntldraw is not liable for any damages related to the Software or this License, including direct, indirect, special, or incidental damages, to the fullest extent permitted by law. You must pass this limitation of liability on whenever you distribute the Software or derivative works.\n\n## Governing law\n\nThis License is governed by the laws of Delaware, and the parties consent to exclusive jurisdiction in Delaware courts. The parties waive all defenses of lack of personal jurisdiction and forum non-conveniens.\n\n## Entire agreement / assignment\n\nThis License is the entire agreement between the parties, and supersedes any and all prior agreements, understandings or communications, written or oral, between the parties relating to the subject matter hereof. This License may be assigned by tldraw without your prior consent.\n"
+        }
+      ],
+      "source_notice_attempts": [
+        {
+          "url": "https://raw.githubusercontent.com/tldraw/tldraw/32f526615477f3554b62ead28d26d0fd374fb346/LICENSE",
+          "result": "HTTPError"
+        }
+      ],
+      "matches_host_lock_integrity": true
+    },
+    {
+      "package": "@tldraw/editor",
+      "version": "5.2.5",
+      "metadata_url": "https://registry.npmjs.org/@tldraw%2feditor/5.2.5",
+      "metadata_sha256": "6e7b548ae002a16b8ce2f2e7316e48d745a4d5103a7efaf8eb50381e0bf9383f",
+      "tarball_url": "https://registry.npmjs.org/@tldraw/editor/-/editor-5.2.5.tgz",
+      "tarball_sha256": "cf5db26cd5a0820cc0418237c350d5d836cfe639947ebbcf995d121b4230279d",
+      "registry_integrity": "sha512-/2aIuOLik7+tIzdmnjZ5XuxPRfSzZnNXVbxqCiFIVgbwe1W4jwm2lr2K4EpGduzdnbTNNvh6nPDJGg/jamAvnA==",
+      "registry_integrity_matched": true,
+      "license_declared": "SEE LICENSE IN LICENSE.md",
+      "repository": {
+        "url": "https://github.com/tldraw/tldraw",
+        "type": "git"
+      },
+      "git_head": "32f526615477f3554b62ead28d26d0fd374fb346",
+      "notices": [
+        {
+          "path": "package/LICENSE.md",
+          "bytes": 104,
+          "sha256": "4575c72988945bb8fe9a205a096866cb1ccda2908b0fdee96a967c08e3bfd3dd",
+          "text": "This code is licensed under the [tldraw license](https://github.com/tldraw/tldraw/blob/main/LICENSE.md)\n"
+        }
+      ],
+      "source_notices": [
+        {
+          "url": "https://raw.githubusercontent.com/tldraw/tldraw/32f526615477f3554b62ead28d26d0fd374fb346/LICENSE.md",
+          "bytes": 4609,
+          "sha256": "9578fcddc20e404b6a29f44b6fea81d8b331698c0e7e9be34132d6f4394fa533",
+          "text": "# tldraw license\n\nThis License from tldraw, Inc. (“tldraw”) governs your use of the accompanying Software. By using the Software, you accept the terms of this License. The tldraw software is copyrighted by tldraw Inc.\n\nAlternative licenses are available from tldraw for commercial and non-commercial use. To get an alternative license or to learn more, visit https://tldraw.dev or contact sales@tldraw.com.\n\n## Definitions\n\n\"Production Environment\" means any production deployment of the Software that operates on servers, cloud platforms, web applications, or where the software is used to provide functionality to end users, customers, or the public. Production Environment excludes internal development.\n\n\"Development Environment\" means any internal hosting or deployment of the Software for development, testing, or staging purposes, operated by your organization and not accessible to end users, customers, or the public.\n\n\"License Key\" means the programmatically generated key that controls Software functionality and usage restrictions.\n\n## Permissions\n\nSubject to the following conditions, you are permitted to:\n\n- Use the Software in Development Environments.\n- Modify the Software to suit your needs.\n- Bundle the Software with your own projects.\n- Submit modifications of the Software to tldraw.\n\n## Conditions\n\nIn exchange for these permissions, you agree:\n\n- Not to use the Software in Production Environments.\n- Not to disable, change, or interfere with the Software's License Key enforcement.\n- Not to remove any copyright or other notices from the Software.\n- Not to make the Software available under a license that supersedes or negates the effect of this License.\n- Not to distribute the Software or modifications of the Software as a standalone product, but only as part of another application.\n- To include a verbatim copy of this License in any distribution of the Software.\n- To comply with tldraw's trademark policy.\n\n## Trial license\n\nIn the case that tldraw makes the Software available to you on a trial basis, you are permitted to use the Software in Production Environments for the specified period beginning from the date of the trial’s License Key issuance. Business units are limited to one trial period unless otherwise approved by tldraw in writing.\n\n## Commercial license\n\nIn the case that tldraw makes the Software available to you under the terms of a separate commercial agreement, you are permitted to use the Software in Production Environments for the specified period beginning from the date of the agreement’s License Key issuance.\n\n## Termination\n\nYour license to use the Software will terminate automatically if you breach any terms of this License or initiate a copyright, trade secret, or patent claim against tldraw, any of its affiliates, or any user of the Software (including as modified by you).\n\n## Technical enforcement\n\nThe Software includes technical measures to verify License Key validity, detect deployment environments, enforce usage restrictions based on license type, and ensure proper watermark display. The Software may collect and transmit usage data to tldraw for license compliance purposes.\n\n## Ownership of intellectual property\n\ntldraw retains all right, title, and interest in the Software, including all intellectual property rights therein. This Agreement grants you only the specific, limited rights expressly set forth herein, and tldraw reserves all rights not expressly granted.\n\n## Disclaimer of warranties\n\nThe Software is provided \"AS IS,\" without any warranties. This includes any implied warranties of merchantability, fitness for a particular purpose, or non-infringement. You must pass this disclaimer on whenever you distribute the Software or derivative works.\n\n## Limitation of liability\n\ntldraw is not liable for any damages related to the Software or this License, including direct, indirect, special, or incidental damages, to the fullest extent permitted by law. You must pass this limitation of liability on whenever you distribute the Software or derivative works.\n\n## Governing law\n\nThis License is governed by the laws of Delaware, and the parties consent to exclusive jurisdiction in Delaware courts. The parties waive all defenses of lack of personal jurisdiction and forum non-conveniens.\n\n## Entire agreement / assignment\n\nThis License is the entire agreement between the parties, and supersedes any and all prior agreements, understandings or communications, written or oral, between the parties relating to the subject matter hereof. This License may be assigned by tldraw without your prior consent.\n"
+        }
+      ],
+      "source_notice_attempts": [
+        {
+          "url": "https://raw.githubusercontent.com/tldraw/tldraw/32f526615477f3554b62ead28d26d0fd374fb346/LICENSE",
+          "result": "HTTPError"
+        }
+      ],
+      "matches_host_lock_integrity": true
+    },
+    {
+      "package": "@tldraw/driver",
+      "version": "5.2.5",
+      "metadata_url": "https://registry.npmjs.org/@tldraw%2fdriver/5.2.5",
+      "metadata_sha256": "e52fd903bc7c615209f8e382268c9e9ef376a9ba0f90a3bf37641ea53172426c",
+      "tarball_url": "https://registry.npmjs.org/@tldraw/driver/-/driver-5.2.5.tgz",
+      "tarball_sha256": "5953c8d91cf3548600a691e6e98165392f53d16776a983c01c57d0b63023c680",
+      "registry_integrity": "sha512-smu4NnqTdIM59/hHTvuXxqJWQ5aLpFUR59ibS//o30P9pgMAoN4v/7NhYx9g+V7RAeOzIpDqREouz3hZdoEt9Q==",
+      "registry_integrity_matched": true,
+      "license_declared": "SEE LICENSE IN LICENSE.md",
+      "repository": {
+        "url": "https://github.com/tldraw/tldraw",
+        "type": "git"
+      },
+      "git_head": "32f526615477f3554b62ead28d26d0fd374fb346",
+      "notices": [],
+      "source_notices": [
+        {
+          "url": "https://raw.githubusercontent.com/tldraw/tldraw/32f526615477f3554b62ead28d26d0fd374fb346/LICENSE.md",
+          "bytes": 4609,
+          "sha256": "9578fcddc20e404b6a29f44b6fea81d8b331698c0e7e9be34132d6f4394fa533",
+          "text": "# tldraw license\n\nThis License from tldraw, Inc. (“tldraw”) governs your use of the accompanying Software. By using the Software, you accept the terms of this License. The tldraw software is copyrighted by tldraw Inc.\n\nAlternative licenses are available from tldraw for commercial and non-commercial use. To get an alternative license or to learn more, visit https://tldraw.dev or contact sales@tldraw.com.\n\n## Definitions\n\n\"Production Environment\" means any production deployment of the Software that operates on servers, cloud platforms, web applications, or where the software is used to provide functionality to end users, customers, or the public. Production Environment excludes internal development.\n\n\"Development Environment\" means any internal hosting or deployment of the Software for development, testing, or staging purposes, operated by your organization and not accessible to end users, customers, or the public.\n\n\"License Key\" means the programmatically generated key that controls Software functionality and usage restrictions.\n\n## Permissions\n\nSubject to the following conditions, you are permitted to:\n\n- Use the Software in Development Environments.\n- Modify the Software to suit your needs.\n- Bundle the Software with your own projects.\n- Submit modifications of the Software to tldraw.\n\n## Conditions\n\nIn exchange for these permissions, you agree:\n\n- Not to use the Software in Production Environments.\n- Not to disable, change, or interfere with the Software's License Key enforcement.\n- Not to remove any copyright or other notices from the Software.\n- Not to make the Software available under a license that supersedes or negates the effect of this License.\n- Not to distribute the Software or modifications of the Software as a standalone product, but only as part of another application.\n- To include a verbatim copy of this License in any distribution of the Software.\n- To comply with tldraw's trademark policy.\n\n## Trial license\n\nIn the case that tldraw makes the Software available to you on a trial basis, you are permitted to use the Software in Production Environments for the specified period beginning from the date of the trial’s License Key issuance. Business units are limited to one trial period unless otherwise approved by tldraw in writing.\n\n## Commercial license\n\nIn the case that tldraw makes the Software available to you under the terms of a separate commercial agreement, you are permitted to use the Software in Production Environments for the specified period beginning from the date of the agreement’s License Key issuance.\n\n## Termination\n\nYour license to use the Software will terminate automatically if you breach any terms of this License or initiate a copyright, trade secret, or patent claim against tldraw, any of its affiliates, or any user of the Software (including as modified by you).\n\n## Technical enforcement\n\nThe Software includes technical measures to verify License Key validity, detect deployment environments, enforce usage restrictions based on license type, and ensure proper watermark display. The Software may collect and transmit usage data to tldraw for license compliance purposes.\n\n## Ownership of intellectual property\n\ntldraw retains all right, title, and interest in the Software, including all intellectual property rights therein. This Agreement grants you only the specific, limited rights expressly set forth herein, and tldraw reserves all rights not expressly granted.\n\n## Disclaimer of warranties\n\nThe Software is provided \"AS IS,\" without any warranties. This includes any implied warranties of merchantability, fitness for a particular purpose, or non-infringement. You must pass this disclaimer on whenever you distribute the Software or derivative works.\n\n## Limitation of liability\n\ntldraw is not liable for any damages related to the Software or this License, including direct, indirect, special, or incidental damages, to the fullest extent permitted by law. You must pass this limitation of liability on whenever you distribute the Software or derivative works.\n\n## Governing law\n\nThis License is governed by the laws of Delaware, and the parties consent to exclusive jurisdiction in Delaware courts. The parties waive all defenses of lack of personal jurisdiction and forum non-conveniens.\n\n## Entire agreement / assignment\n\nThis License is the entire agreement between the parties, and supersedes any and all prior agreements, understandings or communications, written or oral, between the parties relating to the subject matter hereof. This License may be assigned by tldraw without your prior consent.\n"
+        }
+      ],
+      "source_notice_attempts": [
+        {
+          "url": "https://raw.githubusercontent.com/tldraw/tldraw/32f526615477f3554b62ead28d26d0fd374fb346/LICENSE",
+          "result": "HTTPError"
+        }
+      ],
+      "matches_host_lock_integrity": true
+    }
+  ],
+  "evidence_limits": [
+    "Publisher gitHead connects source license to the published version; archive code was not rebuilt or proved identical to that commit.",
+    "Source MIT or vendor license evidence is not approval for all bundled materials or commercial use.",
+    "No mutable main license was used."
+  ]
+}

@@ -103,3 +103,11 @@ All tools receive the execution context implicitly; `workspace_id` is taken from
 | intel_apply_schedule | save schedule | write; version + durable grant | `{preview_id: string, approval_id: string, expected_revision?: int, idempotency_key: string}` |
 
 Long-running tools return 202 + `operation_id`; P2 shows a task card. Auto-continuation requires a `waiting_external` run state (job_id, tool-call id, reservation, Pi checkpoint) resumed exactly once via Inbox (acceptance A21).
+
+## 预算预留回执丢失的只读恢复
+
+`POST /api/internal/flow/budget/lookup` 仅用于找回已经存在的 `schedule_window` 父预算回执，不是 reserve 的另一种入口。请求体为 `{workspace_id,key,ref_id}`；内部短时令牌须为 issuer=`loom-engine`、actor=`service_principal:loom-engine`，并带独立 `flow.budget.lookup` scope。tenant/workspace 来自签名上下文，body workspace 必须一致；若 token 带 job_id，也须等于 ref_id。
+
+服务端只读取已有账本，以 tenant、原幂等键、purpose、ref_id 和 workspace 审计绑定核验，**不重新校验已撤销用户的支出授权，也不新增账户、预留、额度或账务记录**。找到则返回 `{code:0,data:{reservation_id,status}}`；确实不存在返回 `{code:0,data:null}`；身份或 workspace 不符返回 403，旧记录没有可信 workspace 绑定返回 409，须保留待对账状态，不能当作不存在后重新预留。找到回执后仍使用原 close/settle/release 路径处理。
+
+原 `/budget/reserve` 继续要求当前 grant 的 `intel.collect` 支出授权。新预留与 `note=schedule-workspace:<workspace_id>` 同事务提交，回执响应丢失也不会丢失归属；同 key 的 purpose/ref/amount/workspace 变化拒绝，不将旧无绑定预留自动归给新的 workspace。该只读 scope 不授予采集、模型调用或恢复运行权限。

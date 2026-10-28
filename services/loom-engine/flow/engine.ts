@@ -230,6 +230,8 @@ export class Engine {
    */
   budget?: {
     reserve: (sc: { tenant_id: string; workspace_id: string; grant_actor: string }, key: string, amountMicro: number, refId: string) => Promise<{ reservation_id: string }>;
+    /** Read-only recovery of an already accepted reservation; never allocates or reauthorizes spend. */
+    lookup?: (sc: { tenant_id: string; workspace_id: string }, key: string, refId: string) => Promise<{ reservation_id: string } | null>;
     close: (sc: { tenant_id: string; workspace_id: string }, reservationId: string, outcome: "settle" | "release", actualMicro: number) => Promise<void>;
   };
   /** PRD §9.3 default per-tenant cap on concurrently leased/running collection jobs (flow_tenant_limits overrides). */
@@ -951,7 +953,11 @@ export class Engine {
     if (!src || src.status !== "active") return this.fail(run, "source revoked");
     if (isVideoKind(src.kind)) {
       try { return await this.video.executeDiscovery(run, src); }
-      catch (e: any) { if (e.reason === "STALE_FENCE") throw e; return this.fail(run, e.reason ?? String(e?.message ?? e)); }
+      catch (e: any) {
+        if (e.reason === "STALE_FENCE") throw e;
+        if (isUnknownOutcome(e)) return this.parkUnknownOutcome(run, e);
+        return this.fail(run, e.reason ?? String(e?.message ?? e), e.retry_after);
+      }
     }
     const cursor = (await this.db.query(`SELECT last_external_id, feed_etag, feed_last_modified, feed_validator_identity FROM flow_source_cursors WHERE source_id=$1 AND tenant_id=$2`, [src.id, run.tenant_id])).rows[0];
     const feedValidators = cursor?.feed_validator_identity ? { etag: cursor.feed_etag ?? "", last_modified: cursor.feed_last_modified ?? "", identity: cursor.feed_validator_identity } : null;
@@ -1074,19 +1080,25 @@ export class Engine {
       return { status: final, items_new: created, items_revised: revised };
     }).catch(async (err) => {
       if (err instanceof CancelRequested) return this.confirmCancel(run);
-      if (isUnknownOutcome(err)) {
-        // We cannot tell whether COMMIT landed: park the job; reconcile() decides from the outbox.
-        await this.db.query(`UPDATE flow_collection_runs SET status='reconciliation_required', error=$3 WHERE id=$1 AND fencing_token=$2 AND status IN ('leased','running')`,
-          [run.id, run.fencing_token, String(err?.message ?? err).slice(0, 500)]);
-        return { status: "reconciliation_required" };
-      }
+      if (isUnknownOutcome(err)) return this.parkUnknownOutcome(run, err);
       throw err;
     });
   }
 
-  private async fail(run: any, error: string) {
+  private async parkUnknownOutcome(run: any, error: unknown) {
+    // A committed video page may already have advanced its durable cursor. The
+    // shared reconciler must read that state before another provider page call.
+    const result = await this.db.query(`UPDATE flow_collection_runs SET status='reconciliation_required', error=$3 WHERE id=$1 AND fencing_token=$2 AND status IN ('leased','running') RETURNING status`,
+      [run.id, run.fencing_token, String((error as any)?.message ?? error).slice(0, 500)]);
+    if (result.rows[0]) return { status: "reconciliation_required" };
+    const current = (await this.db.query(`SELECT status FROM flow_collection_runs WHERE id=$1 AND fencing_token=$2`, [run.id, run.fencing_token])).rows[0];
+    return { status: current?.status ?? "stale" };
+  }
+
+  private async fail(run: any, error: string, retryAfter?: number) {
     return this.db.tx(async (q) => {
       const cls = classifyFailure(error);
+      const providerDelay = typeof retryAfter === "number" && Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(86400, Math.ceil(retryAfter)) * 1000 : 0;
       const cur = (await q.query(`SELECT status, attempts, max_attempts FROM flow_collection_runs WHERE id=$1 AND fencing_token=$2 FOR UPDATE`, [run.id, run.fencing_token])).rows[0];
       if (cur?.status === "cancel_requested") {
         await q.query(`UPDATE flow_collection_runs SET status='cancelled', finished_at=now(), lease_owner=NULL WHERE id=$1`, [run.id]);
@@ -1098,7 +1110,7 @@ export class Engine {
       if (retryable) {
         // Retryable: retry_wait until retry_at, then the job is claimable again (→ leased).
         await q.query(`UPDATE flow_collection_runs SET status='retry_wait', error=$2, retry_at=$3, lease_owner=NULL WHERE id=$1`,
-          [run.id, error.slice(0, 500), new Date(this.now().getTime() + retryDelayMs(Number(cur.attempts))).toISOString()]);
+          [run.id, error.slice(0, 500), new Date(this.now().getTime() + Math.max(retryDelayMs(Number(cur.attempts)), providerDelay)).toISOString()]);
       } else {
         await q.query(`UPDATE flow_collection_runs SET status='failed', error=$2, finished_at=now(), lease_owner=NULL WHERE id=$1`, [run.id, error.slice(0, 500)]);
       }
@@ -1108,9 +1120,9 @@ export class Engine {
         await q.query(`UPDATE flow_sources SET status='paused', paused_reason='credential_invalid' WHERE id=$1 AND status='active'`, [run.source_id]);
       } else if (cls === "rate_limited" || cls === "transient") {
         // Exponential backoff: 1m·2^(n-1), capped at 6h; after 8 consecutive failures, pause.
-        await q.query(`UPDATE flow_sources SET backoff_until = now() + LEAST(interval '6 hours', interval '1 minute' * power(2, LEAST(consecutive_failures, 12) - 1)),
+        await q.query(`UPDATE flow_sources SET backoff_until = GREATEST(now() + LEAST(interval '6 hours', interval '1 minute' * power(2, LEAST(consecutive_failures, 12) - 1)), $2::timestamptz),
             status = CASE WHEN consecutive_failures >= 8 THEN 'paused' ELSE status END,
-            paused_reason = CASE WHEN consecutive_failures >= 8 THEN 'too_many_failures' ELSE paused_reason END WHERE id=$1`, [run.source_id]);
+            paused_reason = CASE WHEN consecutive_failures >= 8 THEN 'too_many_failures' ELSE paused_reason END WHERE id=$1`, [run.source_id, new Date(this.now().getTime() + providerDelay).toISOString()]);
       }
       if (retryable) {
         await this.emit(q, run, run.operation_id, run.id, "operation.retrying", { error: error.slice(0, 500), class: cls, attempt: Number(cur.attempts) });

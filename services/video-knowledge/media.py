@@ -470,10 +470,12 @@ class Processor:
                         observations = self.gateway.observe(body, frames, checkpoint, save, active)
                         valid = {f["frame_id"] for f in frames}
                         for observation in observations:
-                            if observation.get("kind") not in ("observation", "inference") or not observation.get("frame_ids") or set(observation["frame_ids"]) - valid or not isinstance(observation.get("text"), str):
+                            frame_ids = observation.get("frame_ids")
+                            if observation.get("kind") not in ("observation", "inference") or not isinstance(frame_ids, list) or not frame_ids or any(not isinstance(ident, str) for ident in frame_ids) or len(set(frame_ids)) != len(frame_ids) or set(frame_ids) - valid or not isinstance(observation.get("text"), str):
                                 raise Failure("INVALID_VISUAL_OBSERVATION", 502)
                             observation["review_status"] = "unreviewed"
-                            observed_frames = [f for f in frames if f["frame_id"] in observation["frame_ids"]]
+                            by_id = {f["frame_id"]: f for f in frames}
+                            observed_frames = [by_id[ident] for ident in frame_ids]
                             visual_records.append({"type": "model_" + observation["kind"], "derived": True, "text": observation["text"], "frame_ids": observation["frame_ids"], "frame_refs": [f["object_key"] for f in observed_frames], "start_ms": min(f["timestamp_ms"] for f in observed_frames), "end_ms": max(f["timestamp_ms"] for f in observed_frames), "media_sha256": manifest["media_sha256"], "review_status": "unreviewed", "provenance": {"model_tasks": usage.get("model_tasks", [])}})
                         completed.append("vlm")
                 except Failure as exc:

@@ -62,6 +62,16 @@ try {
     WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY knowledge_id,created_at,id LIMIT 100`);
   report.releases = await query(`SELECT id,knowledge_id,version,content_hash,revoked_at IS NOT NULL AS revoked FROM flow_knowledge_releases
     WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY id LIMIT 100`);
+  report.skill_candidates = await query(`SELECT id,candidate_hash,native_skill_hash,state,
+    jsonb_array_length(receipts) AS receipt_count FROM flow_video_skill_candidates
+    WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY id LIMIT 100`);
+  // Identity and scorer metadata only: never retain case input, model output or
+  // frozen method/evidence content in uploaded observation artifacts.
+  report.skill_evaluation_tasks = await query(`SELECT candidate_id,case_id,variant,task_id,state,generation,
+    model_request->>'key' AS request_key,result->>'run_id' AS run_id,result->>'usage_ref' AS usage_ref,
+    result->>'actual_model_config_hash' AS model_config_hash,result->>'scorer' AS scorer,
+    result->>'passed' AS passed FROM flow_video_skill_eval_tasks
+    WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY candidate_id,case_id,variant LIMIT 100`);
   report.objects = await query(`SELECT video_job_id,object_id,object_key,sha256,bytes,content_type,state,replica_object_key
     FROM flow_video_objects WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY object_key LIMIT 100`);
   report.ready_events = await query(`SELECT job_id,type,count(*)::int AS count FROM flow_outbox
@@ -87,6 +97,13 @@ try {
   check('explicit_review_and_publication_persisted', report.releases.length >= 1 && report.releases.every(release =>
     report.knowledge.some(row => row.id === release.knowledge_id && row.content_hash === release.content_hash)
     && ['submit', 'approve'].every(decision => report.reviews.some(row => row.knowledge_id === release.knowledge_id && row.decision === decision))));
+  check('skill_candidate_has_sixty_real_completed_comparisons_without_deployment', report.skill_candidates.length === 1
+    && report.skill_candidates[0].receipt_count === 0 && report.skill_evaluation_tasks.length === 60
+    && new Set(report.skill_evaluation_tasks.map(task => task.task_id)).size === 60
+    && report.skill_evaluation_tasks.every(task => task.candidate_id === report.skill_candidates[0].id
+      && task.state === 'completed' && task.generation === 0 && task.run_id === task.task_id
+      && task.usage_ref === `model_task:${task.task_id}` && task.scorer === 'exact_expected_output_v1'
+      && task.passed === 'true' && /^[a-f0-9]{64}$/.test(task.model_config_hash || '')));
 
   const accepted = report.objects.filter(object => object.state === 'accepted');
   phase = 'minio_object_verification';
@@ -117,6 +134,16 @@ try {
   report.model_boundary = await receipt.json();
   check('actual_go_gateway_reached_synthetic_model', report.model_boundary.synthetic_model_boundary === true
     && report.model_boundary.real_model_quality_verified === false && report.model_boundary.unique_model_calls >= 1);
+  const nativeCalls = report.model_boundary.calls.filter(call => call.request_kind === 'native_canvas');
+  check('actual_native_canvas_model_call_once', nativeCalls.length === 1 && nativeCalls[0].requests === 1
+    && /^[a-f0-9]{64}$/.test(nativeCalls[0].skill?.hash || '') && nativeCalls[0].knowledge_snapshot?.run_id);
+  const evaluationCalls = report.model_boundary.calls.filter(call => call.request_kind === 'skill_evaluation');
+  check('all_skill_comparisons_reached_go_managed_gateway_once', evaluationCalls.length === 60
+    && evaluationCalls.every(call => call.requests === 1)
+    && report.skill_evaluation_tasks.every(task => evaluationCalls.some(call =>
+      call.call_id === `video-model:${hash(JSON.stringify([workspace, task.candidate_id, task.request_key]))}`
+      && call.case_id === task.case_id && call.variant === task.variant
+      && call.candidate_hash === report.skill_candidates[0]?.candidate_hash)));
   // Excludes lifecycle state and revocation, allowing before/after withdrawal comparison.
   report.stable_identity_sha256 = hash(JSON.stringify({
     jobs: report.jobs.map(({ id, document_id, revision, input_manifest_sha256, processing_manifest_sha256 }) => ({ id, document_id, revision, input_manifest_sha256, processing_manifest_sha256 })),

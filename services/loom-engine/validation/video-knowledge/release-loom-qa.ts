@@ -1,5 +1,6 @@
 // Independent release boundary fixture. Real domain lifecycle and durable DB;
-// seeded evidence/evaluator/reviewer are synthetic, not business acceptance.
+// Seeded evidence, external model and reviewer are synthetic, not business
+// acceptance. The evaluator, gateway, billing and release domain are real.
 import { PGlite } from "@electric-sql/pglite";
 import { createServer } from "node:http";
 import { readFile, writeFile } from "node:fs/promises";
@@ -10,7 +11,10 @@ import { handler } from "../../flow/server.ts";
 import { sha } from "../../flow/video-contract.ts";
 import { VideoKnowledgeService, applyVideoRetention } from "../../flow/video-knowledge.ts";
 import { VideoKnowledgeSkills } from "../../flow/video-knowledge-skills.ts";
-import { knowledgeHash, EVAL_KINDS } from "../../flow/video-knowledge-contract.ts";
+import { EVAL_KINDS } from "../../flow/video-knowledge-contract.ts";
+import { VideoKnowledgeEvaluator } from "../../flow/video-knowledge-evaluator.ts";
+import { closeKnowledgeBudget } from "../../flow/video-knowledge-budget.ts";
+import { sign } from "../../flow/auth.ts";
 import { configureVideoKnowledge, platformKnowledgeRuntime } from "../../flow/video-knowledge-runtime.ts";
 import { initializeVideoDeletionJournal, configureVideoRetentionJournal, replayVideoRetentionJournal } from "../../flow/video-journal.ts";
 
@@ -31,7 +35,20 @@ configureVideoKnowledge(engine, runtime);
 const scope = { ...JSON.parse(process.env.VIDEO_QA_SCOPE!), actor: { type: "user", id: "u_alice" }, policy_version: "qa_v1",
   scopes: ["intel.knowledge.read", "intel.knowledge.research", "intel.knowledge.write", "intel.knowledge.review", "intel.knowledge.publish", "intel.skills.release", "intel.skills.evaluate", "intel.skills.deploy", "intel.skills.install"] };
 const k = new VideoKnowledgeService(engine), skills = new VideoKnowledgeSkills(k);
+const server = createServer(handler(engine, { signingKey, audience: "loom-engine", issuer: "flow-platform" }));
+await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+const url = `http://127.0.0.1:${(server.address() as any).port}`;
+const stop = async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await db.close(); };
+async function api(path: string, input: any, key: string, expected = 200) {
+  const token = sign(signingKey, { ...scope, iss: "flow-platform", aud: "loom-engine" });
+  const response = await fetch(url + path, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "x-idempotency-key": key }, body: JSON.stringify(input) });
+  const body: any = await response.json();
+  if (response.status !== expected) throw Error(`${path}: ${response.status} ${JSON.stringify(body)}`);
+  return body.data;
+}
 if (mode === "export") {
+  process.stdout.write(url + "\n");
+  await new Promise<void>(resolve => process.stdin.once("data", () => { process.stdin.pause(); resolve(); }));
   const native = await runtime.resolveBase!(scope, { id: "video-knowledge-core", version: "1.0.0" });
   const method = { id: native.id, version: native.version, hash: native.hash };
   const body = "QA synthetic evidence 😀; not industry advice", title = "QA release fixture";
@@ -49,30 +66,44 @@ if (mode === "export") {
   knowledge = await k.review(scope, knowledge.id, "submit", { ...preKnowledge(), decision: "submit" });
   knowledge = await k.review(scope, knowledge.id, "approve", { ...preKnowledge(), decision: "approve", checks: { evidence_support: true, critical_fields: true } });
   knowledge = await k.publish(scope, knowledge.id, "publish", preKnowledge());
+  const summaries = [];
+  for (const version of ["1.0.0", "2.0.0"]) {
   const input = { base: { ...method, required_tools: native.required_tools },
-    pack: { id: "qa-loom-release", version: "1.0.0", name: "Synthetic domain export", required_tools: ["intel_search_knowledge"], mcp_requirements: [],
-      skills: [{ id: "qa-loom-method", version: "1.0.0", name: "Synthetic domain method", method: "Use published evidence only", steps: ["Keep provenance"], references: [], output_schema: { type: "object", required: ["claims"], properties: { claims: { type: "array" } } } }] },
+    pack: { id: "qa-loom-release", version, name: "Synthetic domain export", required_tools: ["intel_search_knowledge"], mcp_requirements: [],
+      skills: [{ id: "qa-loom-method", version, name: "Synthetic domain method", method: `Use published evidence only; test version ${version}`, steps: ["Keep provenance"], references: [], output_schema: { type: "object", required: ["claims"], properties: { claims: { type: "array" } } } }] },
     knowledge_releases: [{ knowledge_id: knowledge.id, version: knowledge.version, release_id: knowledge.release_id, content_hash: knowledge.content_hash }], evidence,
     rule_evidence: [{ rule: "method", evidence_ids: [evidence[0].evidence_id] }, { rule: "step:0", evidence_ids: [evidence[0].evidence_id] }],
-    eval_spec: { dataset_version: "qa-synthetic-not-gold", model_config: { model: "fixture-no-model" }, cases: EVAL_KINDS.map((kind, i) => ({ id: `case-${i}`, kind, input: "QA", expected: "fixture" })) } };
-  let candidate = await skills.create(scope, "qa-native-candidate", input);
+    eval_spec: { dataset_version: "qa-synthetic-not-gold", model_config: { model: "fixture-release-model", budget_micro: 6000000, max_tokens: 200 }, cases: Array.from({ length: 20 }, (_, i) => ({ id: `case-${i}`, kind: EVAL_KINDS[i % EVAL_KINDS.length], input: "QA synthetic case, not industry gold", expected: "fixture" })) } };
+  let candidate = await api("/v1/video/skill-candidates", input, `qa-native-candidate-${version}`, 201);
   const pre = { expected_hash: candidate.candidate_hash };
-  candidate = await skills.requestEvaluation(scope, candidate.id, "request-fixture-eval", pre);
-  const report = { candidate_hash: candidate.candidate_hash, eval_spec_hash: knowledgeHash(input.eval_spec), model_config_hash: knowledgeHash(input.eval_spec.model_config), actual_model_config_hash: "b".repeat(64), dataset_version: input.eval_spec.dataset_version, base_hash: method.hash,
-    cases: input.eval_spec.cases.map(c => ({ id: c.id, input_hash: knowledgeHash({ input: c.input, expected: c.expected }), critical_failure: false,
-      ...Object.fromEntries(["base", "without_skill", "candidate"].map(v => [v, { score: 1, passed: true, run_id: `qa-fixture-${v}`, usage_ref: "qa-fixture-not-billing", actual_model_config_hash: "b".repeat(64) }])) })) };
-  candidate = await skills.evaluate({ ...scope, actor: { type: "service_principal", id: "video-model-evaluator" } }, candidate.id, "synthetic-eval", { ...pre, report });
-  candidate = await skills.review(scope, candidate.id, "synthetic-review", { ...pre, decision: "approve", reason: "Synthetic fixture only, not human industry acceptance" });
-  candidate = await skills.export(scope, candidate.id, "actual-domain-export", pre);
-  await writeFile(join(directory, "candidate.json"), JSON.stringify(candidate));
+  await api(`/v1/video/skill-candidates/${candidate.id}/review`, { ...pre, decision: "approve", reason: "Premature approval must fail" }, "premature-review", 409);
+  candidate = await api(`/v1/video/skill-candidates/${candidate.id}/evaluation-request`, pre, "request-real-evaluator");
+  const evaluator = new VideoKnowledgeEvaluator(engine), deadline = Date.now() + 120000;
+  while (candidate.state === "evaluation_running" && Date.now() < deadline) {
+    const worked = await evaluator.workOnce("qa-real-evaluator");
+    candidate = await skills.row(scope, candidate.id);
+    if (candidate.eval_result?.blocked_reason) throw Error(`actual evaluation blocked: ${JSON.stringify(candidate.eval_result)}`);
+    if (!worked) await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  if (candidate.state !== "passed" || candidate.eval_result.scorer !== "exact_expected_output_v1") throw Error(`actual evaluator failed: ${JSON.stringify(candidate.eval_result)}`);
+  const tasks = (await db.query(`SELECT case_id,variant,task_id,result FROM flow_video_skill_eval_tasks WHERE candidate_id=$1 ORDER BY case_id,variant`, [candidate.id])).rows;
+  if (tasks.length !== 60 || tasks.some(t => t.result.usage_ref !== `model_task:${t.task_id}`)) throw Error("real model-task receipts incomplete");
+  await closeKnowledgeBudget(engine, "video_skill_evaluate");
+  candidate = await api(`/v1/video/skill-candidates/${candidate.id}/review`, { ...pre, decision: "approve", reason: "Synthetic reviewer only; actual evaluator over synthetic model responses, not industry acceptance" }, "synthetic-review");
+  if (candidate.state !== "approved_for_release" || candidate.receipts.length) throw Error("approval confused with deployment");
+  candidate = await api(`/v1/video/skill-candidates/${candidate.id}/export`, pre, "actual-domain-export");
+  if (candidate.release_package.deployment_status !== "not_deployed") throw Error("export confused with deployment");
+  await writeFile(join(directory, `candidate-${version}.json`), JSON.stringify(candidate));
+  summaries.push({ version, candidate_id: candidate.id, native_skill_hash: candidate.native_skill_hash, candidate_hash: candidate.candidate_hash, tasks, budget_close_receipt: candidate.budget_close_receipt });
+  }
   await writeFile(join(directory, "knowledge.json"), JSON.stringify(knowledge));
-  await db.close(); process.stdout.write("EXPORTED_REAL_DOMAIN_FIXTURE\n");
+  await writeFile(join(directory, "evaluation-evidence.json"), JSON.stringify({ fixture_only: true, cases_per_version: 20, versions: summaries }));
+  await stop(); process.stdout.write("EXPORTED_REAL_DOMAIN_FIXTURE\n");
 } else if (mode === "serve") {
-  const candidate = JSON.parse(await readFile(join(directory, "candidate.json"), "utf8"));
-  if ((await skills.get(scope, candidate.id)).state !== "release_package_exported") throw Error("durable export missing");
-  const server = createServer(handler(engine, { signingKey, audience: "loom-engine", issuer: "flow-platform" }));
-  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  process.stdout.write(`http://127.0.0.1:${(server.address() as any).port}\n`);
-  const stop = async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await db.close(); process.exit(0); };
-  process.once("SIGINT", () => { void stop(); }); process.once("SIGTERM", () => { void stop(); });
+  for (const version of ["1.0.0", "2.0.0"]) {
+    const candidate = JSON.parse(await readFile(join(directory, `candidate-${version}.json`), "utf8"));
+    if (!["release_package_exported", "workspace_installed"].includes((await skills.get(scope, candidate.id)).state)) throw Error("durable exported or installed candidate missing");
+  }
+  process.stdout.write(url + "\n");
+  process.once("SIGINT", () => { void stop().then(() => process.exit(0)); }); process.once("SIGTERM", () => { void stop().then(() => process.exit(0)); });
 } else throw Error("export or serve required");

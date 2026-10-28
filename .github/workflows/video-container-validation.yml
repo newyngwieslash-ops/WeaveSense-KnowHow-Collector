@@ -35,21 +35,27 @@ jobs:
         run: |
           python scripts/video-doctor.py --mode build --env-file deploy/flow/backup/video-images.env
           python -m unittest discover -s scripts -p test_video_doctor.py -v
+          python -m unittest discover -s scripts -p test_video_supply_chain.py -v
+          python -m unittest discover -s scripts -p test_video_container_sbom.py -v
       - name: Build isolated Linux amd64 images (never push)
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/video-container-evidence"
+          python scripts/video-build-provenance.py source "$RUNNER_TEMP/video-container-evidence"
+          source_commit="$(git rev-parse HEAD)"
           # This checked-in file contains public, registry-verified digest references only.
           set -a
           . deploy/flow/backup/video-images.env
           set +a
           docker build --platform linux/amd64 --progress plain \
+            --label "org.opencontainers.image.revision=$source_commit" \
             --build-arg NODE_IMAGE="$VIDEO_BACKUP_NODE_IMAGE" \
             --build-arg POSTGRES_IMAGE="$VIDEO_BACKUP_POSTGRES_IMAGE" \
             --build-arg MC_IMAGE="$VIDEO_BACKUP_MC_IMAGE" \
             --target video-backup -f deploy/flow/backup/Dockerfile.video \
             -t knowhow-backup:ci . 2>&1 | tee "$RUNNER_TEMP/video-container-evidence/backup-build.log"
           docker build --platform linux/amd64 --progress plain \
+            --label "org.opencontainers.image.revision=$source_commit" \
             -t knowhow-worker:ci services/video-knowledge 2>&1 | tee "$RUNNER_TEMP/video-container-evidence/worker-build.log"
       - name: Smoke actual image runtimes and collect package evidence
         run: |
@@ -57,16 +63,20 @@ jobs:
           out="$RUNNER_TEMP/video-container-evidence"
           git rev-parse HEAD > "$out/source-commit.txt"
           cp deploy/flow/backup/video-image-lock.json "$out/"
+          cp services/video-knowledge/requirements-lock-provenance.json "$out/worker-lock.json"
           docker image inspect knowhow-backup:ci knowhow-worker:ci > "$out/images.json"
           docker run --rm --network none --entrypoint cat knowhow-backup:ci /usr/local/share/video-backup/build-evidence.txt > "$out/backup-runtime.txt"
           docker run --rm --network none --entrypoint /bin/sh knowhow-backup:ci -c 'node --version && pg_dump --version && pg_restore --version && mc --version && node --experimental-strip-types --input-type=module -e "await import(\"./flow/video-journal.ts\"); await import(\"./flow/engine.ts\")"' > "$out/backup-smoke.txt"
           docker run --rm --network none --entrypoint python knowhow-worker:ci -c 'import core,dtk,media,runtime,synthesis,server; import subprocess; subprocess.run(["ffmpeg","-version"],check=True); print("worker imports and FFmpeg passed")' > "$out/worker-smoke.txt"
           docker run --rm --network none --entrypoint dpkg-query knowhow-backup:ci -W '-f=${Package}\t${Version}\n' > "$out/backup-dpkg.tsv"
           docker run --rm --network none --entrypoint dpkg-query knowhow-worker:ci -W '-f=${Package}\t${Version}\n' > "$out/worker-dpkg.tsv"
-          # Node runtime is copied without npm; use its actual package-lock + installed tree.
-          docker run --rm --network none --entrypoint node knowhow-backup:ci -e 'const fs=require("fs"); const lock=JSON.parse(fs.readFileSync("package-lock.json")); console.log(JSON.stringify(Object.entries(lock.packages).filter(([p])=>p&&fs.existsSync(p+"/package.json")).map(([p,v])=>({path:p,name:JSON.parse(fs.readFileSync(p+"/package.json")).name,version:v.version,integrity:v.integrity}))))' > "$out/backup-npm.json"
-          docker run --rm --network none --entrypoint python knowhow-worker:ci -m pip list --format=json > "$out/worker-pip.json"
+          # Observers only read metadata/notices; never execute dependency modules.
+          docker run --rm -i --network none --entrypoint node knowhow-backup:ci --input-type=module < scripts/video-installed-npm.mjs > "$out/backup-npm.json"
+          docker run --rm -i --network none --entrypoint python knowhow-worker:ci - < scripts/video-installed-python.py > "$out/worker-pip.json"
+          docker run --rm --network none --entrypoint sha256sum knowhow-backup:ci /app/LICENSE > "$out/backup-notice.sha256"
+          docker run --rm --network none --entrypoint sha256sum knowhow-worker:ci /app/NOTICE /app/requirements.lock > "$out/worker-notice.sha256"
           python scripts/video-container-sbom.py "$out"
+          python scripts/video-build-provenance.py seal "$out"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

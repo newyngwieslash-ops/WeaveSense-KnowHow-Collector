@@ -112,12 +112,13 @@ printf '{"backend_recreated":true,"web_not_recreated":true,"proxied_readiness_af
 "${compose[@]}" images --format json > "$out/images.json"
 "${compose[@]}" ps --all --format json | python scripts/fullstack/sanitize.py > "$out/healthy-start.jsonl"
 export FULLSTACK_TENANT_ID="$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.VIDEO_FULLSTACK_STATE)).tenantId)")"
-export FULLSTACK_WORKSPACE_ID="$FLOW_VIDEO_WORKSPACES"
+export FULLSTACK_WORKSPACE_ID="$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.VIDEO_FULLSTACK_STATE)).workspaceId)")"
 observe() {
   "${compose[@]}" exec -T -e FULLSTACK_TENANT_ID -e FULLSTACK_WORKSPACE_ID loom-engine node --input-type=module < scripts/fullstack/observe.mjs
 }
 (cd .github/browser && npx playwright test --config playwright.fullstack.config.mjs) 2>&1 | python scripts/fullstack/sanitize.py
 cp "$VIDEO_FULLSTACK_RESULT" "$out/browser-initial.json"
+node scripts/fullstack/long-input.mjs > "$out/long-input.json"
 observe > "$out/persistence-before-restart.json"
 # Browser process has exited. Restart real services with the same volumes.
 "${compose[@]}" restart platform loom-engine loom-scheduler video-worker
@@ -129,9 +130,17 @@ cp "$VIDEO_FULLSTACK_RESULT" "$out/browser-after-restart.json"
 observe > "$out/persistence-after-restart.json"
 python - "$out" <<'PY'
 import json, pathlib, sys
+from scripts.fullstack.skill_receipts import verify as verify_skill_receipts
 root = pathlib.Path(sys.argv[1])
 before = json.loads((root / 'persistence-before-restart.json').read_text())
 after = json.loads((root / 'persistence-after-restart.json').read_text())
+browser = json.loads((root / 'browser-after-restart.json').read_text())
+skill_receipts = verify_skill_receipts(before, after, browser)
+(root / 'skill-evaluation-verification.json').write_text(json.dumps(skill_receipts) + '\n')
+native = [call for call in after['model_boundary']['calls'] if call.get('request_kind') == 'native_canvas']
+assert len(native) == 1 and native[0]['requests'] == 1, 'Native replay invoked the model more than once'
+assert native[0]['skill'] == browser['native']['skill'], 'Native model boundary differs from the frozen host skill'
+assert native[0]['knowledge_snapshot']['run_id'] == browser['native']['workflow_run_id'], 'Native request is not bound to the actual workflow run'
 assert before['objects'] == after['objects'], 'Persisted object IDs/hashes changed across restart'
 assert [x['id'] for x in before['jobs']] == [x['id'] for x in after['jobs']], 'Job identity changed across restart'
 assert before['stable_identity_sha256'] == after['stable_identity_sha256'], 'Evidence/revision/release identity changed across restart'

@@ -25,7 +25,7 @@ class Host:
             output = {"observations": [{"kind": "observation", "text": "fixture only", "frame_ids": [payload["frames"][0]["frame_id"]]}]}
         else:
             output = {"summary": "derived fixture only", "input_ids": [item["input_id"] for item in payload["input"]["inputs"]]}
-        return {"code": 0, "data": {"task_id": task, "status": "succeeded", "output": output, "usage_ref": "model_task:" + task, "cost_micro": 0, "model_config_hash": "test-route"}}
+        return {"code": 0, "data": {"task_id": task, "status": "succeeded", "output": output, "usage_ref": "model_task:" + task, "cost_micro": 0, "model_config_hash": "f" * 64}}
 
 
 class GatewayTest(unittest.TestCase):
@@ -76,6 +76,23 @@ class GatewayTest(unittest.TestCase):
         with self.assertRaises(Failure):
             batches([{"text": "x" * 40000}])
         self.assertEqual(self.host.posts, [])
+
+    def test_completed_model_must_bind_frozen_route_and_usage_to_requested_task(self):
+        call = self.gateway.call
+        for mutation in ({"task_id": "another-task"}, {"usage_ref": "model_task:another-task"},
+                         {"model_config_hash": "route-name"}, {"model_config_hash": None}):
+            with self.subTest(mutation=mutation):
+                state = {}
+                def invalid(body, method, path, payload=None):
+                    result = call(body, method, path, payload)
+                    return {**result, **mutation} if method == "GET" else result
+                self.gateway.call = invalid
+                with self.assertRaises(Failure) as error:
+                    self.gateway.observe(self.body, [self.frame], state, lambda _: None, lambda: None)
+                self.assertEqual(error.exception.code, "MODEL_PROVENANCE_INVALID")
+                self.assertFalse(state.get("usage", {}).get("model_tasks"))
+                self.assertTrue(all("output" not in task for task in state["model_tasks"].values()))
+        self.gateway.call = call
 
     def test_local_usage_admitted_before_compute_and_settled_once(self):
         calls, state = [], {}

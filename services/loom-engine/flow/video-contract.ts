@@ -7,6 +7,12 @@ export const canonical = (v: any): any => Array.isArray(v) ? v.map(canonical) : 
 export const canonicalHash = (v: unknown) => sha(JSON.stringify(canonical(v)));
 export const newVideoId = (prefix: string) => prefix + randomBytes(12).toString("hex");
 export const videoError = (status: number, reason: string) => Object.assign(new HttpError(status, reason), { reason });
+/** A bounded preview must not emit half a UTF-16 surrogate pair. */
+export function videoTextPreview(value: string, limit: number) {
+  let end = Math.min(value.length, limit);
+  if (end > 0 && /[\uDC00-\uDFFF]/.test(value[end] ?? "") && /[\uD800-\uDBFF]/.test(value[end - 1] ?? "")) end--;
+  return value.slice(0, end);
+}
 export const VIDEO_STATES = ["queued", "running", "retry_wait", "blocked_auth", "blocked_budget", "reconciliation_required", "cancel_requested", "cancelled", "failed", "completed", "completed_with_gaps"] as const;
 export const TERMINAL_VIDEO_STATES = ["cancelled", "failed", "completed", "completed_with_gaps"];
 export const VIDEO_OBJECT_KEY = /^tenants\/([A-Za-z0-9_-]{1,64})\/workspaces\/([A-Za-z0-9_-]{1,64})\/video\/([A-Za-z0-9_-]{1,80})\/([a-f0-9]{64})\/([A-Za-z0-9_.-]{1,120})$/;
@@ -62,6 +68,7 @@ export function canonicalTranscript(title: string, segments: VideoSegment[]) {
   let body = "", previous = -1;
   const spans = segments.map(segment => {
     if (!segment || typeof segment.text !== "string" || !segment.text.trim()) throw videoError(422, "INVALID_SEGMENT");
+    if (segment.kind && !["subtitle", "asr", "ocr"].includes(segment.kind) || (segment as any).derived === true) throw videoError(422, "DERIVED_MATERIAL_NOT_SOURCE");
     const known = segment.start_ms != null || segment.end_ms != null;
     if (known && (!Number.isSafeInteger(segment.start_ms) || !Number.isSafeInteger(segment.end_ms) || segment.start_ms! < 0 || segment.end_ms! < segment.start_ms! || segment.start_ms! < previous)) throw videoError(422, "INVALID_SEGMENT_TIME");
     if (known) previous = segment.start_ms!;

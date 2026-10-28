@@ -5,6 +5,15 @@ description: 源铭振跃后端核心持久化表与状态边界
 
 # 后端数据库
 
+## 视频知识整理恢复记录
+
+Loom 的独立 PostgreSQL schema 由 `services/loom-engine/flow/migrations` 管理，不与本页宿主 GORM schema 版本混用。
+迁移 `0031_video_extraction_retry.sql` 为 `flow_video_knowledge_runs` 增加 `model_generation`、`external_task_status` 和 `model_attempt_history`：
+明确终态任务经用户恢复后使用新代次幂等键，原任务 ID、状态、请求键、失败原因及恢复操作者保留为最小审计记录，不复制原文。
+结果不明时保留原任务及请求键，只对账；冻结输入、批次游标与父预算身份不变，重试不会重置已发生费用。
+已成功返回但内容校验失败的模型回执也先持久化，避免误认为从未提交。只有服务端生成的旧 `model_failed` 可回填为明确失败，其余旧记录保持未知。
+视频阶段恢复在外部预算/任务查询之后，于同一事务锁定并比较任务状态、阶段 attempt/fencing token、预算代次，再提交恢复和预算变化；取消胜出后不得复活任务。
+
 ## 画布工作流准入检查点（Schema 68）
 
 `flow_canvas_workflow_executions` 是准入回执及有界检查点，不是新队列或执行引擎。唯一键为 `(tenant_id, workspace_id, canvas_id, execution_key)`，确定性运行 ID 对同一范围稳定；`request_hash` 区分重复请求和参数冲突。记录保存所有者、原始 revision、冻结画布正文、预算 reservation ID、capability snapshot ID、状态、CAS revision 与最大 512 KiB 的阶段检查点。检查点包括节点 task ID/key/request hash、结果、错误及报告保存阶段/报告引用。PostgreSQL 按 tenant_id 启用 FORCE RLS。
@@ -338,3 +347,21 @@ Schema 32 为 `channel_models` 新增 `tags`（TEXT、NOT NULL、默认 `'[]'`�
 迁移 46 新增 skill_curation_settings、skill_curation_categories、skill_curation_assignments；默认关闭，不导入技能内容。表结构与事务规则见 [平台技能策展](./skill-curation)。
 
 迁移 47 依赖 46，新增 skill_curation_roots 与 skill_curation_root_assignments；保留原五个根 ID，根停用时使用派生默认桶，根表为空回落固定五类。
+
+## 视频 Skill 评测终态重试
+
+Loom 增量迁移 `0032_video_skill_evaluation_retry.sql` 为 `flow_video_skill_eval_tasks` 新增 `generation INTEGER NOT NULL DEFAULT 0`、`attempt_history JSONB NOT NULL DEFAULT '[]'`，不改变原任务复合主键或租户策略。只有明确观察到模型 `failed`/`cancelled` 后，用户新的评测请求才递增 generation 并清除终态 task ID；原 task ID、状态、请求键/摘要、重试时间和操作者作为最小审计保留，不复制证据或模型全文。新任务仍用相同 candidate ID 对应同一个宿主父预算，失败重试不得增加原冻结预算。
+
+未知结果、传输丢回复、成功模型输出的本地校验失败不得递增 generation，必须沿用原 task/key 对账。迁移对旧行加默认值；旧 blocked 行缺少终态状态时按未知处理。应用回退可保留新增列，但旧版本不具备此终态重试能力，不应人工删列或重写迁移记录。
+
+## 视频预算网络边界与取消竞态
+
+Loom 迁移 `0033_video_budget_close_intent.sql` 新增 `budget_reserving_at`、`budget_closing_at`。预约前持久意图；即使用户取消先于宿主回复，已接受的 reservation 也只能归回原 generation，再由维护流程结清。回复丢失时维护只使用受限内部只读 lookup 按原 key/ref/workspace 找回已有 hold，不重新分配预算，也不要求已撤销用户重新授权消费；不存在或不明确的旧收据保持 pending，不能假定为零。
+
+结清前持久 close 意图，关闭回复未知时重复同一 reservation 的幂等 close；重试必须等待关闭确定。费用与 closed 写回同时比较 reservation/generation，不能让旧维护响应覆盖新一代预算。调用方重试仍受冻结总预算及当时授权约束，不能因 generation 变化增加总额。
+
+升级不会自动复活历史 `cancelled` 抽取行：旧实现无法从该状态可靠地区分模型子任务取消与后续材料撤销，且父预算可能已关闭。历史行保留审计、源材料撤销和预算边界；新实现的模型子任务 `cancelled` 映射为可显式恢复的 `failed`，用户/保留策略取消不变。旧关闭预算不得直接重开或手工改状态绕过重新授权。
+
+### 采集窗口预算的 workspace 审计绑定
+
+`flow_budget_reservations` 的 `schedule_window` 根预留复用已有 `note` 字段保存 `schedule-workspace:<workspace_id>`，与预留和 credit ledger 同事务写入；字段结构不变。可信内部只读 `/api/internal/flow/budget/lookup` 可在原用户授权撤销或任务取消后，按 tenant + 原 key + ref_id + purpose + workspace 绑定找回原回执，以便退款/结算；查不到不创建新 hold。旧无绑定记录保留并返回待人工对账冲突，不猜测归属，不把用户重新授权当作恢复历史账务的前提。

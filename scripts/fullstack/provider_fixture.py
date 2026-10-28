@@ -22,6 +22,40 @@ def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
 
 
+def completion(request, output):
+    # Nonzero synthetic usage exercises actual host pricing and settlement.
+    return {"id": "fixture_" + hashlib.sha256(canonical(request)).hexdigest()[:24],
+            "object": "chat.completion", "model": MODEL,
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": canonical(output).decode()}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}}
+
+
+def evaluation_response(request, frozen):
+    """Deterministic outputs only; production evaluator owns scores/approval."""
+    kinds = {"positive", "negative", "boundary", "missing_material", "regression"}
+    if not isinstance(frozen, dict) or not re.fullmatch(r"synthetic-skill-(?:0[0-9]|1[0-9])", frozen.get("case_id", "")) or frozen.get("variant") not in {"base", "without_skill", "candidate"}:
+        raise ValueError("invalid_synthetic_evaluation_identity")
+    if not isinstance(frozen.get("input"), str) or not frozen["input"].startswith("Synthetic Skill evaluation fixture: "):
+        raise ValueError("non_fixture_case_rejected")
+    kind = frozen["input"].removeprefix("Synthetic Skill evaluation fixture: ")
+    if kind not in kinds or not re.fullmatch(r"[a-f0-9]{64}", frozen.get("candidate_hash", "")):
+        raise ValueError("invalid_synthetic_evaluation_case")
+    method = frozen.get("method")
+    expected_id = "video-knowledge-core" if frozen["variant"] == "base" else "fullstack-synthetic-method"
+    if frozen["variant"] == "without_skill":
+        if method is not None:
+            raise ValueError("no_skill_variant_has_method")
+    elif not isinstance(method, dict) or method.get("id") != expected_id or method.get("version") != "1.0.0":
+        raise ValueError("invalid_synthetic_evaluation_method")
+    evidence = frozen.get("evidence")
+    if not isinstance(evidence, list) or not evidence or any(not isinstance(e, dict) or not isinstance(e.get("quote"), str) or not e["quote"].startswith(MARKER) or not re.fullmatch(r"[a-f0-9]{64}", e.get("snippet_hash", "")) for e in evidence):
+        raise ValueError("non_fixture_evaluation_evidence")
+    output = "insufficient material." if kind in {"negative", "missing_material"} else "evidence acknowledged."
+    return completion(request, {"case_id": frozen["case_id"], "output": MARKER + " " + output,
+                               "unsupported_claims": [], "permission_violations": [], "missing_evidence": [],
+                               "limitations": ["Synthetic external model response, not an industry evaluation"]})
+
+
 def knowledge_response(request):
     """Copy only the submitted fixture quote and its immutable references."""
     if not isinstance(request, dict) or request.get("model") != MODEL or request.get("stream") is True:
@@ -30,9 +64,25 @@ def knowledge_response(request):
     if not isinstance(messages, list) or len(messages) != 2:
         raise ValueError("invalid_fixture_messages")
     system, user = messages
-    if not isinstance(system, dict) or not isinstance(user, dict) or system.get("role") != "system" or not isinstance(system.get("content"), str) or "video-knowledge-core" not in system["content"] or user.get("role") != "user":
+    if not isinstance(system, dict) or not isinstance(user, dict) or system.get("role") != "system" or not isinstance(system.get("content"), str) or user.get("role") != "user":
         raise ValueError("not_knowledge_extraction")
     frozen = json.loads(user["content"])
+    if system["content"].startswith("Evaluate the supplied frozen method and fixed business case."):
+        return evaluation_response(request, frozen)
+    if isinstance(frozen, dict) and "template" in frozen:
+        # The actual Canvas runner wraps the native template and its frozen
+        # knowledge snapshot. Accept that one production protocol, not an
+        # arbitrary prompt-driven fixture or a second application runtime.
+        template = frozen["template"]
+        if not system["content"].startswith("Execute the approved skill template on input as one bounded batch.") or not isinstance(template, dict) or template.get("id") != "video-knowledge-core" or template.get("version") != "1.0.0" or not re.fullmatch(r"[a-f0-9]{64}", template.get("hash", "")):
+            raise ValueError("invalid_native_template")
+        snapshot = template.get("knowledge_snapshot")
+        expected_method = {key: template[key] for key in ("id", "version", "hash")}
+        if not isinstance(snapshot, dict) or not snapshot.get("id") or not snapshot.get("run_id") or snapshot.get("method") != expected_method or not re.fullmatch(r"[a-f0-9]{64}", snapshot.get("content_hash", "")):
+            raise ValueError("missing_native_snapshot")
+        frozen = frozen.get("input")
+    elif "video-knowledge-core" not in system["content"]:
+        raise ValueError("not_knowledge_extraction")
     if not isinstance(frozen, dict) or not isinstance(frozen.get("profile_id"), str) or type(frozen.get("profile_version")) is not int:
         raise ValueError("invalid_fixture_profile")
     evidence = frozen.get("evidence")
@@ -56,11 +106,7 @@ def knowledge_response(request):
               "relevance": "relevant", "knowledge_units": [unit],
               "missing_information": ["real_industry_validation"],
               "coverage_limitations": ["Deterministic TEST model boundary; not actual model quality evidence"]}
-    # Valid nonzero usage is deliberate: the real host must price/settle it.
-    return {"id": "fixture_" + hashlib.sha256(canonical(request)).hexdigest()[:24],
-            "object": "chat.completion", "model": MODEL,
-            "choices": [{"index": 0, "message": {"role": "assistant", "content": canonical(output).decode()}, "finish_reason": "stop"}],
-            "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}}
+    return completion(request, output)
 
 
 def make_handler(token):
@@ -111,6 +157,15 @@ def make_handler(token):
                 if not call_id or not self.headers.get("X-Flow-Reservation-Id") or not self.headers.get("X-Flow-Price-Version"):
                     raise ValueError("host_accounting_headers_required")
                 digest = hashlib.sha256(canonical(request)).hexdigest()
+                frozen = json.loads(request["messages"][1]["content"])
+                native = frozen.get("template")
+                identity = {"request_kind": "native_canvas" if native else "knowledge_extraction"}
+                if native:
+                    identity["skill"] = {key: native[key] for key in ("id", "version", "hash")}
+                    identity["knowledge_snapshot"] = {key: native["knowledge_snapshot"][key] for key in ("id", "run_id", "content_hash")}
+                elif "case_id" in frozen:
+                    identity = {"request_kind": "skill_evaluation", "case_id": frozen["case_id"],
+                                "variant": frozen["variant"], "candidate_hash": frozen["candidate_hash"]}
                 with lock:
                     previous = calls.get(call_id)
                     if previous and previous["request_sha256"] != digest:
@@ -118,7 +173,7 @@ def make_handler(token):
                     calls[call_id] = {"call_id": call_id, "request_sha256": digest,
                                       "response_sha256": hashlib.sha256(canonical(response)).hexdigest(),
                                       "requests": (previous or {}).get("requests", 0) + 1,
-                                      "synthetic": True, "total_tokens": 150}
+                                      "synthetic": True, "total_tokens": 150, **identity}
                 return self.send(200, response)
             except (ValueError, KeyError, TypeError, UnicodeError):
                 return self.send(400, {"error": "invalid_or_non_fixture_model_request"})

@@ -6,7 +6,9 @@ import { canonical } from "./video-contract.ts";
 export const knowledgeHash = reportPayloadHash;
 export const KNOWLEDGE_TYPES = ["fact", "definition", "procedure", "example", "pitfall", "parameter", "constraint", "risk"] as const;
 export const KNOWLEDGE_STATES = ["candidate", "in_review", "approved", "published", "rejected", "withdrawn", "superseded"] as const;
-export const MATERIAL_TYPES = ["source_original", "platform_subtitles", "asr_transcript", "ocr", "visual_observation"] as const;
+// Model observations remain derived visual records, never quoteable source
+// material for another generation (including previously imported revisions).
+export const MATERIAL_TYPES = ["source_original", "platform_subtitles", "asr_transcript", "ocr"] as const;
 export const EVAL_KINDS = ["positive", "negative", "boundary", "missing_material", "regression"] as const;
 
 export const VIDEO_KNOWLEDGE_METHOD = Object.freeze({

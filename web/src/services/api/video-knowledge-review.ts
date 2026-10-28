@@ -3,8 +3,9 @@ import { videoMutationHeaders, type VideoPage } from "./video-knowledge";
 
 const root = "/intelligence/knowledge";
 const ws = (workspaceId: string, signal?: AbortSignal) => ({ headers: { "X-Workspace-Id": workspaceId }, signal });
-export type KnowledgeExtractionRun = { id: string; video_job_id: string; document_id: string; revision: number; profile_id: string; profile_version: number; state: string; input_hash: string; candidate_ids: string[]; batch_cursor?: number; error?: { code?: string; message?: string } | string | null };
+export type KnowledgeExtractionRun = { id: string; video_job_id: string; document_id: string; revision: number; profile_id: string; profile_version: number; state: string; input_hash: string; external_task_id?: string | null; external_task_status?: string | null; model_generation?: number; candidate_ids: string[]; batch_cursor?: number; error?: { code?: string; message?: string } | string | null };
 export const listKnowledgeExtractions = (workspaceId: string, videoJobId: string, signal?: AbortSignal) => http.get<VideoPage<KnowledgeExtractionRun>>(`${root}/extractions`, { ...ws(workspaceId, signal), params: { video_job_id: videoJobId, limit: 30 } });
+export const retryKnowledgeExtraction = (workspaceId: string, run: KnowledgeExtractionRun) => http.post<{ id: string; accepted: boolean; model_generation: number; reconciliation_only: boolean }>(`${root}/extractions/${encodeURIComponent(run.id)}/retry`, { expected_hash: run.input_hash }, videoMutationHeaders(workspaceId));
 export type KnowledgeState = "candidate" | "in_review" | "approved" | "published" | "rejected" | "withdrawn" | "superseded";
 export type EvidenceSnapshot = {
     evidence_id: string; document_id: string; revision: number; snippet_hash: string; quote: string; char_start: number; char_end: number;

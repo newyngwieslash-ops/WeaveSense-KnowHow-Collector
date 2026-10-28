@@ -499,6 +499,12 @@ test("QA R25/K025 PostgreSQL: pre-erasure backup cannot resurrect data before la
   assert.ok(videoResearch.output.claims.length > 0); assert.ok(rssResearch.output.claims.length > 0);
   const videoReport = await reports.saveReport(S, "user:qa_reviewer", "restore-video-report", { title: "PRIVATE_RESTORE_CANARY report", body: "PRIVATE_RESTORE_CANARY", material_scope: { document_ids: [ready.document_id] }, claims: videoResearch.output.claims, research_run_id: videoResearch.id });
   const rssReport = await reports.saveReport(S, "user:qa_reviewer", "restore-rss-report", { title: "RSS report", body: "RSS_BASELINE_CANARY", material_scope: { document_ids: [rssDocument.id] }, claims: rssResearch.output.claims, research_run_id: rssResearch.id });
+  const pendingSource = await f.engine.createSource(S, { kind: "bilibili", title: "Unfinished restore fixture", url: "https://www.bilibili.com/video/BV1PENDING001",
+    config: { source_type: "video", native_id: "BV1PENDING001", profile_id: f.profile.id, profile_version: f.profile.version,
+      usage_basis: "Self-authored recovery fixture; no platform", allowed_uses: ["knowledge"] } });
+  const pendingJob = await f.engine.video.start(S, "pending-before-real-backup", { source_id: pendingSource.id });
+  const pendingLease = await f.engine.video.claim("worker-before-backup");
+  assert.equal(pendingLease.video_job_id, pendingJob.video_job_id);
   const execute = promisify(execFile), scripts = fileURLToPath(new URL("../../../deploy/flow/backup/", import.meta.url));
   const scriptEnvironment = { ...process.env, VIDEO_DELETION_JOURNAL_DIR: journalConfig.directory, VIDEO_DELETION_JOURNAL_ID: journalConfig.journalId,
     VIDEO_DELETION_JOURNAL_KEY: journalConfig.key, VIDEO_JOURNAL_OFFLINE_ACK: "ALL_JOURNAL_CLIENTS_STOPPED" };
@@ -533,7 +539,7 @@ test("QA R25/K025 PostgreSQL: pre-erasure backup cannot resurrect data before la
   assert.equal((await restored.query("SELECT body FROM flow_document_revisions WHERE document_id=$1 AND revision=$2", [ready.document_id, ready.revision])).rows[0].body, "PRIVATE_RESTORE_CANARY 😀");
   assert.equal((await restored.query("SELECT count(*)::int n FROM flow_video_deletion_tombstones WHERE document_id=$1", [ready.document_id])).rows[0].n, 0);
   assert.ok((await readFile(join(objectDirectory, sha(processing.manifest.objects[0].object_key)))).includes(Buffer.from("PRIVATE_RESTORE_CANARY")));
-  const engine = new Engine(restored); engine.video.enabled = true; engine.video.provider = f.provider;
+  const engine = new Engine(restored, undefined, () => new Date(Date.now() + 120000)); engine.video.enabled = true; engine.video.provider = f.provider;
   configureVideoKnowledge(engine, { resolveBase: async () => ({ ...method, required_tools: ["intel_search_knowledge"] }) });
   journal.configureVideoRetentionJournal(engine, journalConfig, (q, event) => applyVideoRetention(engine, q, event, event));
   const signingKey = "s".repeat(48), server = createServer(handler(engine, { signingKey, audience: "loom-engine", issuer: "flow-platform" }));
@@ -581,5 +587,31 @@ test("QA R25/K025 PostgreSQL: pre-erasure backup cannot resurrect data before la
   await assert.rejects(readFile(join(objectDirectory, sha(processing.manifest.objects[0].object_key))), (e: any) => e.code === "ENOENT");
   await journal.replayVideoRetentionJournal(engine);
   assert.equal((await request(revisionPath)).status, 404, "replay must be idempotent");
-  t.diagnostic("actual non-superuser pg_dump before erase + pg_restore; actual filesystem object snapshot restore; external authoritative journal survives both restores; production HTTP quarantine/replay and domain/pin invalidation; synthetic source/model/review only");
+  const resumedLease = await engine.video.claim("worker-after-real-restore");
+  assert.equal(resumedLease.video_job_id, pendingJob.video_job_id);
+  assert.ok(Number(resumedLease.fencing_token) > Number(pendingLease.fencing_token));
+  await assert.rejects(engine.video.heartbeat(pendingLease), (e: any) => e.reason === "STALE_FENCE");
+  const restoredObject = async (name: string, value: unknown) => {
+    const raw = Buffer.from(JSON.stringify(value)), digest = sha(raw), key = `tenants/${S.tenant_id}/workspaces/${S.workspace_id}/video/${pendingJob.video_job_id}/${digest}/${name}`;
+    await writeFile(join(objectDirectory, sha(key)), raw);
+    return { object_key: key, sha256: digest, bytes: raw.length, content_type: "application/json" };
+  };
+  const resumedSegments = [{ text: "Self-authored pending job resumed after restore 😀", start_ms: 0, end_ms: 1000 }];
+  const resumedInput = await restoredObject("input.json", { kind: "manual", language: "en", segments: resumedSegments });
+  const resumedInputManifest: VideoManifest = { schema_version: 1, artifact_stage: "input_ready", video_job_id: pendingJob.video_job_id,
+    stage_attempt: resumedLease.attempt, fencing_token: Number(resumedLease.fencing_token), input_kind: "platform_subtitles", input_hash: resumedInput.sha256,
+    media_sha256: null, availability: "not_acquired", objects: [resumedInput], coverage: { required: [], completed: [], missing: [] }, processors: { version: "restore-fixture-v1" } };
+  const inputReceipt = await engine.video.importManifest(S, pendingJob.video_job_id, resumedInputManifest, resumedLease);
+  const resumedProcess = await engine.video.claim("process-after-real-restore");
+  assert.equal(resumedProcess.video_job_id, pendingJob.video_job_id);
+  const resumedText = await restoredObject("segments.json", { segments: resumedSegments });
+  const resumedManifest: VideoManifest = { ...resumedInputManifest, artifact_stage: "processing_complete", stage_attempt: resumedProcess.attempt,
+    fencing_token: Number(resumedProcess.fencing_token), parent_manifest_sha256: inputReceipt.manifest_sha256, objects: [resumedText],
+    transcript: { parts: [{ object_key: resumedText.object_key, sha256: resumedText.sha256, segment_count: 1, start_ms: 0, end_ms: 1000 }] },
+    coverage: { required: ["transcript"], completed: ["transcript"], missing: [], duration_ms: 1000 } };
+  const resumedReady = await engine.video.importManifest(S, pendingJob.video_job_id, resumedManifest, resumedProcess);
+  assert.equal(resumedReady.completion_level, "knowledge_ready");
+  assert.equal((await engine.getRevision(S, resumedReady.document_id, resumedReady.revision)).body, resumedSegments[0].text);
+  assert.equal((await request(revisionPath)).status, 404, "resuming unrelated work cannot resurrect erased historical text");
+  t.diagnostic("actual non-superuser pg_dump before erase + pg_restore; actual filesystem object snapshot restore; external journal quarantine/replay; pre-backup unfinished lease reclaimed/fenced and completed after restore; synthetic source/model/review only");
 });

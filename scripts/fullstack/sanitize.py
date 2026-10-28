@@ -23,6 +23,8 @@ def secret_values(root):
     if state.exists():
         data = json.loads(state.read_text())
         secrets.extend(data[name] for name in ("username", "password"))
+        if "foreign" in data:
+            secrets.extend(data["foreign"][name] for name in ("username", "password"))
     if any(not isinstance(value, str) or not value for value in secrets):
         raise ValueError("missing ephemeral credential")
     return sorted(set(secrets), key=len, reverse=True)

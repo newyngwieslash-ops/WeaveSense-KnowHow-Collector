@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { exerciseNativeSkill, verifyNativeAfterRestart, verifyNativeAfterWithdrawal } from './fullstack-native.mjs';
+import { exerciseSkillCandidate, verifySkillCandidateAfterRestart, verifySkillCandidateAfterWithdrawal } from './fullstack-skill-lifecycle.mjs';
 
 // Live production routes only: no route interception, injected session, in-memory
 // engine or direct database writes. The model upstream alone is synthetic.
@@ -157,6 +159,56 @@ async function publishedUI(page, title) {
   return detail;
 }
 
+async function verifySeparateTenant(page, state, evidence) {
+  const context = await page.context().browser().newContext({ baseURL: process.env.VIDEO_FULLSTACK_BASE_URL || 'http://127.0.0.1:4180' });
+  const other = await context.newPage();
+  try {
+    await login(other, state.foreign);
+    const foreignAPI = (path, options) => browserAPI(other, state.foreign.workspaceId, path, options);
+    const profile = accepted(await foreignAPI('/video/profiles', { method: 'POST', key: randomUUID(), body: {
+      name: 'Synthetic isolated tenant with zero curation budget', config: { required_capabilities: ['transcript'], budget_micro: 10000,
+        knowledge_model_id: model, knowledge_budget_micro: 0, knowledge_max_tokens: 1000 },
+    } }), 'separate tenant profile');
+    const source = accepted(await foreignAPI('/sources', { method: 'POST', key: randomUUID(), body: {
+      kind: 'bilibili', title: 'Separate tenant self-authored fixture', url: sourceURL,
+      config: { source_type: 'video', native_id: nativeId, profile_id: profile.id, profile_version: profile.version,
+        usage_basis: 'Self-authored synthetic subtitle, no platform acquisition', allowed_uses: ['knowledge'], processing_mode: 'subtitles_first' },
+    } }), 'separate tenant source');
+    // Identical external identity and bytes must still produce scoped objects,
+    // not a cross-tenant cache hit or authority granted by knowing an ID.
+    const raw = JSON.stringify({ kind: 'manual', language: 'en', segments: [{ text: quote, start_ms: 0, end_ms: 4000 }] });
+    const job = accepted(await foreignAPI('/video/jobs', { method: 'POST', key: randomUUID(), body: {
+      source_id: source.id, native_id: nativeId, canonical_url: sourceURL, profile_id: profile.id, profile_version: profile.version,
+      lawful_input: { input_kind: 'platform_subtitles', sha256: digest(raw), bytes: Buffer.byteLength(raw), content_type: 'application/json' },
+    } }), 'separate tenant job');
+    accepted(await foreignAPI(`/video/jobs/${job.video_job_id}/input`, { method: 'PUT', raw }), 'separate tenant input');
+    let ready;
+    await expect.poll(async () => { ready = accepted(await foreignAPI(`/video/jobs/${job.video_job_id}`), 'foreign ready'); return ready.completion_level; },
+      { timeout: 120000, intervals: [1000, 2000] }).toBe('knowledge_ready');
+    expect(ready.video_job_id).not.toBe(evidence.video_job_id); expect(ready.document_id).not.toBe(evidence.document_id);
+    let extraction;
+    await expect.poll(async () => { extraction = accepted(await foreignAPI(`/knowledge/extractions?video_job_id=${job.video_job_id}`), 'zero-budget extraction').items[0]; return extraction?.state; },
+      { timeout: 60000, intervals: [1000, 2000] }).toBe('blocked_budget');
+    expect(extraction.external_task_id).toBeFalsy(); expect(extraction.candidate_ids).toEqual([]);
+    for (const path of [`/video/jobs/${evidence.video_job_id}`, `/video/jobs/${evidence.video_job_id}/artifacts`,
+      `/documents/${evidence.document_id}/revisions/${evidence.document_revision}`, `/knowledge/${evidence.knowledge_id}`]) {
+      expect((await foreignAPI(path)).status, `foreign ID read ${path}`).toBe(404);
+      expect((await browserAPI(other, state.workspaceId, path)).status, `foreign scope selector ${path}`).toBe(404);
+    }
+    expect((await foreignAPI(`/video/jobs/${evidence.video_job_id}/cancel`, { method: 'POST', body: { reason: 'Isolation denial check' }, key: randomUUID() })).status).toBe(404);
+    expect((await foreignAPI(`/knowledge/${evidence.knowledge_id}/withdraw`, { method: 'POST', body: { expected_version: evidence.knowledge_version,
+      expected_hash: evidence.knowledge_hash, reason: 'Isolation denial check' }, key: randomUUID() })).status).toBe(404);
+    expect((await browserAPI(page, state.workspaceId, `/video/jobs/${job.video_job_id}`)).status).toBe(404);
+    expect((await browserAPI(page, state.foreign.workspaceId, `/video/jobs/${job.video_job_id}`)).status).toBe(404);
+    expect(accepted(await browserAPI(page, state.workspaceId, `/knowledge/${evidence.knowledge_id}`), 'publication unchanged after denied writes').state).toBe('published');
+    evidence.isolation = { tenant_id: state.foreign.tenantId, workspace_id: state.foreign.workspaceId,
+      video_job_id: ready.video_job_id, document_id: ready.document_id, extraction_id: extraction.id,
+      input_sha256: digest(raw), zero_budget_state: extraction.state, external_task_created: false };
+    evidence.checks.actual_second_tenant_material_ids_read_write_and_selector_isolation = true;
+    evidence.checks.zero_curation_budget_denies_model_submission_without_hiding_ready_material = true;
+  } finally { await context.close(); }
+}
+
 test(`live host lawful-input pipeline (${phase})`, async ({ page }, testInfo) => {
   if (!statePath) throw new Error('VIDEO_FULLSTACK_STATE is required');
   if (!/^[a-f0-9]{40}$/.test(process.env.VIDEO_FULLSTACK_SOURCE_SHA || '')) throw new Error('VIDEO_FULLSTACK_SOURCE_SHA must be the checked-out git rev-parse HEAD');
@@ -174,7 +226,7 @@ test(`live host lawful-input pipeline (${phase})`, async ({ page }, testInfo) =>
     source_commit: process.env.VIDEO_FULLSTACK_SOURCE_SHA,
     runtime: 'Chromium -> built host UI / same-origin Go -> real Loom -> real Python worker -> PostgreSQL / MinIO',
     synthetic_boundaries: ['self-authored timed subtitle input', 'deterministic model HTTP provider'],
-    not_claimed: ['real platform acquisition', 'ASR accuracy', 'audio/video playback', 'industry quality', 'native Skill execution', 'production deployment'],
+    not_claimed: ['real platform acquisition', 'ASR accuracy', 'audio/video playback', 'industry quality', 'LLM autonomous tool selection', 'production deployment'],
     workspace_id: state.workspaceId, tenant_id: state.tenantId,
     checks: {},
   };
@@ -301,6 +353,9 @@ test(`live host lawful-input pipeline (${phase})`, async ({ page }, testInfo) =>
       }
       evidence.evidence = published.evidence.map(item => ({ evidence_id: item.evidence_id, document_id: item.document_id, revision: item.revision, snippet_hash: item.snippet_hash, char_start: item.char_start, char_end: item.char_end, start_ms: item.start_ms, end_ms: item.end_ms }));
       evidence.checks.ui_review_approve_publish = true;
+      await verifySeparateTenant(page, state, evidence);
+      await exerciseNativeSkill(page, state, evidence);
+      await exerciseSkillCandidate(page, state, evidence);
       await publishedUI(page, evidence.knowledge_title);
       await page.screenshot({ path: testInfo.outputPath('published-knowledge.png'), fullPage: true });
       await page.reload();
@@ -319,6 +374,8 @@ test(`live host lawful-input pipeline (${phase})`, async ({ page }, testInfo) =>
       expect(record.content_hash).toBe(evidence.knowledge_hash);
       expect(record.release_id).toBe(evidence.release_id);
       expect(record.state).toBe('published');
+      await verifyNativeAfterRestart(page, state, evidence);
+      await verifySkillCandidateAfterRestart(page, state, evidence);
       await publishedUI(page, evidence.knowledge_title);
       evidence.checks.post_service_restart_published_record_revision_evidence_durable = true;
       await decision(page, '撤回', '撤回已发布知识');
@@ -327,6 +384,9 @@ test(`live host lawful-input pipeline (${phase})`, async ({ page }, testInfo) =>
       expect(accepted(await api('/knowledge/search', { method: 'POST', body: { q: '', limit: 30 } }), 'withdrawn search').items).toHaveLength(0);
       const withdrawn = await api(`/knowledge/${evidence.knowledge_id}`);
       expect([404, 410]).toContain(withdrawn.status);
+      await verifyNativeAfterWithdrawal(page, state, evidence);
+      await verifySkillCandidateAfterWithdrawal(page, state, evidence);
+      await page.goto('/intelligence/video-knowledge');
       await page.reload();
       await expect(page.getByText('未找到已发布知识；不会回退未审核材料', { exact: true })).toBeVisible();
       evidence.checks.ui_withdraw_removes_default_search_after_reload = true;

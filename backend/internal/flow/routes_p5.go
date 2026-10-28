@@ -204,21 +204,118 @@ func RegisterP5Routes(api gin.IRouter, db *gorm.DB, cfg Config, user UserFunc, g
 			AmountMicro int64  `json:"amount_micro"`
 			RefID       string `json:"ref_id"`
 		}
-		if err := json.NewDecoder(io.LimitReader(c.Request.Body, 1<<16)).Decode(&body); err != nil || body.Key == "" || body.AmountMicro <= 0 {
+		if err := json.NewDecoder(io.LimitReader(c.Request.Body, 1<<16)).Decode(&body); err != nil || body.Key == "" || len(body.Key) > 160 || body.RefID == "" || len(body.RefID) > 80 || body.AmountMicro <= 0 {
 			reply(c, http.StatusBadRequest, nil, "bad request")
+			return
+		}
+		if body.WorkspaceID != ctx.WorkspaceID {
+			reply(c, http.StatusForbidden, nil, "workspace scope mismatch")
 			return
 		}
 		if err := AuthorizeGrant(db, body.GrantActor, ctx.TenantID, body.WorkspaceID, "intel.collect"); err != nil {
 			reply(c, http.StatusForbidden, nil, "grant revoked")
 			return
 		}
-		rsv, err := Billing{DB: db, Now: billing.Now}.Reserve(ctx.TenantID, body.Key, "schedule_window", body.RefID, body.AmountMicro)
+		var rsv model.FlowBudgetReservation
+		err := TenantTx(db, ctx.TenantID, func(tx *gorm.DB) error {
+			note := "schedule-workspace:" + ctx.WorkspaceID
+			err := tx.First(&rsv, "tenant_id = ? AND idempotency_key = ?", ctx.TenantID, body.Key).Error
+			if err == nil {
+				// Never bind an old unscoped receipt to a caller-selected workspace.
+				if rsv.Purpose != "schedule_window" || rsv.ParentID != "" || rsv.RefID != body.RefID || rsv.ReservedMicro != body.AmountMicro || rsv.Note != note {
+					return ErrForbidden
+				}
+				return nil
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			rsv, err = (Billing{DB: tx, Now: billing.Now}).Reserve(ctx.TenantID, body.Key, "schedule_window", body.RefID, body.AmountMicro)
+			if err != nil {
+				return err
+			}
+			if rsv.Purpose != "schedule_window" || rsv.ParentID != "" || rsv.RefID != body.RefID || rsv.ReservedMicro != body.AmountMicro || (rsv.Note != "" && rsv.Note != note) {
+				return ErrForbidden
+			}
+			// The scope binding commits atomically with the hold, even when the
+			// HTTP response is lost. It is accounting metadata, not a new grant.
+			return tx.Model(&rsv).Update("note", note).Error
+		})
+		if errors.Is(err, ErrForbidden) {
+			reply(c, http.StatusConflict, nil, "reservation identity conflict")
+			return
+		}
 		if errors.Is(err, ErrBudgetInsufficient) || errors.Is(err, ErrBudgetQuota) || errors.Is(err, ErrBudgetProvider) {
 			reply(c, http.StatusPaymentRequired, gin.H{"reason": err.Error()}, "budget denied")
 			return
 		}
 		if err != nil {
 			reply(c, http.StatusInternalServerError, nil, "reserve failed")
+			return
+		}
+		reply(c, http.StatusOK, gin.H{"reservation_id": rsv.ID, "status": rsv.Status}, "ok")
+	})
+	// Read-only recovery of a lost reserve response. A cancelled/revoked grant
+	// cannot spend again, but the trusted service can recover its exact old hold
+	// for settlement/release. A missing receipt never creates a reservation.
+	api.POST("/internal/flow/budget/lookup", func(c *gin.Context) {
+		db := reqDB(c, db)
+		ctx, ok := internalServiceCtx(c, cfg)
+		if !ok {
+			return
+		}
+		if ctx.Issuer != "loom-engine" || ctx.Actor.ID != "loom-engine" || !ctx.HasScope("flow.budget.lookup") {
+			reply(c, http.StatusForbidden, nil, "accounting lookup scope required")
+			return
+		}
+		var body struct {
+			WorkspaceID string `json:"workspace_id"`
+			Key         string `json:"key"`
+			RefID       string `json:"ref_id"`
+		}
+		decoder := json.NewDecoder(io.LimitReader(c.Request.Body, 1<<16))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&body); err != nil || body.Key == "" || len(body.Key) > 160 || body.RefID == "" || len(body.RefID) > 80 {
+			reply(c, http.StatusBadRequest, nil, "bad request")
+			return
+		}
+		if body.WorkspaceID != ctx.WorkspaceID || (ctx.JobID != "" && ctx.JobID != body.RefID) {
+			reply(c, http.StatusForbidden, nil, "accounting scope mismatch")
+			return
+		}
+		var rsv model.FlowBudgetReservation
+		err := TenantTx(db, ctx.TenantID, func(tx *gorm.DB) error {
+			var workspace model.Workspace
+			if err := tx.First(&workspace, "id = ? AND tenant_id = ?", ctx.WorkspaceID, ctx.TenantID).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return ErrForbidden
+				}
+				return err
+			}
+			return tx.First(&rsv, "tenant_id = ? AND idempotency_key = ?", ctx.TenantID, body.Key).Error
+		})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			reply(c, http.StatusOK, nil, "not found")
+			return
+		}
+		if errors.Is(err, ErrForbidden) {
+			reply(c, http.StatusForbidden, nil, "accounting scope mismatch")
+			return
+		}
+		if err != nil {
+			reply(c, http.StatusInternalServerError, nil, "accounting lookup unavailable")
+			return
+		}
+		if rsv.Purpose != "schedule_window" || rsv.ParentID != "" || rsv.RefID != body.RefID {
+			reply(c, http.StatusForbidden, nil, "accounting identity mismatch")
+			return
+		}
+		if rsv.Note == "" {
+			reply(c, http.StatusConflict, nil, "legacy reservation requires accounting reconciliation")
+			return
+		}
+		if rsv.Note != "schedule-workspace:"+ctx.WorkspaceID {
+			reply(c, http.StatusForbidden, nil, "accounting workspace mismatch")
 			return
 		}
 		reply(c, http.StatusOK, gin.H{"reservation_id": rsv.ID, "status": rsv.Status}, "ok")

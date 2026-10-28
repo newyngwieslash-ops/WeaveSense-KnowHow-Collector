@@ -62,6 +62,14 @@ class FullstackConfigTests(unittest.TestCase):
         self.assertEqual(actions[0]["Resource"], ["arn:aws:s3:::flow-intel/tenants/tn_test/workspaces/ws_test/video/*"])
         self.assertNotIn("s3:*", json.dumps(policy))
 
+    def test_two_actual_test_tenants_have_exact_scoped_prefixes_not_wildcard_tenants(self):
+        config.prepare()
+        (self.private / "state.json").write_text(json.dumps({"tenantId": "tn_a", "workspaceId": "ws_a", "foreign": {"tenantId": "tn_b", "workspaceId": "ws_b"}}))
+        config.scope()
+        self.assertEqual(config.env_read()["FLOW_VIDEO_WORKSPACES"], "ws_a,ws_b")
+        policy = json.loads((self.private / "object-policy.json").read_text())
+        self.assertEqual(policy["Statement"][-1]["Resource"], ["arn:aws:s3:::flow-intel/tenants/tn_a/workspaces/ws_a/video/*", "arn:aws:s3:::flow-intel/tenants/tn_b/workspaces/ws_b/video/*"])
+
     def test_cleanup_requires_successful_queries_and_no_owned_resources(self):
         runner = (ROOT / "scripts/fullstack/run.sh").read_text()
         body = re.search(r"if ! python - .*? <<'PY'\n(.*?)\nPY\n", runner, re.S).group(1)

@@ -31,6 +31,8 @@ export class VideoKnowledgeEvaluator {
     if (!task) return false;
     const p = [task.tenant_id, task.workspace_id, task.candidate_id, task.case_id, task.variant, owner, task.fencing_token];
     const ctx = { tenant_id: task.tenant_id, workspace_id: task.workspace_id, actor: { type: "service_principal", id: "video-model-evaluator" }, scopes: ["intel.skills.evaluate"], policy_version: "policy_v1" } as ExecutionContext;
+    let modelStatus: string | undefined;
+    let observedTaskID: string | undefined;
     try {
       assertKnowledgeEnabled(this.k.e, task);
       const candidate = await this.skills.row(ctx, task.candidate_id), proposal = candidate.proposal;
@@ -43,7 +45,7 @@ export class VideoKnowledgeEvaluator {
       if (!Number.isSafeInteger(config.budget_micro) || config.budget_micro < spec.cases.length * 3) fail("evaluation_budget_required", 402);
       const method = task.variant === "base" ? base.skill : task.variant === "candidate" ? proposal.pack.skills[0] : null;
       const evidence = await this.k.resolveEvidence(ctx, proposal.evidence);
-      const request = task.model_request ?? { key: `skill-eval:${candidate.id}:${task.case_id}:${task.variant}`, model_id: config.model,
+      const request = task.model_request ?? { key: `skill-eval:${candidate.id}:${knowledgeHash({ case_id: task.case_id, variant: task.variant })}${task.generation ? `:retry:${task.generation}` : ""}`, model_id: config.model,
         budget_micro: Math.min(20000000, Math.floor(config.budget_micro / (spec.cases.length * 3))), max_tokens: config.max_tokens ?? 4000,
         input: { case_id: c.id, input: c.input, method, variant: task.variant, candidate_hash: candidate.candidate_hash,
           evidence: evidence.map(({ body: _body, ...e }) => e) } };
@@ -53,6 +55,7 @@ export class VideoKnowledgeEvaluator {
       }
       const result = await hooks.modelTask(ctx, candidate.id, "video_skill_evaluate", request, task.task_id ?? undefined);
       if (!result.task_id || (task.task_id && task.task_id !== result.task_id)) fail("evaluation_task_contract", 502);
+      modelStatus = result.status; observedTaskID = result.task_id;
       if (result.status !== "succeeded") {
         if (["failed", "cancelled", "reconciliation_required"].includes(result.status)) fail(`evaluation_model_${result.status}`, 409);
         await this.db.query(`UPDATE flow_video_skill_eval_tasks SET task_id=$8,state='submitted',lease_owner=NULL,lease_expires_at=NULL,next_poll_at=now()+interval '5 seconds' WHERE tenant_id=$1 AND workspace_id=$2 AND candidate_id=$3 AND case_id=$4 AND variant=$5 AND lease_owner=$6 AND fencing_token=$7`, [...p, result.task_id]);
@@ -80,7 +83,7 @@ export class VideoKnowledgeEvaluator {
       await this.finalize(candidate);
     } catch (error: any) {
       const blocked = [402, 403, 409, 422].includes(error.status);
-      await this.db.query(`UPDATE flow_video_skill_eval_tasks SET state=$8,result=$9,lease_owner=NULL,lease_expires_at=NULL,next_poll_at=now()+interval '30 seconds' WHERE tenant_id=$1 AND workspace_id=$2 AND candidate_id=$3 AND case_id=$4 AND variant=$5 AND lease_owner=$6 AND fencing_token=$7`, [...p, blocked ? "blocked" : "queued", JSON.stringify({ error: error.reason ?? "evaluation_provider_error", retryable: !blocked })]);
+      await this.db.query(`UPDATE flow_video_skill_eval_tasks SET state=$8,result=$9,task_id=coalesce($10,task_id),lease_owner=NULL,lease_expires_at=NULL,next_poll_at=now()+interval '30 seconds' WHERE tenant_id=$1 AND workspace_id=$2 AND candidate_id=$3 AND case_id=$4 AND variant=$5 AND lease_owner=$6 AND fencing_token=$7`, [...p, blocked ? "blocked" : "queued", JSON.stringify({ error: error.reason ?? "evaluation_provider_error", retryable: !blocked, ...(modelStatus ? { model_status: modelStatus } : {}) }), observedTaskID ?? null]);
       if (blocked) await this.db.query(`UPDATE flow_video_skill_candidates SET eval_result=eval_result || $4::jsonb WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 AND state='evaluation_running'`, [...p.slice(0, 3), JSON.stringify({ blocked_reason: error.reason ?? "evaluation_blocked" })]);
     }
     return true;

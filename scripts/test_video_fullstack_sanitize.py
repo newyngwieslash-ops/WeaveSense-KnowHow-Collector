@@ -79,6 +79,14 @@ class FullstackSanitizerTests(unittest.TestCase):
         for path in self.out.iterdir():
             self.assertEqual(path.read_text(), original)
 
+    def test_second_test_account_credentials_are_redacted_without_erasing_scope_ids(self):
+        state = self.private / "state.json"
+        state.write_text(json.dumps({"username": self.username, "password": self.password,
+            "foreign": {"username": "ci_foreign_fixture", "password": "synthetic_foreign_password", "workspaceId": "ws_foreign"}}))
+        values = sanitize.secret_values(self.root)
+        cleaned = sanitize.sanitize('ci_foreign_fixture synthetic_foreign_password ws_foreign', values)
+        self.assertEqual(cleaned, '[REDACTED] [REDACTED] ws_foreign')
+
     def test_streaming_cli_redacts_credentials_without_changing_public_facts(self):
         original = "2000 disabled 1793157592000 " + " ".join(self.values) + "\n"
         result = subprocess.run([sys.executable, str(self.scripts / "sanitize.py")], input=original,

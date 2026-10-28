@@ -56,15 +56,16 @@ def prepare():
 def scope():
     values = env_read()
     state = json.loads((PRIVATE / "state.json").read_text())
-    values["FLOW_VIDEO_WORKSPACES"] = state["workspaceId"]
+    scopes = [state] + ([state["foreign"]] if "foreign" in state else [])
+    values["FLOW_VIDEO_WORKSPACES"] = ",".join(item["workspaceId"] for item in scopes)
     save(values)
-    prefix = f"tenants/{state['tenantId']}/workspaces/{state['workspaceId']}/video/"
+    prefixes = [f"tenants/{item['tenantId']}/workspaces/{item['workspaceId']}/video/" for item in scopes]
     policy = {"Version": "2012-10-17", "Statement": [
         {"Effect": "Allow", "Action": ["s3:GetBucketLocation"], "Resource": ["arn:aws:s3:::flow-intel"]},
         {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": ["arn:aws:s3:::flow-intel"],
-         "Condition": {"StringLike": {"s3:prefix": [prefix + "*"]}}},
+         "Condition": {"StringLike": {"s3:prefix": [prefix + "*" for prefix in prefixes]}}},
         {"Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-         "Resource": ["arn:aws:s3:::flow-intel/" + prefix + "*"]},
+         "Resource": ["arn:aws:s3:::flow-intel/" + prefix + "*" for prefix in prefixes]},
     ]}
     write_private(PRIVATE / "object-policy.json", json.dumps(policy))
 

@@ -140,20 +140,27 @@ func ListInstalledSkills(db *gorm.DB, scope Scope) ([]model.FlowSkillInstall, er
 // pins version+hash; later loads in the same run get the pinned version even if
 // the workspace installs a different version meanwhile.
 func LoadSkillForRun(db *gorm.DB, scope Scope, runID, id string) (Skill, error) {
+	resolvePin := func(pin model.FlowSkillRunPin) (Skill, error) {
+		s, ok := FindSkill(id, pin.Version)
+		if !ok || s.Hash != pin.Hash {
+			return Skill{}, errors.New("flow: pinned skill version is no longer available")
+		}
+		if err := checkRuntimeVideoSkill(scope, s); err != nil {
+			return Skill{}, err
+		}
+		if err := videoSkillToolsAvailable(db, scope, s); err != nil {
+			return Skill{}, err
+		}
+		return withVideoKnowledgeSnapshot(scope, runID, s)
+	}
 	if runID != "" {
 		var pin model.FlowSkillRunPin
-		if err := db.First(&pin, "run_id = ? AND skill_id = ? AND tenant_id = ?", runID, id, scope.TenantID).Error; err == nil {
-			s, ok := FindSkill(id, pin.Version)
-			if !ok || s.Hash != pin.Hash {
-				return Skill{}, errors.New("flow: pinned skill version is no longer available")
-			}
-			if err := checkRuntimeVideoSkill(scope, s); err != nil {
-				return Skill{}, err
-			}
-			if err := videoSkillToolsAvailable(db, scope, s); err != nil {
-				return Skill{}, err
-			}
-			return withVideoKnowledgeSnapshot(scope, runID, s)
+		err := db.First(&pin, "run_id = ? AND skill_id = ? AND tenant_id = ?", runID, id, scope.TenantID).Error
+		if err == nil {
+			return resolvePin(pin)
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return Skill{}, err
 		}
 	}
 	var inst model.FlowSkillInstall
@@ -168,8 +175,17 @@ func LoadSkillForRun(db *gorm.DB, scope Scope, runID, id string) (Skill, error) 
 		return Skill{}, err
 	}
 	if runID != "" {
-		db.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.FlowSkillRunPin{RunID: runID, SkillID: id, TenantID: scope.TenantID, Version: s.Version, Hash: s.Hash, CreatedAt: time.Now().UTC()})
-		return LoadSkillForRun(db, scope, runID, id)
+		if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.FlowSkillRunPin{RunID: runID, SkillID: id, TenantID: scope.TenantID, Version: s.Version, Hash: s.Hash, CreatedAt: time.Now().UTC()}).Error; err != nil {
+			return Skill{}, err
+		}
+		// A concurrent first load may have won with a different installed version.
+		// Read that durable pin once; a failed insert or scope collision must not
+		// recurse forever or silently use this caller's unpersisted version.
+		var pin model.FlowSkillRunPin
+		if err := db.First(&pin, "run_id = ? AND skill_id = ? AND tenant_id = ?", runID, id, scope.TenantID).Error; err != nil {
+			return Skill{}, err
+		}
+		return resolvePin(pin)
 	}
 	return s, nil
 }

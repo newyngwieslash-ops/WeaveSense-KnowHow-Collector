@@ -60,9 +60,9 @@ async function loop(name: string, ms: number, fn: () => Promise<unknown>) {
 
 // Platform hooks (re-check grants, LLM brief summarization). Service token, aud = platform issuer.
 const platformBase = env("FLOW_PLATFORM_INTERNAL_URL", "");
-const platformCall = async (path: string, sc: { tenant_id: string; workspace_id: string }, body: unknown) => {
+const platformCall = async (path: string, sc: { tenant_id: string; workspace_id: string }, body: unknown, scopes = ["flow.grants.check"]) => {
   const tok = sign(key, { iss: "loom-engine", aud: env("FLOW_INTERNAL_JWT_ISSUER", "flow-platform"), tenant_id: sc.tenant_id, workspace_id: sc.workspace_id,
-    actor: { type: "service_principal", id: "loom-engine" }, scopes: ["flow.grants.check"], policy_version: "policy_v1" });
+    actor: { type: "service_principal", id: "loom-engine" }, scopes, policy_version: "policy_v1" });
   return fetch(`${platformBase}${path}`, { method: "POST", headers: { authorization: `Bearer ${tok}`, "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(120_000) });
 };
 if (platformBase) {
@@ -84,6 +84,14 @@ if (platformBase) {
 // PRD §9.2: scheduled windows reserve budget with the platform ledger; settled/released when the operation ends.
 if (platformBase) {
   engine.budget = {
+    lookup: async (sc, key, refId) => {
+      const r = await platformCall("/api/internal/flow/budget/lookup", sc, { workspace_id: sc.workspace_id, key, ref_id: refId }, ["flow.budget.lookup"]);
+      if (!r.ok) throw new Error(`budget lookup ${r.status}`);
+      const result = ((await r.json()) as any).data;
+      if (result === null) return null;
+      if (typeof result?.reservation_id !== "string" || !result.reservation_id) throw new Error("invalid budget lookup receipt");
+      return { reservation_id: result.reservation_id };
+    },
     reserve: async (sc, key, amount, refId) => {
       const r = await platformCall("/api/internal/flow/budget/reserve", sc, { grant_actor: sc.grant_actor, workspace_id: sc.workspace_id, key, amount_micro: amount, ref_id: refId });
       if (r.status === 402 || r.status === 403) throw Object.assign(new Error(`budget denied ${r.status}`), { status: 402 });

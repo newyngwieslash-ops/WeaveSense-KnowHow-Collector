@@ -8,7 +8,7 @@ import json
 import time
 import uuid
 
-from core import Failure, InternalClient, canonical, sha
+from core import Failure, HASH, InternalClient, canonical, sha
 
 
 def batches(items, max_bytes=32000, max_items=12):
@@ -90,6 +90,8 @@ class Gateway:
             raise Failure("MODEL_PENDING", 202, True, 5)
         if status not in ("completed", "succeeded"):
             raise Failure("MODEL_FAILED", 502)
+        if result.get("task_id") != saved["task_id"] or result.get("usage_ref") != "model_task:" + saved["task_id"] or not isinstance(result.get("model_config_hash"), str) or not HASH.fullmatch(result["model_config_hash"]):
+            raise Failure("MODEL_PROVENANCE_INVALID", 502)
         output = result.get("output")
         if isinstance(output, str):
             try:

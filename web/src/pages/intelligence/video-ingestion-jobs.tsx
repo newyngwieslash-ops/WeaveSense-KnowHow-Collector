@@ -5,7 +5,7 @@ import { AppDrawer } from "@/components/ui/product/app-drawer/app-drawer";
 import { AppModal } from "@/components/ui/product/app-modal/app-modal";
 import { Callout } from "@/components/ui/product/callout/callout";
 import { cancelVideoJob, getVideoJob, listVideoJobs, readVideoArtifacts, reconcileVideoJob, retryVideoJob, type VideoJob, type VideoStage } from "@/services/api/video-knowledge";
-import { listKnowledgeExtractions } from "@/services/api/video-knowledge-review";
+import { listKnowledgeExtractions, retryKnowledgeExtraction, type KnowledgeExtractionRun } from "@/services/api/video-knowledge-review";
 import { MutationError, useVideoMutation, useVideoResource, VideoLoadState, VIDEO_STATE_LABEL, VideoState } from "./video-common";
 import { VideoTranscriptCorrection } from "./video-transcript-correction";
 import { VideoEvidenceTimeline } from "./video-evidence-timeline";
@@ -15,6 +15,12 @@ const terminal = new Set(["completed", "completed_with_gaps", "cancelled", "fail
 const errorText = (value: VideoJob["error"]) => typeof value === "string" ? value : value ? `${value.code ?? ""} ${value.message ?? ""}` : "—";
 const INTENT_LABEL: Record<NonNullable<VideoStage["submission_intent_state"]>, string> = { none: "无记录", prepared: "已准备", submitted: "已提交", accepted: "已接收", resume_requested: "已请求恢复", terminal: "意图终态", unknown: "未知" };
 const EXTERNAL_LABEL: Record<NonNullable<VideoStage["external_observed_state"]>, string> = { unknown: "未知", pending: "待处理（pending）", completed: "完成（completed）", failed: "失败（failed）", reconciliation_required: "结果不明，需核对（reconciliation_required）" };
+export function KnowledgeExtractionRecovery({ run, busy, onRetry }: { run: KnowledgeExtractionRun; busy: boolean; onRetry: () => void }) {
+    const retryable = ["failed", "blocked_auth", "blocked_budget", "reconciliation_required"].includes(run.state);
+    if (!retryable) return null;
+    const reconcileOnly = run.state === "reconciliation_required" || Boolean(run.external_task_id && !["failed", "cancelled", "succeeded"].includes(run.external_task_status ?? ""));
+    return <Space direction="vertical"><Typography.Text type="secondary">冻结版本与已发生费用不变。只有确认终态才创建新尝试，仍受原总预算限制；结果不明只核对原任务。</Typography.Text><Button disabled={busy} onClick={onRetry}>{reconcileOnly ? "核对整理结果" : "恢复知识整理"}</Button></Space>;
+}
 /** An observed response is historical; local cancellation/completion is never remote evidence. */
 export function VideoExternalStageSummary({ stage, hostState }: { stage: VideoStage; hostState?: VideoJob["state"] }) {
     const observed = stage.external_observed_state && EXTERNAL_LABEL[stage.external_observed_state];
@@ -101,7 +107,7 @@ function VideoIngestionDetail({ workspaceId, jobId, onChanged, onOpenJob }: { wo
             <Card size="small" title="已记录 usage"><pre className="whitespace-pre-wrap break-all">{job.usage ? JSON.stringify(job.usage, null, 2) : "尚未返回计量，不等于零成本"}</pre></Card>
             <Card size="small" title="ready 后独立知识整理运行">
                 <VideoLoadState workspaceId={workspaceId} {...extractions} empty={extractions.data?.items.length === 0 ? "尚无关联整理运行；资料就绪不等于候选已生成" : undefined} onRetry={extractions.refresh} />
-                {extractions.data && <List dataSource={extractions.data.items} renderItem={run => <List.Item><div className="space-y-2"><Typography.Text copyable>{run.id}</Typography.Text><div><Tag>{({ queued: "等待整理", running: "正在整理", submitted: "模型任务已提交", completed: "候选已生成 · 未发布", blocked_budget: "模型或预算阻断", blocked_auth: "整理授权阻断", failed: "整理失败" } as Record<string, string>)[run.state] ?? run.state}</Tag>领域 {run.profile_id} v{run.profile_version} · 修订 {run.revision}</div>{run.error && <MutationError error={errorText(run.error)} />}<Space wrap>{run.candidate_ids?.map(id => <Link key={id} to={`/intelligence/video-knowledge?review=${encodeURIComponent(id)}`}>复核候选 {id}</Link>)}</Space>{run.state === "blocked_budget" && <Callout tone="warning">检查冻结领域版本的知识整理模型与预算；已有运行不会被新配置静默改写。<Link to="/intelligence/domains">查看领域版本</Link></Callout>}</div></List.Item>} />}
+                {extractions.data && <List dataSource={extractions.data.items} renderItem={run => <List.Item><div className="space-y-2"><Typography.Text copyable>{run.id}</Typography.Text><div><Tag>{({ queued: "等待整理", running: "正在整理", submitted: "模型任务已提交", completed: "候选已生成 · 未发布", blocked_budget: "模型或预算阻断", blocked_auth: "整理授权阻断", failed: "整理失败", reconciliation_required: "整理结果待核对" } as Record<string, string>)[run.state] ?? run.state}</Tag>领域 {run.profile_id} v{run.profile_version} · 修订 {run.revision} · 模型代次 {run.model_generation ?? 0}</div>{run.error && <MutationError error={errorText(run.error)} />}<Space wrap>{run.candidate_ids?.map(id => <Link key={id} to={`/intelligence/video-knowledge?review=${encodeURIComponent(id)}`}>复核候选 {id}</Link>)}</Space><KnowledgeExtractionRecovery run={run} busy={mutation.busy} onRetry={() => void mutation.run(async () => { await retryKnowledgeExtraction(workspaceId, run); extractions.refresh(); })} />{run.state === "blocked_budget" && <Callout tone="warning">检查冻结领域版本的知识整理模型与预算；已有运行不会被新配置静默改写。<Link to="/intelligence/domains">查看领域版本</Link></Callout>}</div></List.Item>} />}
             </Card>
             <Card size="small" title="分页产物清单" extra={<Button disabled={mutation.busy} onClick={() => void mutation.run(async () => setArtifacts(await readVideoArtifacts(workspaceId, jobId)))}>读取</Button>}>
                 {artifacts && <><Tag>{artifacts.complete ? "清单完整" : "清单尚未完整"}</Tag>{artifacts.truncated && <Tag>返回有界分页</Tag>}<pre className="whitespace-pre-wrap break-all">{JSON.stringify(artifacts.items, null, 2)}</pre><Button disabled={!artifacts.next_cursor || mutation.busy} onClick={() => void mutation.run(async () => setArtifacts(await readVideoArtifacts(workspaceId, jobId, artifacts.next_cursor!)))}>下一页</Button></>}

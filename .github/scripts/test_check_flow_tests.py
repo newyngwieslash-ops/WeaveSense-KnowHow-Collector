@@ -13,7 +13,9 @@ ok 4 - legacy import (real PostgreSQL, FORCE RLS app role)
 ok 5 - QA PostgreSQL: real independent connections serialize claims, preserve restart fence and enforce video FORCE RLS
 ok 6 - QA K017 PostgreSQL: coordinator required embedding gates FTS, vectors and ready event on verified host receipt
 ok 7 - QA R25/K025 PostgreSQL: pre-erasure backup cannot resurrect data before latest external journal replay
-# tests 7
+ok 8 - AC28 PostgreSQL: failed additive migration is atomic and retry preserves references
+ok 9 - AC07 PostgreSQL: cancel waits for real ready commit then refuses to cancel or delete accepted objects
+# tests 9
 # fail 0
 # skipped 0
 """
@@ -29,7 +31,7 @@ class GateTests(unittest.TestCase):
 
     def test_missing_summary(self):
         with self.assertRaises(ValueError):
-            gate.verify(PASS.replace("# tests 7", ""))
+            gate.verify(PASS.replace("# tests 9", ""))
 
     def test_missing_required(self):
         with self.assertRaises(ValueError):
@@ -37,11 +39,19 @@ class GateTests(unittest.TestCase):
 
     def test_inline_skip(self):
         with self.assertRaises(ValueError):
-            gate.verify(PASS.replace("replay\n# tests", "replay # SKIP\n# tests"))
+            gate.verify(PASS.replace("objects\n# tests", "objects # SKIP\n# tests"))
 
     def test_missing_video_restore(self):
         with self.assertRaises(ValueError):
             gate.verify(PASS.replace("ok 7", "not ok 7"))
+
+    def test_missing_migration_failure_recovery(self):
+        with self.assertRaises(ValueError):
+            gate.verify(PASS.replace("ok 8", "not ok 8"))
+
+    def test_missing_cancel_ready_race(self):
+        with self.assertRaises(ValueError):
+            gate.verify(PASS.replace("ok 9", "not ok 9"))
 
 
 if __name__ == "__main__":
