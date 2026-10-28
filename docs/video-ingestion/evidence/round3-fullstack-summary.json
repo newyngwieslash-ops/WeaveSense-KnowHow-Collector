@@ -1,0 +1,596 @@
+{
+  "schema_version": "weavesense.round3-fullstack-summary/1",
+  "meaning": "Verified retained subset of a disposable GitHub Actions TEST host execution; not raw archive replacement or formal business acceptance",
+  "source_commit": "21410a7e0582f03afca8bb955e1349e777db033c",
+  "source_branch": "feat/knowhow-fullstack-acceptance",
+  "execution": {
+    "environment": "GitHub-hosted Ubuntu 24.04 disposable runner, fresh Compose project and volumes; not the user production host",
+    "run_id": 40623742787,
+    "job_id": 122603621607,
+    "run_url": "https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40623742787",
+    "artifact_id": 12788677246,
+    "artifact_url": "https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40623742787/artifacts/12788677246",
+    "artifact_zip_sha256": "82046c914927ff1190a24c6fc8571ef8b354be295d45370622273b42a674c3c5",
+    "raw_artifact_retention_days": 14,
+    "outcome": {
+      "exit_code": 0,
+      "compose_project": "knowhow-ci-40623742787-1",
+      "production_ready": false,
+      "synthetic_external_model": true,
+      "real_platform_acquisition": false
+    }
+  },
+  "formal_acceptance_established": false,
+  "production_ready": false,
+  "boundaries": {
+    "synthetic": [
+      "self-authored timed subtitle input",
+      "deterministic model HTTP provider"
+    ],
+    "not_claimed": [
+      "real platform acquisition",
+      "ASR accuracy",
+      "audio/video playback",
+      "industry quality",
+      "native Skill execution",
+      "production deployment",
+      "existing workspace B substitution matrix",
+      "scheduler windows or in-flight recovery",
+      "backup restore or migration failure recovery",
+      "two-platform pilot",
+      "global zero skipped tests"
+    ],
+    "ingest": "Authenticated browser HTTP lawful-input API, not an upload form; profile/source/review/publish/search/evidence/withdraw use actual UI",
+    "database_business_state_seeded": false,
+    "external_paid_model_called": false,
+    "private_credentials_retained": false,
+    "cleanup_resource_absence_verified": false,
+    "cleanup_limit": "This candidate used best-effort cleanup; later owned-resource absence verification requires its own final-head execution"
+  },
+  "runtime": {
+    "service_count": 9,
+    "real_services_plus_fixture": "8 actual application/data services plus 1 synthetic external model fixture",
+    "images_meaning": "Local runtime image IDs, not published registry manifest digests; mutable external base tags limit reproducibility",
+    "images": [
+      {
+        "service": "loom-scheduler",
+        "image_id": "sha256:8b00fba52c989fd49fe5d09d5637a26b32e544adbb8b6f43540a7f3b1892429b",
+        "repository": "knowhow-ci-40623742787-1-loom-scheduler",
+        "tag": "latest",
+        "platform": "linux/amd64"
+      },
+      {
+        "service": "postgres",
+        "image_id": "sha256:ab20e934b27ba3ff927c1b4c9ff8cf6c32f315f743efe68dd3441182a87fb085",
+        "repository": "postgres",
+        "tag": "17-alpine",
+        "platform": "linux/amd64"
+      },
+      {
+        "service": "minio",
+        "image_id": "sha256:58fa5eacd66c85704d92e2c2a7633c0f0d9b7a77814995b169d924176c973d98",
+        "repository": "cgr.dev/chainguard/minio",
+        "tag": "latest",
+        "platform": "linux/amd64"
+      },
+      {
+        "service": "web",
+        "image_id": "sha256:526bca98cd6ecd12ff8b09462493291832f9121dcdeba0384146d974b472b210",
+        "repository": "knowhow-ci-40623742787-1-web",
+        "tag": "latest",
+        "platform": "linux/amd64"
+      },
+      {
+        "service": "loom-engine",
+        "image_id": "sha256:8b00fba52c989fd49fe5d09d5637a26b32e544adbb8b6f43540a7f3b1892429b",
+        "repository": "knowhow-ci-40623742787-1-loom-engine",
+        "tag": "latest",
+        "platform": "linux/amd64"
+      },
+      {
+        "service": "video-worker",
+        "image_id": "sha256:02546aa5240470d76223d7da213c5ff5cdcfc62323f2087c2b3fce90c251a458",
+        "repository": "knowhow-ci-40623742787-1-video-worker",
+        "tag": "latest",
+        "platform": "linux/amd64"
+      },
+      {
+        "service": "redis",
+        "image_id": "sha256:98c6ca8f397f86e469be752c3e7ed5eb8b17f2479840cb69a2e413037038e9f4",
+        "repository": "redis",
+        "tag": "7-alpine",
+        "platform": "linux/amd64"
+      },
+      {
+        "service": "platform",
+        "image_id": "sha256:1243ef8d3ec297e012a1b00dbbf1cc219b94b68a7bc09a16b1160ecaa9147cff",
+        "repository": "knowhow-ci-40623742787-1-platform",
+        "tag": "latest",
+        "platform": "linux/amd64"
+      },
+      {
+        "service": "provider-fixture",
+        "image_id": "sha256:563b39b30dfd6c990ae521ad43cb7ee3f244ea18059749648304676860eebb80",
+        "repository": "knowhow-ci-40623742787-1-provider-fixture",
+        "tag": "latest",
+        "platform": "linux/amd64"
+      }
+    ],
+    "startup_services": [
+      {
+        "Service": "loom-engine",
+        "State": "running",
+        "Health": "healthy"
+      },
+      {
+        "Service": "loom-scheduler",
+        "State": "running",
+        "Health": ""
+      },
+      {
+        "Service": "minio",
+        "State": "running",
+        "Health": ""
+      },
+      {
+        "Service": "platform",
+        "State": "running",
+        "Health": "healthy"
+      },
+      {
+        "Service": "postgres",
+        "State": "running",
+        "Health": "healthy"
+      },
+      {
+        "Service": "provider-fixture",
+        "State": "running",
+        "Health": "healthy"
+      },
+      {
+        "Service": "redis",
+        "State": "running",
+        "Health": ""
+      },
+      {
+        "Service": "video-worker",
+        "State": "running",
+        "Health": "healthy"
+      },
+      {
+        "Service": "web",
+        "State": "running",
+        "Health": "healthy"
+      }
+    ],
+    "nginx": "1.27.5; nginx -t passed",
+    "backend_recreation_without_web_restart": {
+      "backend_recreated": true,
+      "web_not_recreated": true,
+      "proxied_readiness_after_recreation": true
+    }
+  },
+  "browser": {
+    "initial_status": "initial_passed_published_awaiting_real_service_restart",
+    "after_restart_status": "passed",
+    "initial_checks": {
+      "initial_real_password_login": true,
+      "ui_profile_and_source_creation": true,
+      "same_key_same_job_and_changed_request_conflict": true,
+      "browser_authenticated_http_ingest_not_ui_upload_form": true,
+      "invalid_required_subtitle_rejected_without_ready_document": true,
+      "real_worker_to_knowledge_ready": true,
+      "unpublished_not_in_default_search": true,
+      "anonymous_and_nonexistent_nonmember_workspace_selector_denied": true,
+      "edit_invalidates_approval_and_stale_publish_rejected": true,
+      "ui_review_approve_publish": true,
+      "ui_search_fixed_evidence_no_invented_media_and_reload": true
+    },
+    "combined_checks": {
+      "initial_real_password_login": true,
+      "ui_profile_and_source_creation": true,
+      "same_key_same_job_and_changed_request_conflict": true,
+      "browser_authenticated_http_ingest_not_ui_upload_form": true,
+      "invalid_required_subtitle_rejected_without_ready_document": true,
+      "real_worker_to_knowledge_ready": true,
+      "unpublished_not_in_default_search": true,
+      "anonymous_and_nonexistent_nonmember_workspace_selector_denied": true,
+      "edit_invalidates_approval_and_stale_publish_rejected": true,
+      "ui_review_approve_publish": true,
+      "ui_search_fixed_evidence_no_invented_media_and_reload": true,
+      "restart_real_password_login": true,
+      "post_service_restart_published_record_revision_evidence_durable": true,
+      "ui_withdraw_removes_default_search_after_reload": true
+    },
+    "initial_page_error_count": 0,
+    "restart_page_error_count": 0,
+    "numeric_evidence_time_ms": [
+      0,
+      4000
+    ],
+    "initial_test_seconds": 39.384,
+    "restart_test_seconds": 8.121,
+    "screenshots": {
+      "published-knowledge.png": "Animation-obscured closing drawer; NOT used as publication visual proof. Subsequent harness adds a visibility wait.",
+      "withdrawn-default-search.png": "Clear actual post-withdrawal default-search empty state; raw archive only"
+    }
+  },
+  "cross_service_identity": {
+    "tenant_id": "tn_u_b097adb43de662430151cfd693716d42",
+    "workspace_id": "ws_u_b097adb43de662430151cfd693716d42",
+    "profile_id": "vp_b9dd0f2f29704f8195434fc8d295baea",
+    "profile_version": 1,
+    "profile_hash": "8b92baf675af4363ccc569ed32883fa520b704c0881bbe8de3fa664928ff7abf",
+    "source_id": "src_937ff75898d130058a16",
+    "video_job_id": "vj_c4841285f7f18c06ca50b5d0",
+    "invalid_input_job_id": "vj_b65fb71433a591fedb8ddb2f",
+    "operation_id": "op_0a61394928bf7f9791738994",
+    "document_id": "doc_92c8af56ed360f15a8073072",
+    "document_revision": 1,
+    "document_hash": "41234a4b1914b1ed4270bcf60620293ec889302e6859eb50c56da4c5c92ea948",
+    "extraction_id": "vkr_10e047543330ed799668d4df",
+    "knowledge_id": "kn_acf54a49f9277c3695d3058c",
+    "knowledge_version": 2,
+    "knowledge_hash": "9d0ad1e14665f41dfa3b047c646d187e4224941877b905e37ecd6767770bd71d",
+    "release_id": "krel_5f17ecc5386a33eb5b4ee039",
+    "input_sha256": "136d8c0ec1cfa7589f5f29a6a503bee7134c16c7ddce13d4e85c8d41e0ab7118",
+    "media_availability": "not_acquired",
+    "evidence": [
+      {
+        "evidence_id": "ev_18e45906c5d62b29cbf30f36",
+        "document_id": "doc_92c8af56ed360f15a8073072",
+        "revision": 1,
+        "snippet_hash": "a9c1e6e0ba5380b9a96741ff48a2fa5b663a0de860cb5f84583440ad1cf4dc4d",
+        "char_start": 60,
+        "char_end": 127,
+        "start_ms": 0,
+        "end_ms": 4000
+      }
+    ]
+  },
+  "persistence": {
+    "observed_before": "2026-10-28T03:00:50.473Z",
+    "observed_after": "2026-10-28T03:01:41.941Z",
+    "database": {
+      "database": "flow_intel",
+      "role": "flow_intel",
+      "superuser": false,
+      "bypass_rls": false,
+      "version": "170011"
+    },
+    "applied_migrations": [
+      "0001_flow_intel.sql",
+      "0002_chunks_evidence_monitors.sql",
+      "0003_reports_research_briefs.sql",
+      "0004_connectors.sql",
+      "0005_grant_recheck.sql",
+      "0006_rls.sql",
+      "0007_source_backoff.sql",
+      "0008_feed_validators.sql",
+      "0009_terms_research_sources.sql",
+      "0010_media_ocr.sql",
+      "0011_legacy_import.sql",
+      "0012_job_states_misfire.sql",
+      "0013_budget_fairness_events.sql",
+      "0014_media_asr.sql",
+      "0015_legacy_archive.sql",
+      "0016_gaps9.sql",
+      "0017_raw_response_archive.sql",
+      "0018_composite_keys_and_fk.sql",
+      "0019_monitor_canvas_binding.sql",
+      "0020_report_structured_output.sql",
+      "0021_monitor_hits_cycles.sql",
+      "0022_monitor_cycle_force_rls.sql",
+      "0023_video_core.sql",
+      "0024_video_knowledge_governance.sql",
+      "0025_video_embedding_staging.sql",
+      "0026_video_deletion_journal.sql",
+      "0027_video_origin_candidates.sql",
+      "0028_video_retention_policy.sql",
+      "0029_video_observability.sql",
+      "0030_video_external_observation.sql"
+    ],
+    "rls": [
+      {
+        "table_name": "flow_knowledge_releases",
+        "enabled": true,
+        "forced": true
+      },
+      {
+        "table_name": "flow_knowledge_units",
+        "enabled": true,
+        "forced": true
+      },
+      {
+        "table_name": "flow_video_jobs",
+        "enabled": true,
+        "forced": true
+      },
+      {
+        "table_name": "flow_video_knowledge_runs",
+        "enabled": true,
+        "forced": true
+      },
+      {
+        "table_name": "flow_video_objects",
+        "enabled": true,
+        "forced": true
+      },
+      {
+        "table_name": "flow_video_stages",
+        "enabled": true,
+        "forced": true
+      }
+    ],
+    "before_checks": {
+      "postgres_non_superuser_non_bypassrls": true,
+      "all_checked_source_migrations_applied": true,
+      "video_and_knowledge_rls_forced": true,
+      "real_material_job_completed": true,
+      "invalid_upload_has_no_document_or_ready_state": true,
+      "success_has_both_worker_manifests": true,
+      "success_has_document_revision_and_temporal_evidence": true,
+      "database_content_and_snippet_hashes_match": true,
+      "one_ready_event_per_success": true,
+      "real_model_extraction_created_candidates": true,
+      "explicit_review_and_publication_persisted": true,
+      "actual_object_store_artifacts_exist": true,
+      "accepted_object_bytes_and_hashes_match_minio": true,
+      "actual_go_gateway_reached_synthetic_model": true
+    },
+    "after_checks": {
+      "postgres_non_superuser_non_bypassrls": true,
+      "all_checked_source_migrations_applied": true,
+      "video_and_knowledge_rls_forced": true,
+      "real_material_job_completed": true,
+      "invalid_upload_has_no_document_or_ready_state": true,
+      "success_has_both_worker_manifests": true,
+      "success_has_document_revision_and_temporal_evidence": true,
+      "database_content_and_snippet_hashes_match": true,
+      "one_ready_event_per_success": true,
+      "real_model_extraction_created_candidates": true,
+      "explicit_review_and_publication_persisted": true,
+      "actual_object_store_artifacts_exist": true,
+      "accepted_object_bytes_and_hashes_match_minio": true,
+      "actual_go_gateway_reached_synthetic_model": true
+    },
+    "jobs": [
+      {
+        "id": "vj_b65fb71433a591fedb8ddb2f",
+        "operation_id": "op_8e6caf0b0cc41f7eecd483a6",
+        "source_id": "src_937ff75898d130058a16",
+        "asset_id": "va_20eea93b6eb470f2ce08c1c3",
+        "state": "queued",
+        "stage": "awaiting_input",
+        "completion_level": "pending",
+        "document_id": null,
+        "revision": null,
+        "input_manifest_sha256": null,
+        "processing_manifest_sha256": null,
+        "verified_input_hash": null,
+        "verified_media_sha256": null,
+        "processing_identity": null,
+        "available_capabilities": []
+      },
+      {
+        "id": "vj_c4841285f7f18c06ca50b5d0",
+        "operation_id": "op_0a61394928bf7f9791738994",
+        "source_id": "src_937ff75898d130058a16",
+        "asset_id": "va_20eea93b6eb470f2ce08c1c3",
+        "state": "completed",
+        "stage": "ready",
+        "completion_level": "knowledge_ready",
+        "document_id": "doc_92c8af56ed360f15a8073072",
+        "revision": 1,
+        "input_manifest_sha256": "b5fae268f9479a37a3ad22afcf751f2d0868455ff47e311c271660f9d15bc84c",
+        "processing_manifest_sha256": "e8089fcfcd935f74406342bccec283ef6a3fb03fbce196d305e259a791dca6f7",
+        "verified_input_hash": "136d8c0ec1cfa7589f5f29a6a503bee7134c16c7ddce13d4e85c8d41e0ab7118",
+        "verified_media_sha256": null,
+        "processing_identity": "fd1fb080cfd3dbbc5ab3c4473dc03854f5ffb2abc0aada952d63c0adebdca775",
+        "available_capabilities": [
+          "transcript"
+        ]
+      }
+    ],
+    "manifests": [
+      {
+        "video_job_id": "vj_c4841285f7f18c06ca50b5d0",
+        "artifact_stage": "input_ready",
+        "sha256": "b5fae268f9479a37a3ad22afcf751f2d0868455ff47e311c271660f9d15bc84c"
+      },
+      {
+        "video_job_id": "vj_c4841285f7f18c06ca50b5d0",
+        "artifact_stage": "processing_complete",
+        "sha256": "e8089fcfcd935f74406342bccec283ef6a3fb03fbce196d305e259a791dca6f7"
+      }
+    ],
+    "revisions": [
+      {
+        "document_id": "doc_92c8af56ed360f15a8073072",
+        "revision": 1,
+        "content_hash": "41234a4b1914b1ed4270bcf60620293ec889302e6859eb50c56da4c5c92ea948",
+        "material_type": "transcript",
+        "video_manifest_sha256": "e8089fcfcd935f74406342bccec283ef6a3fb03fbce196d305e259a791dca6f7",
+        "content_hash_verified": true
+      }
+    ],
+    "temporal_evidence": [
+      {
+        "id": "ev_18e45906c5d62b29cbf30f36",
+        "document_id": "doc_92c8af56ed360f15a8073072",
+        "revision": 1,
+        "snippet_hash": "a9c1e6e0ba5380b9a96741ff48a2fa5b663a0de860cb5f84583440ad1cf4dc4d",
+        "video_job_id": "vj_c4841285f7f18c06ca50b5d0",
+        "start_ms": "0",
+        "end_ms": "4000",
+        "alignment_method": "source_segment",
+        "material_type": "platform_subtitles",
+        "snippet_hash_verified": true
+      }
+    ],
+    "extractions": [
+      {
+        "id": "vkr_10e047543330ed799668d4df",
+        "video_job_id": "vj_c4841285f7f18c06ca50b5d0",
+        "document_id": "doc_92c8af56ed360f15a8073072",
+        "revision": 1,
+        "state": "completed",
+        "input_hash": "d68bbc29122b296ae57ab177585a8a346b0b17998b9bab5ec9340836aeb1851d",
+        "external_task_id": "mt_124a9c0c545233c42cb9b2a1",
+        "candidate_ids": [
+          "kn_acf54a49f9277c3695d3058c"
+        ],
+        "model_config_hash": "38f2946c834e9ed16d2b64cf26df3ea187acc4dc34012a79e1599b6c9343be06"
+      }
+    ],
+    "ready_events": [
+      {
+        "job_id": "vj_c4841285f7f18c06ca50b5d0",
+        "type": "video.knowledge_ready",
+        "count": 1
+      }
+    ],
+    "knowledge_before": [
+      {
+        "id": "kn_acf54a49f9277c3695d3058c",
+        "version": 2,
+        "content_hash": "9d0ad1e14665f41dfa3b047c646d187e4224941877b905e37ecd6767770bd71d",
+        "state": "published",
+        "release_id": "krel_5f17ecc5386a33eb5b4ee039"
+      }
+    ],
+    "knowledge_after": [
+      {
+        "id": "kn_acf54a49f9277c3695d3058c",
+        "version": 2,
+        "content_hash": "9d0ad1e14665f41dfa3b047c646d187e4224941877b905e37ecd6767770bd71d",
+        "state": "withdrawn",
+        "release_id": "krel_5f17ecc5386a33eb5b4ee039"
+      }
+    ],
+    "reviews": [
+      {
+        "knowledge_id": "kn_acf54a49f9277c3695d3058c",
+        "version": 1,
+        "content_hash": "e8a9ae86c6de6ef6441bf494db949b2974b79382bafbbb4be802d165e23a6725",
+        "decision": "submit"
+      },
+      {
+        "knowledge_id": "kn_acf54a49f9277c3695d3058c",
+        "version": 1,
+        "content_hash": "e8a9ae86c6de6ef6441bf494db949b2974b79382bafbbb4be802d165e23a6725",
+        "decision": "approve"
+      },
+      {
+        "knowledge_id": "kn_acf54a49f9277c3695d3058c",
+        "version": 2,
+        "content_hash": "9d0ad1e14665f41dfa3b047c646d187e4224941877b905e37ecd6767770bd71d",
+        "decision": "submit"
+      },
+      {
+        "knowledge_id": "kn_acf54a49f9277c3695d3058c",
+        "version": 2,
+        "content_hash": "9d0ad1e14665f41dfa3b047c646d187e4224941877b905e37ecd6767770bd71d",
+        "decision": "approve"
+      }
+    ],
+    "releases_before": [
+      {
+        "id": "krel_5f17ecc5386a33eb5b4ee039",
+        "knowledge_id": "kn_acf54a49f9277c3695d3058c",
+        "version": 2,
+        "content_hash": "9d0ad1e14665f41dfa3b047c646d187e4224941877b905e37ecd6767770bd71d",
+        "revoked": false
+      }
+    ],
+    "releases_after": [
+      {
+        "id": "krel_5f17ecc5386a33eb5b4ee039",
+        "knowledge_id": "kn_acf54a49f9277c3695d3058c",
+        "version": 2,
+        "content_hash": "9d0ad1e14665f41dfa3b047c646d187e4224941877b905e37ecd6767770bd71d",
+        "revoked": true
+      }
+    ],
+    "minio_objects": [
+      {
+        "video_job_id": "vj_c4841285f7f18c06ca50b5d0",
+        "object_id": "08f735ed660c623a76866e0da3e54c4e",
+        "sha256": "136d8c0ec1cfa7589f5f29a6a503bee7134c16c7ddce13d4e85c8d41e0ab7118",
+        "bytes": "152",
+        "content_type": "application/json",
+        "state": "accepted",
+        "observed_bytes": 152,
+        "observed_sha256": "136d8c0ec1cfa7589f5f29a6a503bee7134c16c7ddce13d4e85c8d41e0ab7118",
+        "verified": true
+      },
+      {
+        "video_job_id": "vj_c4841285f7f18c06ca50b5d0",
+        "object_id": "9d75ec3133ccb57eb8fb920449047daa",
+        "sha256": "eeab538391e5703d70ea2cf3757887a4a58b911e001ff4271f57ad780d3ca4c8",
+        "bytes": "215",
+        "content_type": "application/json",
+        "state": "accepted",
+        "observed_bytes": 215,
+        "observed_sha256": "eeab538391e5703d70ea2cf3757887a4a58b911e001ff4271f57ad780d3ca4c8",
+        "verified": true
+      }
+    ],
+    "minio_objects_equal_before_after": true,
+    "stable_identity_sha256_before": "93468eb89f11068285916a1211b374dbac66b89af01734f03e1fd1bebb560f73",
+    "stable_identity_sha256_after": "93468eb89f11068285916a1211b374dbac66b89af01734f03e1fd1bebb560f73",
+    "restart_comparison": {
+      "same_job_ids": true,
+      "same_object_hashes": true,
+      "actual_service_restart": true
+    }
+  },
+  "model_boundary": {
+    "calls": [
+      {
+        "call_id": "video-model:ad5660db85b3393b0b904d1aaf8e75eb1d186fd53cef426296fa40cc13cb8eac",
+        "request_sha256": "27a680121d018fc4a98b2deb2885afc58d9a00fee4d4b3a5e70e6786e348b94f",
+        "requests": 1,
+        "response_sha256": "3f17b3ebd793b25da0f49c40020d75c253145afe3a44fb4484b9d83d9603aeec",
+        "synthetic": true,
+        "total_tokens": 150
+      }
+    ],
+    "real_model_quality_verified": false,
+    "synthetic_model_boundary": true,
+    "unique_model_calls": 1
+  },
+  "source_artifact_file_sha256": {
+    "source-commit.txt": "f4bc260c2fca76bb734f294e096c52fa9adcbfaeaf455362b6b15eaf0a9ee0c3",
+    "browser-initial.json": "f7dbdf49d4391ed2497e72c33fc420492e4bfff24da7441a3fca0ca010638b75",
+    "browser-after-restart.json": "30619a3efae80781e965b0b7196671043debf7f6b67b8b49cf8d027a66be1331",
+    "persistence-before-restart.json": "e986c683ca217c96962fd2ee7d03365de92069f1c45d2e93522d95f0681e5425",
+    "persistence-after-restart.json": "6d64449b401bd76a5a3477c95fea848cf237db1a57f5da3f0ce159ddd0930f6a",
+    "restart-verification.json": "e34f5291fc5a04144c989cf75a5d316576882c3ce2997a675230b5b796eb479e",
+    "images.json": "3e2c00406f6de5b97d4d4aeafb24ab291600acd80e8ccff0d7b6d8b6b9e81eab",
+    "healthy-start.jsonl": "f056bae1800c932d236ac1056c146f7b74e3c443a49f6d34067512e9d692bbf0",
+    "proxy-recreation.json": "46083ba3f52c1495830fcfa053a3f05abd48b03ac232ffdb9cd51f83d3d874f5",
+    "nginx-runtime.txt": "dc67ccce7c5f38d31e56cb5a61e489c4b7dbeae484b457b6754f5b0ab6460fe7",
+    "outcome.json": "19c1135464bad3261a0cdcef73722580ca4c3192895aadcd18e57b465f8dcd8b"
+  },
+  "candidate_ci": {
+    "source_commit": "21410a7e0582f03afca8bb955e1349e777db033c",
+    "all_four_workflows_succeeded": true,
+    "jobs_succeeded": 13,
+    "runs": {
+      "fullstack": 40623742787,
+      "integration": 40623742806,
+      "quality": 40623742734,
+      "containers": 40623742746
+    },
+    "following_documentation_commit": "Must be checked separately; this record does not claim future HEAD validation",
+    "skip_disclosure": [
+      "Integration Flow: 205 passed, 0 skipped; browser HTTP-boundary suite: 6 passed",
+      "Integration Go: 1952 top-level passed, 5 skipped (paid live key, 2 child-only tests, platform redundancy, optional generated-asset browser fixture)",
+      "Quality Go: 1942 top-level passed, 15 skipped; additional 10 opt-in tests passed in integration host",
+      "Quality Flow: 202 passed, 3 skipped; these PostgreSQL opt-ins passed in integration Flow",
+      "Quality Web: 2530 passed plus 65 Previs assertions",
+      "Separate ASR profile: 7 passed, 1 faster-whisper-unavailable skip; no real ASR claim"
+    ]
+  }
+}

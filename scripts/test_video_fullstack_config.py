@@ -3,6 +3,9 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -58,6 +61,30 @@ class FullstackConfigTests(unittest.TestCase):
         actions = [statement for statement in policy["Statement"] if "s3:PutObject" in statement["Action"]]
         self.assertEqual(actions[0]["Resource"], ["arn:aws:s3:::flow-intel/tenants/tn_test/workspaces/ws_test/video/*"])
         self.assertNotIn("s3:*", json.dumps(policy))
+
+    def test_cleanup_requires_successful_queries_and_no_owned_resources(self):
+        runner = (ROOT / "scripts/fullstack/run.sh").read_text()
+        body = re.search(r"if ! python - .*? <<'PY'\n(.*?)\nPY\n", runner, re.S).group(1)
+        cases = [
+            ([0, 0, 0, 0, 0], ["", "", ""], True),
+            ([1, 0, 0, 0, 0], ["", "", ""], False),
+            ([0, 1, 0, 0, 0], ["", "", ""], False),
+            ([0, 0, 1, 0, 0], ["", "", ""], False),
+            ([0, 0, 0, 1, 0], ["", "", ""], False),
+            ([0, 0, 0, 0, 1], ["", "", ""], False),
+            ([0, 0, 0, 0, 0], ["container-id", "", ""], False),
+            ([0, 0, 0, 0, 0], ["", "project-volume", ""], False),
+            ([0, 0, 0, 0, 0], ["", "", "knowhow-ci-1-1-journal"], False),
+            ([0, 0, 0, 0, 0], ["", "", "knowhow-ci-1-1-journal-unowned"], True),
+        ]
+        for statuses, remaining, valid in cases:
+            with self.subTest(statuses=statuses, remaining=remaining):
+                result = subprocess.run([sys.executable, "-", str(self.root), "knowhow-ci-1-1", *map(str, statuses), *remaining], input=body, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0 if valid else 1, result.stderr)
+                report = json.loads((self.root / "cleanup-verification.json").read_text())
+                self.assertEqual(report["verified"], valid)
+        self.assertIn('name=$journal', runner)
+        self.assertIn('^knowhow-ci-[0-9]+-[0-9]+$', runner)
 
 
 if __name__ == "__main__":

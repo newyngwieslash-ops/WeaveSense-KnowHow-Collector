@@ -152,6 +152,8 @@ async function publishedUI(page, title) {
   // Subtitle-only input must not grow an invented player or platform URL.
   await expect(evidence.locator('video,audio')).toHaveCount(0);
   await evidence.getByRole('button', { name: /^(关闭|close)$/i }).click();
+  await expect(evidence).not.toBeVisible();
+  await expect(detail).toBeVisible();
   return detail;
 }
 
