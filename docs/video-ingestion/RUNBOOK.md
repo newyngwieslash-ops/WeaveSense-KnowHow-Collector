@@ -8,6 +8,8 @@
 
 运行 `python scripts/video-task-ledger.py gate` 检查正式发布门槛。非零退出表示尚未正式验收，不能通过删除任务、修改基线或把待验证条目改成已完成来绕过。
 
+新环境接入顺序、组件/迁移/Skill 兼容矩阵、失败发布边界与六类故障诊断见 [OPERATIONS_COMPATIBILITY.md](OPERATIONS_COMPATIBILITY.md)；逐项工程证据与业务输入边界见 [V1-CLOSURE.md](V1-CLOSURE.md)。
+
 ## 2. 开发环境
 
 第三轮清洁 TEST 整栈、真实浏览器与逐项 AC 证据边界见 [ROUND3.md](ROUND3.md)。容器健康检查不能替代登录接口和真实闭环。Docker Web 镜像使用 Nginx 1.27.5，固定内部 `backend:8080` 通过 Docker DNS 动态刷新；平台容器重建后无需重建 Web 才能恢复上游。`resolve` 需要共享 upstream zone，开源版须为 1.27.3 或更新，见 [Nginx 官方说明](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#server)。不要将该 Docker DNS 配置原样用于没有 Docker DNS 的独立 Nginx 主机。

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { selectCandidateOption } from './fullstack-skill-lifecycle.mjs';
 
 // These tests render the real application and its existing routes in Chromium.
 // HTTP responses are explicit synthetic fixtures, not a live platform/Go/LLM E2E.
@@ -37,6 +38,15 @@ async function fixtures(page, options = {}) {
     if (['/intelligence/monitors', '/intelligence/schedules', '/intelligence/connector-samples'].includes(path) && method === 'GET') return send([]);
     if (path.startsWith('/intelligence/')) {
       expect(request.headers()['x-workspace-id']).toBe('ws_browser');
+      if (options.skillCatalog) {
+        if (path === '/intelligence/skills' && method === 'GET') return send(options.skillCatalog);
+        if (path === '/intelligence/knowledge/search' && method === 'POST') return send({ items: options.publishedKnowledge });
+        if (path === '/intelligence/video/skill-candidates' && method === 'GET') return send({ items: [] });
+        if (path === '/intelligence/video/skill-candidates' && method === 'POST') {
+          state.writes.push({ path, body: request.postDataJSON(), headers: request.headers() });
+          return send(null, 422); // UI serialization only, not a fabricated release.
+        }
+      }
       if (path === '/intelligence/sources' && method === 'POST') {
         const body = request.postDataJSON();
         state.writes.push({ path, body, headers: request.headers() });
@@ -183,6 +193,38 @@ test('actual source Select uses keyboard and verifies its visible selected value
   await expect(page.getByText('Synthetic selector diagnostic', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText('Synthetic selector diagnostic', { exact: true })).toBeVisible();
+  expect(state.errors).toEqual([]);
+  expect(state.unknown).toEqual([]);
+});
+
+test('actual Skill candidate virtual single and multi Select reach offscreen options and submit exact frozen identities', async ({ page }) => {
+  const skills = Array.from({ length: 20 }, (_, index) => ({ id: `skill-${index}`, pack_id: 'synthetic-pack',
+    name: index === 19 ? 'Evidence-bound video knowledge organization' : `Synthetic method ${index}`,
+    version: '1.0.0', hash: index.toString(16).padStart(64, '0'), method: 'Synthetic UI fixture only', steps: [] }));
+  const knowledge = Array.from({ length: 30 }, (_, index) => ({ id: `knowledge-${index}`, version: 1,
+    state: 'published', release_id: `release-${index}`, content_hash: 'b'.repeat(64),
+    unit: { title: index === 29 ? 'Synthetic 已发布知识😀e\u0301' : `Synthetic knowledge ${index}`,
+      evidence: [{ evidence_id: `evidence-${index}`, revision: 1, snippet_hash: 'c'.repeat(64) }] } }));
+  const state = await fixtures(page, { skillCatalog: { packs: [{ id: 'synthetic-pack', required_tools: ['intel_search_knowledge'], skills }], installed: [] }, publishedKnowledge: knowledge });
+  await page.goto('/intelligence/video-skills');
+  await page.getByRole('button', { name: '创建候选', exact: true }).click();
+  const form = page.getByRole('dialog', { name: '创建可执行原生方法候选', exact: true });
+  const base = skills.at(-1), published = knowledge.at(-1);
+  await selectCandidateOption(page, form.getByLabel('基础原生版本（已部署）', { exact: true }), `${base.name} v${base.version}`, skills.length);
+  await selectCandidateOption(page, form.getByLabel('冻结已发布知识与证据', { exact: true }), `${published.unit.title} v${published.version}`, knowledge.length);
+  await expect(form).toBeVisible();
+  await expect(form.getByText('evidence-29', { exact: false })).toBeVisible();
+  await form.getByLabel('完整原生 JSON skillpack（不是 SKILL.md，服务端执行 schema 校验）', { exact: true }).fill('{}');
+  await form.getByLabel('逐规则证据映射 JSON（method 与每一步均须唯一映射）', { exact: true }).fill('[]');
+  await form.getByLabel('固定评测集版本', { exact: true }).fill('synthetic-select-only');
+  await form.getByLabel('固定宿主模型 ID（不填写 API key）', { exact: true }).fill('synthetic-select-only');
+  await form.getByLabel('固定模型预算（micro）', { exact: true }).fill('1000');
+  await form.getByLabel('评测用例 JSON（positive / negative / boundary / missing_material / regression）', { exact: true }).fill('[]');
+  await form.getByRole('button', { name: '冻结候选', exact: true }).click();
+  await expect.poll(() => state.writes.length).toBe(1);
+  expect(state.writes[0].body.base).toEqual({ id: base.id, version: base.version, hash: base.hash, required_tools: ['intel_search_knowledge'] });
+  expect(state.writes[0].body.knowledge_releases).toEqual([{ knowledge_id: published.id, version: published.version, release_id: published.release_id, content_hash: published.content_hash }]);
+  expect(state.writes[0].body.evidence).toEqual(published.unit.evidence);
   expect(state.errors).toEqual([]);
   expect(state.unknown).toEqual([]);
 });

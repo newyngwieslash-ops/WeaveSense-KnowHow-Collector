@@ -10,6 +10,7 @@ import { Engine } from "./engine.ts";
 import { sha, type VideoManifest } from "./video-contract.ts";
 import { configureVideoRetentionJournal, initializeVideoDeletionJournal, replayVideoRetentionJournal } from "./video-journal.ts";
 import { applyVideoRetention } from "./video-knowledge.ts";
+import { closeIsolatedPostgresDatabase } from "../validation/video-knowledge/pg-test-cleanup.ts";
 
 const url = process.env.FLOW_VIDEO_TEST_PG_URL;
 test("AC07 PostgreSQL: cancel waits for real ready commit then refuses to cancel or delete accepted objects", { skip: !url && "isolated FLOW_VIDEO_TEST_PG_URL required", timeout: 30_000 }, async t => {
@@ -19,9 +20,8 @@ test("AC07 PostgreSQL: cancel waits for real ready commit then refuses to cancel
   const primary = await pgDb(target.toString()), other = await pgDb(target.toString());
   const directory = await mkdtemp(join(tmpdir(), "video-cancel-ready-"));
   t.after(async () => {
-    await primary.close(); await other.close();
-    await maintenance.query(`DROP DATABASE "${name}" WITH (FORCE)`); await maintenance.close();
-    await rm(directory, { recursive: true, force: true });
+    try { await closeIsolatedPostgresDatabase(maintenance, name, [primary, other]); }
+    finally { await rm(directory, { recursive: true, force: true }); }
   });
   assert.equal((await primary.query("SELECT rolsuper FROM pg_roles WHERE rolname=current_user")).rows[0].rolsuper, false);
   await migrate(primary);

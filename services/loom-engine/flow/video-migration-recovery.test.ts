@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { migrate, pgliteDb, pgDb, type Db } from "./db.ts";
 import { Engine } from "./engine.ts";
 import { sha } from "./video-contract.ts";
+import { closeIsolatedPostgresDatabase } from "../validation/video-knowledge/pg-test-cleanup.ts";
 
 // Fail a real SQL transaction midway through the new migration; the wrapper
 // supplies only fault timing, never fabricated rows or transaction outcomes.
@@ -64,5 +65,5 @@ test("AC28 PostgreSQL: failed additive migration is atomic and retry preserves r
   await admin.query(`CREATE DATABASE "${name}"`);
   const target = new URL(url!); target.pathname = `/${name}`;
   const db = await pgDb(target.toString());
-  try { await recovery(db); } finally { await db.close(); await admin.query(`DROP DATABASE "${name}" WITH (FORCE)`); await admin.close(); }
+  try { await recovery(db); } finally { await closeIsolatedPostgresDatabase(admin, name, [db]); }
 });

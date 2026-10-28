@@ -14,6 +14,7 @@ import { initializeVideoDeletionJournal, configureVideoRetentionJournal, replayV
 import { applyVideoRetention, VideoKnowledgeService } from "./video-knowledge.ts";
 import { sha } from "./video-contract.ts";
 import { Reports } from "./reports.ts";
+import { closeIsolatedPostgresDatabase } from "../validation/video-knowledge/pg-test-cleanup.ts";
 
 const url = process.env.FLOW_VIDEO_TEST_PG_URL;
 test("QA PostgreSQL: real independent connections serialize claims, preserve restart fence and enforce video FORCE RLS", { skip: !url && "FLOW_VIDEO_TEST_PG_URL not configured" }, async t => {
@@ -21,7 +22,7 @@ test("QA PostgreSQL: real independent connections serialize claims, preserve res
   await maintenance.query(`CREATE DATABASE "${name}"`);
   const databaseURL = new URL(url!); databaseURL.pathname = `/${name}`;
   let db = await pgDb(databaseURL.toString()); await migrate(db);
-  const other = await pgDb(databaseURL.toString()); t.after(async () => { await db.close(); await other.close(); await maintenance.query(`DROP DATABASE "${name}" WITH (FORCE)`); await maintenance.close(); });
+  const other = await pgDb(databaseURL.toString()); t.after(() => closeIsolatedPostgresDatabase(maintenance, name, [db, other]));
   let now = new Date("2026-10-26T00:00:00Z");
   const first = new Engine(db, async () => [], () => now), second = new Engine(other, async () => [], () => now);
   first.video.enabled = true; second.video.enabled = true;
