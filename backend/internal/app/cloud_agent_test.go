@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"yingce/backend/internal/database"
 	"yingce/backend/internal/model"
 )
 
@@ -476,29 +477,52 @@ func TestCloudAgentWorkerPersistsRealResponse(t *testing.T) {
 
 func TestCloudAgentConcurrentIdempotencyReservesOnce(t *testing.T) {
 	s, db, _, _ := creationTestService(t)
+	if err := database.ConfigurePool(db); err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Create(&model.CanvasProject{ID: "agent-canvas", UserID: "user", PayloadJSON: `{"nodes":[]}`}).Error; err != nil {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
+	start := make(chan struct{})
+	ids := make(chan string, 4)
 	for i := 0; i < 4; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := s.CreateCloudAgentRun("user", agentTestRequest(), ""); err != nil {
+			<-start
+			run, err := s.CreateCloudAgentRun("user", agentTestRequest(), "")
+			if err != nil {
 				t.Error(err)
+				return
 			}
+			ids <- run.ID
 		}()
 	}
+	close(start)
 	wg.Wait()
-	for _, table := range []any{&model.Task{}, &model.BillingOrder{}, &model.CreditLedgerEntry{}} {
+	close(ids)
+	if len(ids) != 4 {
+		t.Fatalf("successful callers = %d, want 4", len(ids))
+	}
+	for id := range ids {
+		if id != cloudAgentID("user", agentTestRequest().IdempotencyKey) {
+			t.Fatalf("concurrent caller returned a different run: %q", id)
+		}
+	}
+	for _, table := range []any{&model.Task{}, &model.BillingOrder{}, &model.CreditLedgerEntry{}, &model.CloudAgentExecution{}} {
 		var count int64
-		db.Model(table).Count(&count)
+		if err := db.Model(table).Count(&count).Error; err != nil {
+			t.Fatal(err)
+		}
 		if count != 1 {
 			t.Fatalf("expected one %T, got %d", table, count)
 		}
 	}
 	var account model.CreditAccount
-	db.First(&account, "user_id = ?", "user")
+	if err := db.First(&account, "user_id = ?", "user").Error; err != nil {
+		t.Fatal(err)
+	}
 	if account.AvailableMicrocredits != 9900 || account.ReservedMicrocredits != 100 {
 		t.Fatalf("unexpected reservation: %+v", account)
 	}

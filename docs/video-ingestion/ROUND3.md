@@ -13,6 +13,7 @@
 | 第一次 Actions 验证 | `20fce7b` 的 [整栈运行 40614778081](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40614778081)因 job 环境中使用不可用的 `runner.temp` 上下文而未启动 job；`f0347739` 将其移到 step 环境 | 工作流解析修正不是运行成功 |
 | 首次实际构建/启动 | `f0347739` 的 [运行 40614875677](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40614875677)已构建5个应用/fixture镜像，PG/Redis/MinIO及Go/Web启动；Web仅接internal网络没有发布端口，宿主bootstrap连接被拒绝 | 不是整栈成功；未执行浏览器闭环。已按产物修正仅Nginx双网络入口，后台保持内部网络 |
 | 第二次真实整栈启动 | `11ce4538` 的 [运行40615728450](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40615728450)已空环境启动8个服务并通过真实注册/工作区引导；平台重建后Nginx缓存旧IP，登录会话返回502，真实UI正确显示认证恢复错误 | 不是浏览器闭环成功。已修正生产Nginx动态DNS上游并固定1.27.5，保留Web不重建断言，待重跑确认 |
+| 代理恢复与真实登录 | `9a2e16ed` 的 [运行40616976301](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40616976301)确认后端容器已重建、Web容器未重建、匿名会话代理恢复200；真实页面登录与知识域创建通过 | 浏览器误点AntD虚拟下拉的离屏辅助选项而超时，尚未创建来源或触达worker；修正为真实键盘选取后重跑。8个真实应用/数据服务之外另有1个模型fixture |
 | 整栈及最终 head CI | 待实际结果与产物核验 | 不沿用第二轮或中间提交的成功结果 |
 | 正式 V1 台账 | 本轮映射不修改 [PROGRESS.json](PROGRESS.json)；29 项全局 AC 均未由本页认定完成 | 测试数量不是业务验收百分比 |
 
@@ -42,8 +43,12 @@ Loom 知识整理 → 真实 Go Model Gateway / 预算入口
 
 1. **Loom 宿主钩子配置遗漏。** `flow/main.ts` 从 `FLOW_PLATFORM_INTERNAL_URL` 安装授权、预算状态和知识整理运行时；原视频 overlay 仅给相关角色设置了 Python 使用的 `FLOW_PLATFORM_URL`。现在为 API、scheduler、enrich 角色显式配置正确变量，覆盖实际 core+video 默认路径，而非只在测试 overlay 绕过。
 2. **媒体执行器秘密过度暴露。** video-worker 原本继承整份 `.env.flow`，因此显式配置了低权限对象账号仍不能防止数据库、MinIO root、独立删除日志和模型秘密进入解码器环境。现在移除该服务的广义 `env_file`，只枚举所需变量。静态回归检查禁止整份继承及上述无关秘密。
+3. **后端重建后代理地址失效。** Nginx原静态上游会继续连接已经释放的容器IP。现在固定支持动态解析的`nginx:1.27.5-alpine`，使用共享上游zone和Docker DNS resolver，保留原有五条代理的URI、SSE配置和内部接口404隔离。`9a2e16ed`运行已实际验证后端重建而Web不重启时的代理恢复；这不是只靠配置文本推定成功。
+4. **并发幂等请求的SQLite快照竞争。** 同提交的宿主集成测试暴露`EnsureCloudAgent`在WAL过期读快照上升级写事务时返回锁错误。修复仅对已回滚、纯数据库事务中的类型化`SQLITE_BUSY`做有界重试；每次重新检查撤权屏障，不重试整个请求、模型调用或扣费。测试保持生产8连接池和4个同时提交，要求全部返回同一ID且任务/执行/账单/账本各一条；确定性旧快照和重试间撤权用例同时保留。
 
 源码与检查：[docker-compose.video.yml](../../docker-compose.video.yml)、[test_video_deployment.py](../../scripts/test_video_deployment.py)。静态检查只证明配置合同；运行时环境与闭环仍须由实际 TEST 产物建立。
+
+已知但不阻塞本轮失败关闭检查的诊断缺陷：宿主`HTTPVideoProvider.uploadInput`把worker的所有422映射为`INPUT_HASH_MISMATCH`，包括空字幕的`NO_SUBTITLES`。因此负向用例只断言422、无文档、无ready，不宣称失败原因分类已正确；后续应单独补充错误分类合同与回归。
 
 ## 可重复运行：仅新建、可销毁的 TEST checkout
 

@@ -52,9 +52,11 @@ async function login(page, credentials) {
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
   }, credentials.password);
-  const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/auth/login' && r.request().method() === 'POST');
-  await page.getByRole('button', { name: buttonName('登录'), exact: true }).click();
-  expect((await response).status()).toBe(200);
+  const [response] = await Promise.all([
+    page.waitForResponse(r => new URL(r.url()).pathname === '/api/auth/login' && r.request().method() === 'POST', { timeout: 30000 }),
+    page.getByRole('button', { name: buttonName('登录'), exact: true }).click(),
+  ]);
+  expect(response.status()).toBe(200);
   await expect(page).toHaveURL(/\/intelligence\/domains$/);
   await expect(page.getByRole('button', { name: '新建知识域', exact: true })).toBeEnabled();
 }
@@ -70,9 +72,10 @@ async function saveProfile(page) {
   // a cheap deterministic response does not waive that admission requirement.
   await modal.getByLabel('资料就绪后知识整理总预算（micro）', { exact: true }).fill('100000');
   await modal.getByLabel('每次整理输出 token 上限', { exact: true }).fill('1000');
-  const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/intelligence/video/profiles' && r.request().method() === 'POST');
-  await modal.getByRole('button', { name: '保存新版本', exact: true }).click();
-  const out = await response;
+  const [out] = await Promise.all([
+    page.waitForResponse(r => new URL(r.url()).pathname === '/api/intelligence/video/profiles' && r.request().method() === 'POST', { timeout: 30000 }),
+    modal.getByRole('button', { name: '保存新版本', exact: true }).click(),
+  ]);
   expect(out.ok()).toBe(true);
   const envelope = await out.json();
   expect(envelope.code).toBe(0);
@@ -88,15 +91,26 @@ async function saveSource(page, profile) {
   await modal.getByLabel('来源名称', { exact: true }).fill('Synthetic lawful-input source (not a platform acquisition)');
   await modal.getByLabel('原始链接', { exact: true }).fill(sourceURL);
   await modal.getByLabel('平台视频 ID', { exact: true }).fill(nativeId);
-  await modal.getByLabel('冻结知识域版本', { exact: true }).click();
-  await page.getByRole('option', { name: `${profile.name} · v${profile.version}`, exact: true }).click();
+  const profileSelector = modal.getByLabel('冻结知识域版本', { exact: true });
+  const profileLabel = `${profile.name} · v${profile.version}`;
+  // AntD virtual Select exposes an offscreen accessibility option, not the
+  // clickable visual item. Use its actual combobox keyboard interaction.
+  await profileSelector.click();
+  await expect(page.getByRole('option', { name: profileLabel, exact: true })).toBeAttached();
+  await profileSelector.press('ArrowDown');
+  await profileSelector.press('Enter');
+  await expect(profileSelector).toHaveAttribute('aria-expanded', 'false');
+  await expect(modal.getByText(profileLabel, { exact: true })).toBeVisible();
   await modal.getByLabel('内容使用依据', { exact: true }).fill('Self-authored synthetic test subtitle; no platform request, account or rights assertion about real media.');
-  const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/intelligence/sources' && r.request().method() === 'POST');
-  await modal.getByRole('button', { name: '保存来源', exact: true }).click();
-  const out = await response;
+  const [out] = await Promise.all([
+    page.waitForResponse(r => new URL(r.url()).pathname === '/api/intelligence/sources' && r.request().method() === 'POST', { timeout: 30000 }),
+    modal.getByRole('button', { name: '保存来源', exact: true }).click(),
+  ]);
   expect(out.ok()).toBe(true);
   const envelope = await out.json();
   expect(envelope.code).toBe(0);
+  expect(envelope.data.config.profile_id).toBe(profile.id);
+  expect(envelope.data.config.profile_version).toBe(profile.version);
   await expect(modal).not.toBeVisible();
   return envelope.data;
 }

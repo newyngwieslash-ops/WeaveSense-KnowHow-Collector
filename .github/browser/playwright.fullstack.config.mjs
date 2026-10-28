@@ -20,6 +20,8 @@ export default defineConfig({
     launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined },
     baseURL: process.env.VIDEO_FULLSTACK_BASE_URL || 'http://127.0.0.1:4180',
     viewport: { width: 1440, height: 1000 },
+    actionTimeout: 30000,
+    navigationTimeout: 30000,
     // Traces/HAR can contain login passwords, Cookie headers and service data.
     // Capture only deliberate, authenticated screenshots and sanitized JSON.
     trace: 'off',

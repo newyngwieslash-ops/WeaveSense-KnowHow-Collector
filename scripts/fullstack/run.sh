@@ -28,6 +28,9 @@ cleanup() {
   trap - EXIT
   set +e
   if $created; then
+    # Retain completed assertions on browser failure too; this report contains
+    # no login state and goes through the same fail-closed sanitizer below.
+    if test -f "$VIDEO_FULLSTACK_RESULT"; then cp "$VIDEO_FULLSTACK_RESULT" "$out/browser-last-observation.json"; fi
     "${compose[@]}" logs --no-color 2>&1 | python scripts/fullstack/sanitize.py > "$out/service-logs.txt" || true
     "${compose[@]}" ps --all --format json | python scripts/fullstack/sanitize.py > "$out/containers.jsonl" || true
     "${compose[@]}" down --volumes --remove-orphans --timeout 30 >/dev/null 2>&1 || true

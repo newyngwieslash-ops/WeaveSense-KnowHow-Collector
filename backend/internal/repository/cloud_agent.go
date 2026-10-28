@@ -3,10 +3,12 @@ package repository
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/mattn/go-sqlite3"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"yingce/backend/internal/model"
@@ -67,6 +69,33 @@ func (r *Repository) EnsureCloudAgent(run *model.CloudAgentExecution) error {
 	if err := r.CheckVideoRunProjection(run.UserID, run.ID); err != nil {
 		return err
 	}
+	for attempt := 0; ; attempt++ {
+		candidate := *run
+		candidate.Journal = append([]model.CloudAgentEventRecord(nil), run.Journal...)
+		candidate.Transcript = append([]model.CloudAgentMessageRecord(nil), run.Transcript...)
+		err := r.ensureCloudAgentTransaction(&candidate)
+		if err == nil {
+			*run = candidate
+			return nil
+		}
+		// WAL readers cannot upgrade a stale snapshot to a writer, even with
+		// busy_timeout. Retry only this rolled-back, DB-only transaction; each
+		// fresh snapshot must repeat the revocation fence before inserting.
+		var busy sqlite3.Error
+		if r.Dialect() != "sqlite" || !errors.As(err, &busy) || busy.Code != sqlite3.ErrBusy || attempt >= 5 {
+			return err
+		}
+		timer := time.NewTimer(time.Duration((attempt+1)*(attempt+1)) * 25 * time.Millisecond)
+		select {
+		case <-r.db.Statement.Context.Done():
+			timer.Stop()
+			return r.db.Statement.Context.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func (r *Repository) ensureCloudAgentTransaction(run *model.CloudAgentExecution) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		local := New(tx.Set(videoProjectionLocalKey, true).Session(&gorm.Session{}))
 		if id := nativeConversationID(run.StateJSON, false); id != "" {
