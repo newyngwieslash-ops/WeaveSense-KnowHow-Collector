@@ -1,6 +1,8 @@
 name: Video container validation
 
 on:
+  push:
+    branches: [feat/knowhow-fullstack-acceptance]
   pull_request:
     paths:
       - "deploy/flow/**"
