@@ -8,6 +8,11 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 PRIVATE = ROOT / ".local/video-fullstack"
 ENV = ROOT / ".env.flow"
+GENERATED_SECRET_NAMES = (
+    "POSTGRES_SUPERUSER_PASSWORD", "PLATFORM_DB_PASSWORD", "INTEL_DB_PASSWORD", "REDIS_PASSWORD",
+    "MINIO_ROOT_PASSWORD", "VIDEO_OBJECT_SECRET_KEY", "FLOW_INTERNAL_JWT_SIGNING_KEY",
+    "VIDEO_DELETION_JOURNAL_KEY", "VIDEO_SERVICE_TOKEN", "FLOW_MODEL_GATEWAY_KEY",
+)
 
 
 def write_private(path, value, exclusive=False):
@@ -43,9 +48,7 @@ def prepare():
         "ASR_ENABLED": "false", "OCR_ENABLED": "false", "DTK_ENABLED": "false", "VIDEO_MODEL_ENABLED": "false",
         "LOOM_SPLIT_ROLES": "false", "LOOM_DIRECT_PROVIDER_KEYS": "disabled", "TZ": "UTC",
     }
-    for name in ("POSTGRES_SUPERUSER_PASSWORD", "PLATFORM_DB_PASSWORD", "INTEL_DB_PASSWORD", "REDIS_PASSWORD",
-                 "MINIO_ROOT_PASSWORD", "VIDEO_OBJECT_SECRET_KEY", "FLOW_INTERNAL_JWT_SIGNING_KEY",
-                 "VIDEO_DELETION_JOURNAL_KEY", "VIDEO_SERVICE_TOKEN", "FLOW_MODEL_GATEWAY_KEY"):
+    for name in GENERATED_SECRET_NAMES:
         values[name] = secrets.token_hex(32)
     save(values, exclusive=True)
 

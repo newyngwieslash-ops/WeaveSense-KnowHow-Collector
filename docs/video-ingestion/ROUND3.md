@@ -32,6 +32,14 @@
 
 工作流原始 artifact 保留 **14 天**。[仓库保留摘要](evidence/round3-fullstack-summary.json)保存选定的脱敏结果及原始文件 hash，**不是完整日志、截图或原始 ZIP 的替代品**。映射中的 `observed_artifact` 指向该 ZIP 中准确文件与 SHA-256。发布截图恰逢浮层关闭动画，不能单靠它证明版面或流程；发布结果依据 HTTP / DOM 断言和数据库记录，撤回截图较清晰。后续截图稳定性修正仍需对应 final head 检查。
 
+### 后续采证修正：功能通过不等于附件完整
+
+`f09cc80b90cb09fdcfff00e2d3ed8c4fe38c66f7` 的[整栈运行第二次尝试](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40626065610/attempts/2)和另三项工作流均成功，13个job终态成功。第一次尝试在Redis镜像下载时遇到上游502、未进入浏览器；对已终态失败的job只执行了一次官方重跑。第二次的真实浏览器、数据库/对象观察、重启、撤回和项目清理均通过，发布截图也已等待真实浮层退场。
+
+但独立审计发现该次[artifact 12789503871](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40626065610/artifacts/12789503871)中的两份Playwright汇总JSON不可解析：旧脱敏器按变量名包含`TOKEN`猜测秘密，把公开计价`FLOW_MODEL_MICRO_PER_1K_TOKENS=2000`误当凭据，替换了数字时间戳的子串。其ZIP SHA-256为`86a1277cfb3556f4e625f9194b2324aae625a4007de763bd876066043aeca492`；**原始归档保持不变，不将CI绿色描述为附件完整合格**。主要浏览器/观察器JSON仍可解析且独立断言通过，清理报告证明所属资源无残留；这些不消除汇总附件缺陷。上文`21410a7e`归档的两份汇总JSON已另行重新下载核对可解析，保留摘要仍只绑定该候选。
+
+当前修正使用生成TEST配置共享的明确秘密清单及私有账号状态，不按变量名子串猜测；脱敏后再严格解析所有保留的JSON/JSONL。解析失败阻止上传，临时环境与账号文件仍清理。修正后的最终提交必须重新执行并核对原始产物，不能继承上述运行的附件完整性结论。
+
 ### 如实披露的条件跳过
 
 - 集成 Go 的 5 个顶层 skip：`TestDDCatLiveImageRoundTrip`（无付费模型 key）；`TestGeneratedAssetBrowserIdentity`（未设置独立 `CANVAS_TEST_GENERATION_BROWSER_RUNNER`）；`TestVideoReleaseCompiledChild`、`TestVideoQALoomReleaseCompiledChild`（只由隔离归档父测试执行，父测试通过，顶层仍记 skip）；`TestRPCProviderRejectsIncompatibleFallbackBinary`（Linux 条件路径，另有适用测试）。
