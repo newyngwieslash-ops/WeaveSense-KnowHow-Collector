@@ -46,11 +46,12 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: .github/browser
       - name: Fresh application containers, real authentication and internal hops
+        id: fullstack
         env:
           VIDEO_FULLSTACK_EVIDENCE: ${{ runner.temp }}/video-fullstack-evidence
         run: bash scripts/fullstack/run.sh
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.fullstack.outputs.sanitized == 'true'
         with:
           name: video-fullstack-evidence
           path: |

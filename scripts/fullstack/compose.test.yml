@@ -2,6 +2,9 @@
 services:
   web:
     ports: !override ["127.0.0.1:4180:3000"]
+    # Docker does not publish ports for a container attached only to an
+    # internal network. Nginx is the sole dual-homed ingress, never the worker.
+    networks: [internal, test-ingress]
   loom-engine:
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
@@ -25,7 +28,8 @@ services:
     security_opt: ["no-new-privileges:true"]
     networks: [internal]
 networks:
-  # Runtime application containers cannot contact real platforms or paid APIs.
+  # Backend, workers and fixture cannot contact real platforms or paid APIs.
   # Build-time downloads use declared package registries, not this network.
   internal:
     internal: true
+  test-ingress: {}

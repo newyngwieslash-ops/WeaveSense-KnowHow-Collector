@@ -1,0 +1,1265 @@
+{
+  "schema_version": "weavesense.round3-acceptance-map/1",
+  "scope": "V1=P0+P1; AC01-AC29 only; AC30/P2 excluded without deletion",
+  "baseline": {
+    "path": "docs/video-ingestion/spec/tasks.baseline.json",
+    "sha256": "0def0d9514aeaac544034dbd6994c76041d35f0c2968011ee02770c86ae2e046",
+    "acceptance_count": 29
+  },
+  "progress_ledger": {
+    "path": "docs/video-ingestion/PROGRESS.json",
+    "sha256_at_mapping": "5562c326690b11419f516adc5e01d294e425f532a8a77c0e552dfdcff8624463",
+    "modified_by_mapping": false
+  },
+  "status": "harness_implemented_actual_fullstack_result_pending",
+  "code_snapshot_context": {
+    "commit": "f0347739bac701ff3733559f4a44c0f2cc5542ca",
+    "meaning": "staged harness snapshot at mapping draft; not final validated head",
+    "branch": "feat/knowhow-fullstack-acceptance"
+  },
+  "formal_acceptance_established": false,
+  "production_ready": false,
+  "actual_successful_execution": null,
+  "evidence_rules": [
+    "expected_artifact denotes an output contract, not an observed or successful artifact",
+    "Every observed run must name exact checked-out source commit, run URL, artifact identity/digest, and pass/fail/skip status",
+    "Synthetic subtitle input and deterministic model provider never establish real platform acquisition, model/industry quality, native Skill use or pilot success",
+    "Partial engineering evidence does not automatically change PROGRESS.json or close the original global acceptance criterion"
+  ],
+  "evidence_catalog": {
+    "browser_initial": {
+      "source": ".github/browser/video-fullstack.spec.mjs",
+      "expected_artifact": "browser-initial.json",
+      "execution_status": "pending"
+    },
+    "browser_restart": {
+      "source": ".github/browser/video-fullstack.spec.mjs",
+      "expected_artifact": "browser-after-restart.json",
+      "execution_status": "pending"
+    },
+    "persistence_before": {
+      "source": "scripts/fullstack/observe.mjs",
+      "expected_artifact": "persistence-before-restart.json",
+      "execution_status": "pending"
+    },
+    "persistence_after": {
+      "source": "scripts/fullstack/observe.mjs",
+      "expected_artifact": "persistence-after-restart.json",
+      "execution_status": "pending"
+    },
+    "restart_comparison": {
+      "source": "scripts/fullstack/run.sh",
+      "expected_artifact": "restart-verification.json",
+      "execution_status": "pending"
+    },
+    "model_fixture_unit": {
+      "source": "scripts/test_video_fullstack_fixture.py",
+      "result": "4 local tests passed in implementation validation; not model-quality or actual stack evidence"
+    },
+    "deployment_unit": {
+      "source": "scripts/test_video_deployment.py",
+      "result": "included in 45 passing local script tests; static deployment contracts, not Docker execution"
+    },
+    "test_network_contract": {
+      "source": "scripts/fullstack/compose.test.yml",
+      "supporting_sources": [
+        "scripts/fullstack/configure.py",
+        "scripts/fullstack/run.sh",
+        "scripts/fullstack/sanitize.py"
+      ],
+      "execution_status": "pending"
+    },
+    "existing_quality_workflows": {
+      "sources": [
+        ".github/workflows/quality.yml",
+        ".github/workflows/video-knowledge.yml",
+        ".github/workflows/video-container-validation.yml"
+      ],
+      "execution_status": "final-head results pending; no prior-commit success transfer"
+    }
+  },
+  "criteria": [
+    {
+      "id": "AC01",
+      "original": {
+        "id": "AC01",
+        "phase": "P0",
+        "title": "B站单视频闭环",
+        "precondition": "可使用的 B站视频及领域配置",
+        "action": "从宿主提交链接并完成处理、复核和检索",
+        "expected": "产生唯一文档、带时轴引用及已发布知识，Agent 正确引用",
+        "requirements": "R02 R06 R07 R11 R15 R16",
+        "tasks": [
+          "COL-002",
+          "COL-003",
+          "COL-004",
+          "COL-005",
+          "COL-006",
+          "COL-007",
+          "COL-008",
+          "COL-015",
+          "COL-016",
+          "COL-021",
+          "K-001",
+          "K-004",
+          "K-005",
+          "K-006",
+          "K-008",
+          "K-009",
+          "K-012",
+          "K-015",
+          "K-018",
+          "K-023",
+          "K-024",
+          "K-029",
+          "IF-014",
+          "IF-017",
+          "IF-020",
+          "IF-021",
+          "IF-024",
+          "FND-003",
+          "FND-005",
+          "QA-001"
+        ]
+      },
+      "round3_engineering_coverage": "planned_partial",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_initial",
+        "persistence_before"
+      ],
+      "assertion_keys_or_test_names": [
+        "ui_profile_and_source_creation",
+        "browser_authenticated_http_ingest_not_ui_upload_form",
+        "real_worker_to_knowledge_ready",
+        "ui_review_approve_publish",
+        "ui_search_fixed_evidence_no_invented_media_and_reload"
+      ],
+      "coverage_statement": "自编英文字幕经真实宿主内部链路形成文档、时轴证据与知识发布；来源界面的 B站 URL 只作标识，不访问平台。",
+      "remaining_original_conditions": [
+        "合法可用的真实 B站视频及首发行业配置",
+        "真实平台获取/转写",
+        "实际宿主 Agent 正确引用；本次仅普通知识检索和证据 UI",
+        "本轮真实执行成功产物与人工确认"
+      ]
+    },
+    {
+      "id": "AC02",
+      "original": {
+        "id": "AC02",
+        "phase": "P0",
+        "title": "抖音单视频闭环",
+        "precondition": "可使用的抖音视频及可用连接",
+        "action": "从宿主提交分享短链",
+        "expected": "归一化后完成下载、转写及证据入库",
+        "requirements": "R02 R06 R11",
+        "tasks": [
+          "COL-002",
+          "COL-003",
+          "COL-004",
+          "COL-005",
+          "COL-006",
+          "COL-007",
+          "COL-008",
+          "COL-015",
+          "COL-016",
+          "COL-021",
+          "K-008",
+          "K-009",
+          "K-012",
+          "K-015",
+          "K-018",
+          "IF-014",
+          "IF-017",
+          "IF-021",
+          "IF-024",
+          "FND-003",
+          "FND-005",
+          "QA-001"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "本轮没有抖音短链、连接、下载或转写；B站形式来源标识也不是平台实测。",
+      "remaining_original_conditions": [
+        "合法抖音视频和可用连接",
+        "实际分享短链归一化、下载、转写及证据入库"
+      ]
+    },
+    {
+      "id": "AC03",
+      "original": {
+        "id": "AC03",
+        "phase": "P0",
+        "title": "关闭聊天后的持续执行",
+        "precondition": "两个平台各一账号，配置两个调度窗口",
+        "action": "关闭浏览器与聊天后等待窗口，再重新登录",
+        "expected": "后台按时新增任务与知识候选，展示运行记录",
+        "requirements": "R03 R20",
+        "tasks": [
+          "COL-011",
+          "COL-023",
+          "COL-024",
+          "COL-028",
+          "IF-011",
+          "IF-017",
+          "IF-018",
+          "IF-019",
+          "IF-020",
+          "IF-021",
+          "IF-022",
+          "IF-023",
+          "IF-024",
+          "IF-025",
+          "IF-026",
+          "IF-027",
+          "IF-028",
+          "QA-001",
+          "QA-003"
+        ]
+      },
+      "round3_engineering_coverage": "related_only",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_restart",
+        "restart_comparison"
+      ],
+      "assertion_keys_or_test_names": [
+        "post_service_restart_published_record_revision_evidence_durable"
+      ],
+      "coverage_statement": "浏览器进程退出后重启服务并读取既有已完成资料；不是无人值守新增采集。",
+      "remaining_original_conditions": [
+        "B站与抖音各一个授权账号",
+        "实际两个调度窗口及关闭浏览器/聊天期间新增任务与候选记录"
+      ]
+    },
+    {
+      "id": "AC04",
+      "original": {
+        "id": "AC04",
+        "phase": "P0",
+        "title": "发现分页失败",
+        "precondition": "多页账号样本，第二页临时失败",
+        "action": "触发采集、重启后恢复",
+        "expected": "不漏已发现任务，不将失败页当完整发现，游标可解释",
+        "requirements": "R04 R23",
+        "tasks": [
+          "COL-002",
+          "COL-007",
+          "COL-009",
+          "COL-010",
+          "COL-012",
+          "COL-013",
+          "COL-017",
+          "COL-018",
+          "COL-019",
+          "COL-026",
+          "COL-027",
+          "COL-030",
+          "K-007",
+          "IF-007",
+          "IF-009",
+          "IF-023"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "本轮不执行账号发现、分页故障或游标恢复。",
+      "remaining_original_conditions": [
+        "多页账号样本和第二页临时失败",
+        "发现期间重启、恢复、不漏任务与游标可解释的执行证据"
+      ]
+    },
+    {
+      "id": "AC05",
+      "original": {
+        "id": "AC05",
+        "phase": "P0",
+        "title": "同一提交重放",
+        "precondition": "同 scope 相同配置与视频",
+        "action": "从手工、定时及 MCP 重复提交",
+        "expected": "不重复下载或发布；同键异参返回409语义",
+        "requirements": "R05 R17",
+        "tasks": [
+          "COL-003",
+          "COL-008",
+          "COL-010",
+          "COL-012",
+          "COL-013",
+          "COL-014",
+          "COL-017",
+          "COL-026",
+          "K-019",
+          "IF-001",
+          "IF-002",
+          "IF-003",
+          "IF-005",
+          "IF-006",
+          "IF-007",
+          "IF-008",
+          "IF-009",
+          "IF-012",
+          "IF-013",
+          "IF-019",
+          "IF-028",
+          "FND-002",
+          "FND-005",
+          "QA-001"
+        ]
+      },
+      "round3_engineering_coverage": "planned_partial",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_initial",
+        "persistence_before"
+      ],
+      "assertion_keys_or_test_names": [
+        "same_key_same_job_and_changed_request_conflict",
+        "real_material_job_completed",
+        "one_ready_event_per_success"
+      ],
+      "coverage_statement": "浏览器 HTTP 同键同参复用任务、异参409；清洁 scope 预期恰有一个完成任务及一个故意无效输入任务，防止隐藏重复。",
+      "remaining_original_conditions": [
+        "定时和批准 MCP 路径与手工路径的交叉重放",
+        "真实下载及跨入口不重复发布/对象/费用证明",
+        "本轮真实执行产物"
+      ]
+    },
+    {
+      "id": "AC06",
+      "original": {
+        "id": "AC06",
+        "phase": "P0",
+        "title": "任务租约与外部结果不明",
+        "precondition": "可控下载任务；含远端接受后响应丢失夹具",
+        "action": "终止Worker并回送旧结果；模拟外部task ID响应丢失",
+        "expected": "只允许当前阶段fencing提交；已确认任务复用；未知结果进入reconciliation_required而非盲目重提",
+        "requirements": "R05 R23",
+        "tasks": [
+          "COL-003",
+          "COL-008",
+          "COL-010",
+          "COL-012",
+          "COL-013",
+          "COL-014",
+          "COL-017",
+          "COL-018",
+          "COL-019",
+          "COL-026",
+          "COL-027",
+          "K-007",
+          "K-019",
+          "IF-002",
+          "IF-007",
+          "IF-009",
+          "IF-013",
+          "IF-023",
+          "FND-002"
+        ]
+      },
+      "round3_engineering_coverage": "related_only",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_restart",
+        "restart_comparison"
+      ],
+      "assertion_keys_or_test_names": [
+        "post_service_restart_published_record_revision_evidence_durable"
+      ],
+      "coverage_statement": "只重启已完成任务所在服务，核对持久身份；不等于在途 fencing 或未知远端结果恢复。",
+      "remaining_original_conditions": [
+        "运行中终止 worker、旧阶段结果回送",
+        "外部已接受但 task ID 响应丢失",
+        "当前 fencing 提交、已确认任务复用及 reconciliation_required 的故障证据"
+      ]
+    },
+    {
+      "id": "AC07",
+      "original": {
+        "id": "AC07",
+        "phase": "P0",
+        "title": "取消与晚到回调",
+        "precondition": "一个运行中媒体任务",
+        "action": "取消后模拟远端cancel不支持和成功晚回调",
+        "expected": "宿主阻止发布；远端状态为confirmed/unsupported/unknown之一；晚产物隔离清理，已发生usage不被抹除",
+        "requirements": "R23 R25",
+        "tasks": [
+          "COL-012",
+          "COL-013",
+          "COL-017",
+          "COL-018",
+          "COL-019",
+          "COL-027",
+          "COL-029",
+          "K-007",
+          "K-025",
+          "IF-007",
+          "IF-009",
+          "IF-023",
+          "IF-026",
+          "IF-027"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "本轮不取消运行中媒体任务，不模拟晚回调。",
+      "remaining_original_conditions": [
+        "运行中媒体任务",
+        "远端 cancel 不支持及成功晚回调",
+        "宿主阻止发布、隔离清理、真实取消状态和已发生 usage 保留"
+      ]
+    },
+    {
+      "id": "AC08",
+      "original": {
+        "id": "AC08",
+        "phase": "P0",
+        "title": "无字幕视频",
+        "precondition": "一段普通话无字幕样本",
+        "action": "启用 ASR 处理",
+        "expected": "保存原始segments和时间映射，引用可定位",
+        "requirements": "R07 R11",
+        "tasks": [
+          "K-001",
+          "K-004",
+          "K-005",
+          "K-006",
+          "K-008",
+          "K-009",
+          "K-012",
+          "K-015",
+          "K-018",
+          "IF-014",
+          "IF-021",
+          "IF-024",
+          "FND-003",
+          "FND-005"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "使用提供的定时字幕，ASR 禁用；字幕时轴不是语音识别结果。",
+      "remaining_original_conditions": [
+        "普通话无字幕合法样本",
+        "实际 ASR 模型及原始 segments/时间映射/引用定位"
+      ]
+    },
+    {
+      "id": "AC09",
+      "original": {
+        "id": "AC09",
+        "phase": "P0",
+        "title": "长视频与大量segments",
+        "precondition": "含超过2000段及超过原文本上限的长样本",
+        "action": "分段处理并中断恢复",
+        "expected": "完整清单可校验，无静默截断，缺口阻断必需就绪",
+        "requirements": "R08 R12",
+        "tasks": [
+          "COL-021",
+          "COL-022",
+          "COL-023",
+          "K-001",
+          "K-003",
+          "K-006",
+          "K-007",
+          "K-017",
+          "IF-003",
+          "IF-010",
+          "IF-011",
+          "IF-022",
+          "FND-002"
+        ]
+      },
+      "round3_engineering_coverage": "planned_partial",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_initial",
+        "persistence_before"
+      ],
+      "assertion_keys_or_test_names": [
+        "invalid_required_subtitle_rejected_without_ready_document",
+        "invalid_upload_has_no_document_or_ready_state"
+      ],
+      "coverage_statement": "空必需字幕上传应由真实 worker 拒绝422，任务仍 awaiting_input，无文档/ready；只证明小输入拒绝路径。",
+      "remaining_original_conditions": [
+        "超过2000段且超过旧文本上限的长样本",
+        "分段处理和中断恢复",
+        "完整清单、无静默截断及真实缺口门禁"
+      ]
+    },
+    {
+      "id": "AC10",
+      "original": {
+        "id": "AC10",
+        "phase": "P1",
+        "title": "静音画面与并发抽帧",
+        "precondition": "静音PPT、短视频、尾组不足网格和两个并发任务",
+        "action": "以视觉必需模式运行；取消其中一个并发任务",
+        "expected": "保留短片和尾组全部有效帧；不混帧不删除其他任务文件；必需视觉失败不能完整ready",
+        "requirements": "R09 R11 R12",
+        "tasks": [
+          "COL-021",
+          "COL-022",
+          "COL-023",
+          "K-001",
+          "K-003",
+          "K-008",
+          "K-009",
+          "K-010",
+          "K-011",
+          "K-012",
+          "K-013",
+          "K-014",
+          "K-015",
+          "K-017",
+          "K-018",
+          "IF-003",
+          "IF-010",
+          "IF-011",
+          "IF-014",
+          "IF-021",
+          "IF-022",
+          "IF-024",
+          "IF-028",
+          "FND-002",
+          "FND-003",
+          "QA-003"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "无媒体、视觉、抽帧、OCR 或 VLM，不用没有播放器推断视觉门禁通过。",
+      "remaining_original_conditions": [
+        "静音PPT、短片、尾组不足网格及两并发任务",
+        "视觉必需处理、取消单任务、帧完整性/目录隔离及必需失败门禁"
+      ]
+    },
+    {
+      "id": "AC11",
+      "original": {
+        "id": "AC11",
+        "phase": "P0",
+        "title": "元信息更新",
+        "precondition": "已转写并引用的视频",
+        "action": "再次采集仅修改标题或描述",
+        "expected": "已转写正文仍存在，来源和派生版本关系可读",
+        "requirements": "R10",
+        "tasks": [
+          "COL-030",
+          "K-002",
+          "K-003",
+          "K-009",
+          "K-016",
+          "K-019"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "已完成文档在重启后保持 hash 不等于再次采集标题/描述修订。",
+      "remaining_original_conditions": [
+        "已转写且被引用的视频",
+        "仅元信息变化的再次采集",
+        "正文保留与 raw/derived 版本关系证据"
+      ]
+    },
+    {
+      "id": "AC12",
+      "original": {
+        "id": "AC12",
+        "phase": "P0",
+        "title": "中文emoji引用",
+        "precondition": "包含emoji和混合中文的标注文本",
+        "action": "创建及解析跨段证据",
+        "expected": "UTF-16偏移和引用片段严格一致，时轴映射正确",
+        "requirements": "R11",
+        "tasks": [
+          "K-008",
+          "K-009",
+          "K-012",
+          "K-015",
+          "K-018",
+          "IF-014",
+          "IF-021",
+          "IF-024",
+          "FND-003"
+        ]
+      },
+      "round3_engineering_coverage": "related_only",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_initial",
+        "persistence_before"
+      ],
+      "assertion_keys_or_test_names": [
+        "ui_search_fixed_evidence_no_invented_media_and_reload",
+        "database_content_and_snippet_hashes_match"
+      ],
+      "coverage_statement": "一条英文字幕核对固定引文、时段与内容 hash；UI 出现 UTF-16 标签不是中文/emoji偏移验收。",
+      "remaining_original_conditions": [
+        "含混合中文和 emoji 的多段标注文本",
+        "跨段证据的 UTF-16 精确偏移与时间映射"
+      ]
+    },
+    {
+      "id": "AC13",
+      "original": {
+        "id": "AC13",
+        "phase": "P0",
+        "title": "就绪屏障与事件重投",
+        "precondition": "worker成功但索引失败的任务，及已有ready旧版本",
+        "action": "模拟索引失败、恢复和事件重投",
+        "expected": "失败时不切换可见revision、不发ready；旧版本可用，恢复后仅一次切换与有效下游运行",
+        "requirements": "R12",
+        "tasks": [
+          "COL-021",
+          "COL-022",
+          "COL-023",
+          "K-003",
+          "K-017",
+          "IF-003",
+          "IF-010",
+          "IF-011",
+          "IF-022",
+          "FND-002"
+        ]
+      },
+      "round3_engineering_coverage": "planned_partial",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_initial",
+        "persistence_before"
+      ],
+      "assertion_keys_or_test_names": [
+        "invalid_required_subtitle_rejected_without_ready_document",
+        "one_ready_event_per_success",
+        "real_model_extraction_created_candidates"
+      ],
+      "coverage_statement": "无效必需输入不能 ready；成功路径检查一次 ready 和知识候选。未注入索引失败或重投。",
+      "remaining_original_conditions": [
+        "已有 ready 旧版本",
+        "worker 成功后索引失败，旧 revision 继续可见",
+        "恢复、事件重投后一次切换与一次有效下游执行"
+      ]
+    },
+    {
+      "id": "AC14",
+      "original": {
+        "id": "AC14",
+        "phase": "P0",
+        "title": "无依据的事实",
+        "precondition": "材料缺少特定参数",
+        "action": "要求整理该参数的知识卡",
+        "expected": "返回信息缺失或推断标记，不能发布伪造事实",
+        "requirements": "R13 R15",
+        "tasks": [
+          "K-013",
+          "K-014",
+          "K-021",
+          "K-022",
+          "K-023",
+          "K-024",
+          "K-029",
+          "IF-020",
+          "FND-003",
+          "QA-001"
+        ]
+      },
+      "round3_engineering_coverage": "related_only",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "model_fixture_unit"
+      ],
+      "assertion_keys_or_test_names": [
+        "preserves_real_frozen_evidence_without_self_approval"
+      ],
+      "coverage_statement": "确定性 fixture 仅复制真实冻结证据并明确 real_industry_validation 缺失；不是模型对无依据请求的行为评测。",
+      "remaining_original_conditions": [
+        "缺少目标参数的真实或受控材料",
+        "明确要求缺失参数的负向任务",
+        "模型/发布门禁拒绝伪造事实的真实宿主执行及人工判定"
+      ]
+    },
+    {
+      "id": "AC15",
+      "original": {
+        "id": "AC15",
+        "phase": "P1",
+        "title": "转载与冲突",
+        "precondition": "两份转载加一份冲突材料",
+        "action": "归并知识并计算来源关系",
+        "expected": "转载不算独立佐证，冲突保留条件和证据",
+        "requirements": "R14",
+        "tasks": [
+          "K-015",
+          "K-020",
+          "K-029",
+          "QA-003"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "本轮只有单一自编来源，不评估独立来源或冲突。",
+      "remaining_original_conditions": [
+        "两份转载和一份冲突材料",
+        "来源归并、非独立佐证处理及冲突条件/证据保留"
+      ]
+    },
+    {
+      "id": "AC16",
+      "original": {
+        "id": "AC16",
+        "phase": "P0",
+        "title": "复核批准发布与撤回",
+        "precondition": "一条候选和一条已批准知识",
+        "action": "修改候选后用旧批准发布，再重新批准发布并撤回",
+        "expected": "旧批准失效且版本冲突；新版本流程完整，撤回后默认检索不返回内容",
+        "requirements": "R15 R16 R25",
+        "tasks": [
+          "COL-029",
+          "K-018",
+          "K-023",
+          "K-024",
+          "K-025",
+          "K-029",
+          "IF-014",
+          "IF-020",
+          "IF-026",
+          "IF-027",
+          "QA-001"
+        ]
+      },
+      "round3_engineering_coverage": "planned_engineering_case",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_initial",
+        "browser_restart",
+        "persistence_before",
+        "persistence_after"
+      ],
+      "assertion_keys_or_test_names": [
+        "unpublished_not_in_default_search",
+        "edit_invalidates_approval_and_stale_publish_rejected",
+        "ui_review_approve_publish",
+        "explicit_review_and_publication_persisted",
+        "ui_withdraw_removes_default_search_after_reload"
+      ],
+      "coverage_statement": "通过真实 UI 提交/批准，编辑产生新版；旧版发布请求应409，重新批准后发布，重启后撤回并从默认检索移除。输入仍为工程合成材料。",
+      "remaining_original_conditions": [
+        "初始和重启阶段全部成功且绑定同一提交",
+        "产物核对真实批准、版本/hash、发布和撤回记录",
+        "对应负责人确认原条款；不由脚本数量自动更新任务台账"
+      ]
+    },
+    {
+      "id": "AC17",
+      "original": {
+        "id": "AC17",
+        "phase": "P0",
+        "title": "跨工作区越权",
+        "precondition": "两个workspace各有视频文档",
+        "action": "替换job/document/evidence/object ID读取",
+        "expected": "全部拒绝或不命中，日志不泄露另一工作区信息",
+        "requirements": "R21",
+        "tasks": [
+          "COL-003",
+          "COL-005",
+          "COL-011",
+          "COL-016",
+          "K-002",
+          "IF-004",
+          "IF-010",
+          "IF-012",
+          "IF-023",
+          "IF-029",
+          "FND-002",
+          "CFG-001"
+        ]
+      },
+      "round3_engineering_coverage": "planned_partial",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_initial",
+        "persistence_before"
+      ],
+      "assertion_keys_or_test_names": [
+        "anonymous_and_nonexistent_nonmember_workspace_selector_denied",
+        "postgres_non_superuser_non_bypassrls",
+        "video_and_knowledge_rls_forced"
+      ],
+      "coverage_statement": "覆盖匿名读取和不存在/无成员 workspace 选择器拒绝；读取实际数据库角色和 FORCE RLS 配置。不存在 scope 不是已存在 workspace B。",
+      "remaining_original_conditions": [
+        "两个实际 workspace 各自已有视频文档",
+        "跨工作区替换 job/document/evidence/object ID 的逐项拒绝",
+        "日志无另一工作区信息泄露"
+      ]
+    },
+    {
+      "id": "AC18",
+      "original": {
+        "id": "AC18",
+        "phase": "P0",
+        "title": "MCP超时和输出边界",
+        "precondition": "批准的MCP连接与较长视频",
+        "action": "调用start后按游标读取产物",
+        "expected": "短调用返回任务句柄，长任务后台运行，分页不丢数据",
+        "requirements": "R17",
+        "tasks": [
+          "COL-014",
+          "IF-001",
+          "IF-002",
+          "IF-003",
+          "IF-005",
+          "IF-006",
+          "IF-007",
+          "IF-008",
+          "IF-009",
+          "IF-012",
+          "IF-013",
+          "IF-019",
+          "IF-028",
+          "FND-002",
+          "FND-005",
+          "QA-001"
+        ]
+      },
+      "round3_engineering_coverage": "related_only",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_initial"
+      ],
+      "assertion_keys_or_test_names": [
+        "browser_authenticated_http_ingest_not_ui_upload_form"
+      ],
+      "coverage_statement": "浏览器普通宿主 HTTP 返回任务句柄并读取产物；没有批准 MCP 连接或长任务分页压力。",
+      "remaining_original_conditions": [
+        "批准的 MCP 连接与较长视频",
+        "实际 MCP start 的短调用及后台执行",
+        "完整游标分页且无数据丢失"
+      ]
+    },
+    {
+      "id": "AC19",
+      "original": {
+        "id": "AC19",
+        "phase": "P0",
+        "title": "内网目标与重定向",
+        "precondition": "恶意链接及配置外目标",
+        "action": "请求私网、元数据、跨域重定向资源",
+        "expected": "默认外联策略仍有效，受信内部通路仅达固定服务",
+        "requirements": "R22",
+        "tasks": [
+          "COL-006",
+          "COL-015",
+          "COL-026",
+          "K-010",
+          "IF-008",
+          "IF-019",
+          "IF-029"
+        ]
+      },
+      "round3_engineering_coverage": "related_only",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "deployment_unit",
+        "test_network_contract"
+      ],
+      "assertion_keys_or_test_names": [
+        "test_untrusted_decoder_has_no_journal_public_port_or_large_tmpfs"
+      ],
+      "coverage_statement": "TEST 后台/worker/模型网络无外网，仅 Nginx 双网络提供 loopback Web；固定模型 fixture 主机，不放宽通用私网保护。配置隔离不是恶意请求测试。",
+      "remaining_original_conditions": [
+        "私网/元数据/配置外目标与跨域重定向负向请求",
+        "真实公共入口 SSRF 阻断和受信内部通路固定服务验证"
+      ]
+    },
+    {
+      "id": "AC20",
+      "original": {
+        "id": "AC20",
+        "phase": "P0",
+        "title": "字幕提示注入",
+        "precondition": "含忽略指令或外传要求的字幕",
+        "action": "执行知识整理Skill",
+        "expected": "内容作为材料处理，无未授权调用和数据外传",
+        "requirements": "R18 R22",
+        "tasks": [
+          "COL-006",
+          "COL-015",
+          "COL-023",
+          "COL-026",
+          "K-010",
+          "K-026",
+          "IF-001",
+          "IF-008",
+          "IF-015",
+          "IF-019",
+          "IF-028",
+          "IF-029",
+          "QA-001"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "固定无恶意字幕和确定性模型不构成提示注入抵御测试；本轮不调用原生整理 Skill。",
+      "remaining_original_conditions": [
+        "含忽略指令/外传要求的字幕",
+        "实际原生知识整理 Skill 执行",
+        "无未授权调用/外传的行为证据"
+      ]
+    },
+    {
+      "id": "AC21",
+      "original": {
+        "id": "AC21",
+        "phase": "P0",
+        "title": "凭据与限流",
+        "precondition": "过期凭据和可控429响应",
+        "action": "执行采集并更新凭据后恢复",
+        "expected": "显示需授权/重试时间；凭据不出现在UI、模型上下文或日志",
+        "requirements": "R02 R23",
+        "tasks": [
+          "COL-002",
+          "COL-003",
+          "COL-004",
+          "COL-005",
+          "COL-007",
+          "COL-008",
+          "COL-012",
+          "COL-013",
+          "COL-017",
+          "COL-018",
+          "COL-019",
+          "COL-027",
+          "K-007",
+          "IF-007",
+          "IF-009",
+          "IF-017",
+          "IF-023",
+          "FND-005",
+          "QA-001"
+        ]
+      },
+      "round3_engineering_coverage": "related_only",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "deployment_unit",
+        "test_network_contract"
+      ],
+      "assertion_keys_or_test_names": [
+        "test_untrusted_decoder_has_no_journal_public_port_or_large_tmpfs"
+      ],
+      "coverage_statement": "临时凭据最小暴露、运行日志和 ps 元数据脱敏；不模拟过期平台凭据、429 或恢复。",
+      "remaining_original_conditions": [
+        "过期平台凭据和可控429",
+        "宿主需授权/重试时间状态及更新凭据后恢复",
+        "UI/模型上下文/日志秘密泄漏专项检查"
+      ]
+    },
+    {
+      "id": "AC22",
+      "original": {
+        "id": "AC22",
+        "phase": "P0",
+        "title": "预算耗尽",
+        "precondition": "很小的workspace处理额度",
+        "action": "连续提交超过额度的任务",
+        "expected": "新重任务阻塞，已完成阶段可重用，usage不重复结算",
+        "requirements": "R24",
+        "tasks": [
+          "COL-020",
+          "COL-024",
+          "COL-031",
+          "K-031",
+          "IF-018",
+          "QA-003"
+        ]
+      },
+      "round3_engineering_coverage": "related_only",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "persistence_before",
+        "model_fixture_unit"
+      ],
+      "assertion_keys_or_test_names": [
+        "actual_go_gateway_reached_synthetic_model"
+      ],
+      "coverage_statement": "模型经真实宿主网关并要求实际 accounting headers，返回非零 usage；未耗尽 workspace 额度，不据此宣称结算去重完成。",
+      "remaining_original_conditions": [
+        "很小 workspace 处理额度",
+        "超额连续提交、重任务阻塞、已完成阶段复用",
+        "实际账本 usage 不重复结算"
+      ]
+    },
+    {
+      "id": "AC23",
+      "original": {
+        "id": "AC23",
+        "phase": "P0",
+        "title": "来源停用到期与撤权",
+        "precondition": "已发布知识引用某视频且文本仍获保留授权",
+        "action": "分别执行停用订阅、媒体到期、远程404与撤权/擦除",
+        "expected": "停用不删历史；到期只标不可播放；远程下架按授权处理；撤权/擦除阻断检索发布并传播Skill依赖",
+        "requirements": "R25",
+        "tasks": [
+          "COL-029",
+          "K-025",
+          "IF-026",
+          "IF-027"
+        ]
+      },
+      "round3_engineering_coverage": "related_only",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "browser_restart"
+      ],
+      "assertion_keys_or_test_names": [
+        "ui_withdraw_removes_default_search_after_reload"
+      ],
+      "coverage_statement": "知识撤回排除默认检索是相关行为，不等同来源停用、媒体到期、平台404或撤权/擦除。",
+      "remaining_original_conditions": [
+        "仍有文本保留授权的已发布视频知识",
+        "分别执行停用订阅、媒体到期、远程404、撤权/擦除",
+        "历史保留/不可播放区分及 Skill 依赖撤权传播"
+      ]
+    },
+    {
+      "id": "AC24",
+      "original": {
+        "id": "AC24",
+        "phase": "P0",
+        "title": "现有功能兼容",
+        "precondition": "RSS Telegram WeChat回归夹具",
+        "action": "启用和关闭视频功能分别运行",
+        "expected": "原有采集、ASR/OCR、检索及周期Canvas路径不退化",
+        "requirements": "R26 R28",
+        "tasks": [
+          "COL-001",
+          "COL-003",
+          "COL-025",
+          "COL-028",
+          "COL-029",
+          "COL-031",
+          "K-001",
+          "IF-001",
+          "IF-030",
+          "FND-004",
+          "FND-005",
+          "QA-002",
+          "QA-003"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "existing_quality_workflows"
+      ],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "继续运行既有全量质量/集成工作流，最终结果须匹配最终提交；本整栈 harness 不覆盖 RSS/Telegram/WeChat 的开关对照。",
+      "remaining_original_conditions": [
+        "对应最终提交的既有回归结果和跳过明细",
+        "视频启用/关闭两种配置下 RSS/Telegram/WeChat、ASR/OCR、检索和周期 Canvas 对照"
+      ]
+    },
+    {
+      "id": "AC25",
+      "original": {
+        "id": "AC25",
+        "phase": "P0",
+        "title": "实际宿主Agent使用",
+        "precondition": "已就绪资料和原生整理Skill",
+        "action": "在intelligence及Canvas实际入口调用",
+        "expected": "加载正确Skill版本，返回宿主证据ID而非外部临时文本",
+        "requirements": "R16 R18",
+        "tasks": [
+          "COL-023",
+          "K-018",
+          "K-024",
+          "K-026",
+          "IF-001",
+          "IF-014",
+          "IF-015",
+          "IF-028",
+          "QA-001"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "普通知识检索、证据 UI 与模型整理不代表实际 Agent 或 Canvas 原生 Skill 调用。",
+      "remaining_original_conditions": [
+        "已就绪资料与原生整理 Skill",
+        "intelligence 及 Canvas 两个真实入口调用",
+        "正确 Skill version/hash 和宿主 evidence ID 返回"
+      ]
+    },
+    {
+      "id": "AC26",
+      "original": {
+        "id": "AC26",
+        "phase": "P1",
+        "title": "Skill评测批准部署安装",
+        "precondition": "候选Skill、固定评测集和运行中的旧版本",
+        "action": "评测、批准、构建、部署、安装新版并回滚",
+        "expected": "旧version/hash在新部署仍可加载；新run可pin新版；批准不等于生效，当前撤权仍阻断旧引用",
+        "requirements": "R19",
+        "tasks": [
+          "K-028",
+          "IF-025",
+          "IF-026",
+          "IF-028",
+          "FND-003",
+          "QA-002",
+          "QA-003"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "构建测试服务不是方法版本发布/安装/回滚；本轮未执行候选 Skill 生命周期。",
+      "remaining_original_conditions": [
+        "候选 Skill、冻结评测集、运行中旧版本",
+        "评测/批准/构建/部署/安装/回滚",
+        "历史版本可加载、新 run pin、批准与生效分离以及撤权仍阻断旧引用"
+      ]
+    },
+    {
+      "id": "AC27",
+      "original": {
+        "id": "AC27",
+        "phase": "P1",
+        "title": "Skill负向与回归测试",
+        "precondition": "包含不适用问题和缺材料问题",
+        "action": "与无Skill基线运行同模型同输入",
+        "expected": "正确拒答/请求补充；关键输出不退化且证据有效",
+        "requirements": "R19 R27",
+        "tasks": [
+          "COL-026",
+          "COL-027",
+          "COL-028",
+          "COL-031",
+          "K-028",
+          "K-030",
+          "K-031",
+          "IF-025",
+          "IF-026",
+          "IF-028",
+          "IF-029",
+          "FND-001",
+          "FND-003",
+          "FND-005",
+          "QA-001",
+          "QA-002",
+          "QA-003"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "确定性模型 fixture 不提供行业 Skill 效果或拒答/补充能力证据。",
+      "remaining_original_conditions": [
+        "不适用和缺材料任务及固定模型/输入",
+        "无 Skill /启用知识/候选 Skill 三基线",
+        "关键输出无退化、负向处理及证据有效性的人工评估"
+      ]
+    },
+    {
+      "id": "AC28",
+      "original": {
+        "id": "AC28",
+        "phase": "P0",
+        "title": "迁移失败与恢复",
+        "precondition": "备份及可回滚的增量迁移",
+        "action": "模拟迁移/发布失败并恢复",
+        "expected": "不丢历史revision与引用，未完成任务可继续",
+        "requirements": "R28",
+        "tasks": [
+          "COL-003",
+          "COL-028",
+          "COL-029",
+          "IF-030",
+          "QA-002",
+          "QA-003"
+        ]
+      },
+      "round3_engineering_coverage": "planned_partial",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [
+        "persistence_before",
+        "persistence_after",
+        "restart_comparison"
+      ],
+      "assertion_keys_or_test_names": [
+        "all_checked_source_migrations_applied",
+        "post_service_restart_published_record_revision_evidence_durable"
+      ],
+      "coverage_statement": "从空库实际迁移、已完成文档/引用/对象重启后保持身份和 hash；没有失败迁移、备份还原或在途续跑。",
+      "remaining_original_conditions": [
+        "备份及可回滚增量迁移",
+        "实际迁移/发布失败与恢复",
+        "历史 revision/引用保留及未完成任务继续执行"
+      ]
+    },
+    {
+      "id": "AC29",
+      "original": {
+        "id": "AC29",
+        "phase": "P0",
+        "title": "试点持续运行",
+        "precondition": "M0冻结的来源、样本和试点时长，默认建议7天",
+        "action": "按冻结时长持续运行并导出结果",
+        "expected": "核对发现量、各阶段成功失败、费用和知识质量，未结阻塞项明确",
+        "requirements": "R03 R24 R27",
+        "tasks": [
+          "COL-011",
+          "COL-020",
+          "COL-023",
+          "COL-024",
+          "COL-026",
+          "COL-027",
+          "COL-028",
+          "COL-031",
+          "K-030",
+          "K-031",
+          "IF-017",
+          "IF-018",
+          "IF-028",
+          "IF-029",
+          "FND-001",
+          "FND-003",
+          "FND-005",
+          "QA-001",
+          "QA-003"
+        ]
+      },
+      "round3_engineering_coverage": "not_covered",
+      "formal_acceptance_status": "not_established",
+      "evidence_refs": [],
+      "assertion_keys_or_test_names": [],
+      "coverage_statement": "一次性清洁 TEST 运行及重启不计入持续试点，不压缩或虚构试点窗口。",
+      "remaining_original_conditions": [
+        "M0冻结行业、5至10个问题、授权来源/样本、复核人与发布人、预算/保留期",
+        "冻结的真实试点时长（原条款默认建议7天）",
+        "持续运行的发现量、阶段成功失败、费用和人工知识质量结果及未结阻塞"
+      ]
+    }
+  ]
+}

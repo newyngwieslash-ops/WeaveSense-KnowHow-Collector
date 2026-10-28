@@ -41,7 +41,16 @@ async function login(page, credentials) {
   await page.goto('/intelligence/domains');
   await expect(page).toHaveURL(/\/login\?next=/);
   await page.getByLabel('用户名 / 邮箱', { exact: true }).fill(credentials.username);
-  await page.locator('#login-password').fill(credentials.password);
+  const password = page.locator('#login-password');
+  await expect(password).toBeVisible();
+  await expect(password).toBeEditable();
+  // Playwright 1.64 fill() logs its value on timeout. Set the real controlled
+  // field without putting credentials in the action log; submit normally.
+  await password.evaluate((element, value) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  }, credentials.password);
   const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/auth/login' && r.request().method() === 'POST');
   await page.getByRole('button', { name: '登录', exact: true }).click();
   expect((await response).status()).toBe(200);
@@ -56,7 +65,9 @@ async function saveProfile(page) {
   await modal.getByLabel('目标问题（每行一项）', { exact: true }).fill('What reference temperature is stated in this synthetic fixture?');
   await modal.getByLabel('每任务预算（micro，0 不代表无限额）', { exact: true }).fill('10000');
   await modal.getByLabel('宿主知识整理模型 ID（须为已配置可用模型）', { exact: true }).fill(model);
-  await modal.getByLabel('资料就绪后知识整理总预算（micro）', { exact: true }).fill('10000');
+  // The real host reserves the conservative system+input+output bound first;
+  // a cheap deterministic response does not waive that admission requirement.
+  await modal.getByLabel('资料就绪后知识整理总预算（micro）', { exact: true }).fill('100000');
   await modal.getByLabel('每次整理输出 token 上限', { exact: true }).fill('1000');
   const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/intelligence/video/profiles' && r.request().method() === 'POST');
   await modal.getByRole('button', { name: '保存新版本', exact: true }).click();

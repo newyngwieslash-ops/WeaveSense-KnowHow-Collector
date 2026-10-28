@@ -16,7 +16,22 @@ state = root / ".local/video-fullstack/state.json"
 if state.exists():
     data = json.loads(state.read_text())
     values.extend(data[key] for key in ("username", "password") if key in data)
-for line in sys.stdin:
+def sanitize(line):
     for value in sorted(values, key=len, reverse=True):
         line = line.replace(value, "[REDACTED]")
-    sys.stdout.write(line)
+    return line
+
+
+if len(sys.argv) > 1:
+    if sys.argv[1] != "--artifacts":
+        raise SystemExit("usage: sanitize.py [--artifacts DIRECTORY ...]")
+    for directory in sys.argv[2:]:
+        for path in Path(directory).rglob("*"):
+            if path.is_file() and path.suffix in {".json", ".jsonl", ".txt", ".md", ".log", ".html"}:
+                original = path.read_text()
+                cleaned = sanitize(original)
+                if cleaned != original:
+                    path.write_text(cleaned)
+else:
+    for line in sys.stdin:
+        sys.stdout.write(sanitize(line))
