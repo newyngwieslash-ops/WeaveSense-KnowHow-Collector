@@ -30,8 +30,17 @@ class VideoDeploymentTests(unittest.TestCase):
             self.assertEqual(service["environment"]["BACKUP_VIDEO_JOURNAL_REQUIRED"], "true")
             self.assertIn("video-deletion-journal:/var/lib/flow-deletion-journal:ro", service["volumes"])
 
+    def test_video_execution_roles_use_the_real_platform_hook_name(self):
+        # main.ts installs authorization, budgets and knowledge extraction only
+        # from INTERNAL_URL; Python's FLOW_PLATFORM_URL is not interchangeable.
+        for role in ("loom-engine", "loom-scheduler", "loom-enrich"):
+            self.assertEqual(self.overlay["services"][role]["environment"]["FLOW_PLATFORM_INTERNAL_URL"], "http://platform:8080")
+
     def test_untrusted_decoder_has_no_journal_public_port_or_large_tmpfs(self):
         service = self.overlay["services"]["video-worker"]
+        self.assertNotIn("env_file", service)
+        forbidden = {"MINIO_ROOT_PASSWORD", "POSTGRES_SUPERUSER_PASSWORD", "PLATFORM_DB_PASSWORD", "INTEL_DB_PASSWORD", "VIDEO_DELETION_JOURNAL_KEY", "FLOW_MODEL_GATEWAY_KEY"}
+        self.assertTrue(forbidden.isdisjoint(service["environment"]))
         self.assertNotIn("ports", service)
         self.assertIs(service["read_only"], True)
         self.assertEqual(service["environment"]["VIDEO_TEMP_ROOT"], "/data/tmp")

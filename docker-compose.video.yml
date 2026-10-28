@@ -30,6 +30,7 @@ services:
       VIDEO_WORKER_URL: http://video-worker:8799
       VIDEO_SERVICE_TOKEN: ${VIDEO_SERVICE_TOKEN:-}
       FLOW_PLATFORM_URL: http://platform:8080
+      FLOW_PLATFORM_INTERNAL_URL: http://platform:8080
     volumes:
       - video-deletion-journal:/var/lib/flow-deletion-journal
   loom-scheduler:
@@ -40,6 +41,7 @@ services:
       VIDEO_WORKER_URL: http://video-worker:8799
       VIDEO_SERVICE_TOKEN: ${VIDEO_SERVICE_TOKEN:-}
       FLOW_PLATFORM_URL: http://platform:8080
+      FLOW_PLATFORM_INTERNAL_URL: http://platform:8080
     volumes:
       - video-deletion-journal:/var/lib/flow-deletion-journal
   loom-enrich:
@@ -50,6 +52,7 @@ services:
       VIDEO_WORKER_URL: http://video-worker:8799
       VIDEO_SERVICE_TOKEN: ${VIDEO_SERVICE_TOKEN:-}
       FLOW_PLATFORM_URL: http://platform:8080
+      FLOW_PLATFORM_INTERNAL_URL: http://platform:8080
     volumes:
       - video-deletion-journal:/var/lib/flow-deletion-journal
   flow-backup:
@@ -82,7 +85,8 @@ services:
       context: ./services/video-knowledge
       dockerfile: Dockerfile
     restart: unless-stopped
-    env_file: [.env.flow]
+    # Do not inherit .env.flow: it contains DB/admin/model/journal secrets which
+    # the untrusted media decoder must never receive. Enumerate its inputs.
     environment:
       VIDEO_PORT: "8799"
       VIDEO_EXECUTION_DB: /data/executions.sqlite3

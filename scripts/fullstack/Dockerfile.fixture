@@ -1,0 +1,7 @@
+FROM python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
+WORKDIR /app
+COPY scripts/fullstack/provider_fixture.py ./
+USER 65534:65534
+EXPOSE 8800
+HEALTHCHECK --interval=5s --timeout=3s CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8800/healthz')"
+CMD ["python", "provider_fixture.py"]

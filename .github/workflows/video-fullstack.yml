@@ -1,0 +1,57 @@
+name: Video full-stack TEST acceptance
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "web/**"
+      - "services/**"
+      - "deploy/flow/**"
+      - "docker-compose*.yml"
+      - "Dockerfile"
+      - "nginx.conf"
+      - "scripts/fullstack/**"
+      - "scripts/*video*"
+      - ".github/browser/**"
+      - ".github/workflows/video-fullstack.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: video-fullstack-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean-stack:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      VIDEO_FULLSTACK_TEST_ACK: DISPOSABLE_TEST_ONLY
+      VIDEO_FULLSTACK_EVIDENCE: ${{ runner.temp }}/video-fullstack-evidence
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.22.1"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci --ignore-scripts
+        working-directory: .github/browser
+      - run: npx playwright install --with-deps chromium
+        working-directory: .github/browser
+      - name: Fresh application containers, real authentication and internal hops
+        run: bash scripts/fullstack/run.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-fullstack-evidence
+          path: |
+            ${{ runner.temp }}/video-fullstack-evidence/
+            .github/browser/test-results/
+          if-no-files-found: error
+          retention-days: 14

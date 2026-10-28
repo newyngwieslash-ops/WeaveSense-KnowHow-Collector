@@ -1,0 +1,31 @@
+# Only overlay the real application stack. No host API is replaced.
+services:
+  web:
+    ports: !override ["127.0.0.1:4180:3000"]
+  loom-engine:
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      video-worker: {condition: service_healthy}
+  loom-scheduler:
+    depends_on:
+      loom-engine: {condition: service_healthy}
+  provider-fixture:
+    profiles: [video]
+    build:
+      context: .
+      dockerfile: scripts/fullstack/Dockerfile.fixture
+    environment:
+      FLOW_MODEL_GATEWAY_KEY: ${FLOW_MODEL_GATEWAY_KEY:?temporary TEST token required}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+networks:
+  # Runtime application containers cannot contact real platforms or paid APIs.
+  # Build-time downloads use declared package registries, not this network.
+  internal:
+    internal: true
