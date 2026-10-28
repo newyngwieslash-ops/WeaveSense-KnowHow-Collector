@@ -32,6 +32,7 @@
 | --- | --- | --- |
 | 宿主 ↔ Loom API | 同源提交的 Go 路由 + Loom `/v1` 契约；既有信封、scope、幂等键和 schema 批准 | 不混用未验证的任意宿主/Loom 版本；契约改变需联合测试并重新批准受影响 MCP schema |
 | Loom ↔ video-worker | `VideoManifest.schema_version=1`；输入/处理父 manifest hash、attempt/fence、对象 hash/字节严格校验；visual schema 为 1 | 未知 schema、缺失必需字段/能力拒绝导入，不通过手改 manifest 或跳过 hash 兼容旧 worker |
+| 进行中任务 ↔ provider 实例 | 提交 intent 冻结 `provider_instance`、外部 task 与原 key；worker 到 DTK 另有固定 route/契约边界 | `PROVIDER_INSTANCE_CHANGED` 时恢复原锁定实例再对账；本地取消不代表远端已取消。不把旧 task ID 发给新实例，不重绑意图或释放未知费用；受控 schema-drift/rollback 测试不是实际上游新版 binary 灰度 |
 | Loom DB | 本次迁移目录截至 `0033_video_budget_close_intent.sql`；0031/0032 保留模型重试 generation，0033 保留预算未知结果意图 | 新程序按迁移账本运行；没有证明旧 binary 能理解新状态时，不将其直接接回该库。失败迁移回滚/重试与整库恢复按各自证据执行 |
 | 删除日志 | journal/checkpoint `version=1`、固定 journal ID/密钥、连续签名链与 DB 绑定 | 数据库可恢复旧快照，独立日志不能跟着回退；先重放最新日志再恢复视频访问。旧日志缺失/不明时隔离，不重新 init |
 | 原生 Skill | 基础 `video-knowledge-core@1.0.0`；发布 manifest schema 1；所有归档 `id/version/hash` 精确存在 | 新构建保留历史包，旧 run 仍 pin 原版；新安装不改旧 pin。当前撤权检查对新旧版本均有效，无历史权限豁免 |

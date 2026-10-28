@@ -25,6 +25,8 @@ Go `/api/intelligence/video/*` 映射 Loom `/v1/video/*`，知识入口映射 `/
 | `/v1/video/jobs/:id/repair` | POST | `intel.video.process` + 幂等 key；显式受控重取，绝不由 GET 触发 |
 | `/v1/video/metrics` | GET | `intel.video.read`；from/to/profile_id，默认7天、最长90天的有界真实统计 |
 
+完整正文分页使用宿主 `POST /api/intelligence/documents/read` → Loom `POST /v1/documents/read`，不是直接访问 worker 或用摘要拼接全文。宿主沿用实际登录和工作区成员 scope，只接受 `document_id`、`revision`、`offset`、`max_chars` 四字段；请求完整读取上限 1 MiB，超限拒绝而不截断，转发上限 10 秒。只读调用不要求幂等键；Loom 保持 `intel.documents.read`、租户/工作区、当前授权和固定修订校验，返回 UTF-16 偏移、完整性与下一页位置。任意自报 tenant/workspace、外链或权限字段不进入受信上下文。
+
 Source 继续用 `/v1/sources`，新增 kind=`bilibili|douyin`。配置包括 `source_type:video|account`、`native_id|author_id`（字符串）、`part_id`（字符串）、`profile_id/profile_version`、`usage_basis`、`allowed_uses:['knowledge']`、可选 `credential_ref/authorization_expires_at/processing_mode`。不保存 Cookie。PATCH source 的 `expected_revision` 和 `status:active|paused` 复用宿主，停止订阅不撤销历史文本。手工运行复用 `/v1/collection-runs`；interval/cron、时区、misfire 和唯一调度锁复用 `/v1/schedules`。
 
 `PATCH /v1/schedules/:id {enabled,expected_revision}` 仅切换既有调度，CAS 冲突 409；monitor 所属调度必须使用原 monitor API。GET schedules 附加 `monitor_id`。cron 窗口长度使用该时区前一次真实触发点，不能把 interval_seconds 的 null 随意改成固定秒数。
@@ -54,6 +56,10 @@ Start：`{source_id,native_id?,part_id?,canonical_url?,content_version?,profile_
 发现结果的 next_cursor 只翻阅已保存项目。要继续尚未完成的远端扫描，POST discover 带原 `discovery_handle` 和新幂等 key，创建从已保存 checkpoint 延续的有界操作，保留原模式/窗口/config。GET 仅投影 checkpoint 代数/partial，不泄露原始 provider 游标或缓冲整页。MCP status/result 可用 discovery_handle 查询，不需要重复提交发现。
 
 Stage 原子 claim、90 秒 lease、15 秒 heartbeat；普通 pending 轮询保留当前 owner/attempt/fence，不再次 submit。进程消失才可到期接管并递增 fence。外部 submit 前先持久 intent；丢响应进入 reconciliation_required。Python 的已验证 intent 查询只恢复其执行收据，不能将 DTK 的未知接单误判为未接单。
+
+提交 intent 同时冻结 `provider_instance`。已存在的外部任务只能向原实例 poll/retry/reconcile/cancel，不能因部署配置变化把旧 external_task_id 发送给新实例。实例不匹配返回 `PROVIDER_INSTANCE_CHANGED`，保留原 intent、任务映射和未知费用；本地取消仍立即 fencing，但远端结果只能记 unknown，不能伪报已取消或释放未确认的费用。恢复原锁定实例后按原任务对账，不清理 intent、不生成新任务键，也不自动把当前实例重新绑定为原提供方。维护清理同样遵循该身份边界。
+
+已经确认的 external_task_id 不得被 poll/retry/reconcile 响应改写；不匹配为 `PROVIDER_TASK_MISMATCH`，在用量、对象、终态或预算写入前阻断。首次未知提交按原 intent 对账得到的首个有效任务收据不受此“已有 ID”比较限制。预算关闭还要求持久远端观察为 completed/failed；仅有 terminal 标记但观察仍 pending/unknown 的历史矛盾记录必须先向原实例核对，不能视为零费用或已确认清理。
 
 Provider/account 熔断状态按 scope 持久化：连续5次不确定网络/服务失败或显式429打开有界冷却，成功控制响应重置；不把宿主 embedding 失败误归到 Python/DTK。显式 retry 先读取外部状态，只有证明失败才持久 `resume_requested`；由下一个当前租约执行恢复，已完成产物仅重新导入，未知结果不重做。
 

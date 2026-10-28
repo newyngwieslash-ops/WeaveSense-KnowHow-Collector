@@ -1,9 +1,13 @@
 package flow
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"time"
 
 	"yingce/backend/internal/model"
 
@@ -30,11 +34,43 @@ func directApproval(body []byte, u *model.User, idem string) ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// Document reads are short scoped calls, not a browser-to-engine escape hatch.
+// Keep range semantics and object visibility in Loom; reject transport-level
+// authority injection and oversize bodies before the ordinary signed proxy.
+func documentReadBoundary(next gin.HandlerFunc) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		body, err := io.ReadAll(io.LimitReader(c.Request.Body, (1<<20)+1))
+		if err != nil || len(body) > 1<<20 {
+			videoReply(c, http.StatusRequestEntityTooLarge, "request_too_large")
+			return
+		}
+		var fields map[string]json.RawMessage
+		if json.Unmarshal(body, &fields) != nil || fields == nil {
+			videoReply(c, http.StatusBadRequest, "invalid_json")
+			return
+		}
+		for field := range fields {
+			switch field {
+			case "document_id", "revision", "offset", "max_chars":
+			default:
+				videoReply(c, http.StatusBadRequest, "untrusted_authority_field")
+				return
+			}
+		}
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		defer cancel()
+		c.Request = c.Request.WithContext(ctx)
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+		next(c)
+	}
+}
+
 // registerContractRoutes adds the PRD §11.1 routes that were only reachable through agent tools.
 func registerContractRoutes(g *gin.RouterGroup, proxy proxyFunc, proxyWith proxyWithFunc, proxyCommand proxyCommandFunc) {
 	g.GET("/sources/health", proxy(http.MethodGet, "/v1/sources/health"))
 	g.PATCH("/sources/:id", proxy(http.MethodPatch, "/v1/sources/:id"))
 	g.POST("/monitors", monitorCreateBoundary(proxyWith(http.MethodPost, "/v1/monitors", directApproval)))
+	g.POST("/documents/read", documentReadBoundary(proxy(http.MethodPost, "/v1/documents/read")))
 	g.GET("/documents/:id/revisions", proxy(http.MethodGet, "/v1/documents/:id/revisions"))
 	g.GET("/documents/:id/revisions/:rev", proxy(http.MethodGet, "/v1/documents/:id/revisions/:rev"))
 	g.POST("/research-runs", proxyCommand("research.request", http.MethodPost, "/v1/research-runs?async=1"))

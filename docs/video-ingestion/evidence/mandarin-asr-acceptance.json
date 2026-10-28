@@ -1,0 +1,455 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "checkout_base_commit": "0614968e5b48a2999368cc4000dac3347676e02a",
+  "working_source_sha256": {
+    "validation/video-knowledge/mandarin-asr-qa.ts": "e4c41a79c63cfa31d7c9462cc5093236ff3d7038a6d54a3233737d3582c67538",
+    "flow/video.ts": "1440eef7585e7b60c1b6f0c80ce00d5ad0bca9a4f7b05b5370b24c874271448c",
+    "flow/video-contract.ts": "909ccb892e7958324b50d4178dab5e9b6da8d194d3055202480eae3a019da496",
+    "flow/engine.ts": "e2f4867fbfe0f35af0a14844c975a61759b600f055130c2e26dd396ebb1e69eb",
+    "flow/server.ts": "266872020cb9e86ab08a078e43b09858dc1c46bc5747ba922aec40f2a5e8bba1",
+    "flow/video-provider.ts": "3242fb1d4a6e2020b5dc5ae12bef876d53b24d5757b481a9bced3f382685c0cd",
+    "workers/asr/server.py": "300de4584ed1644d4b17292df3cfcabbc4891b5943c98d9d020debc3f50f5173",
+    "../video-knowledge/mandarin_asr_smoke.py": "24d6ba28b7036f2c718f1b7d712fc05ed5eccb588cc985f3a33e99a9cc467aa4",
+    "../video-knowledge/media.py": "000843ae7b0d70d654447f10b923ae370697d03d706d129490a49c32daa6f2cf",
+    "../video-knowledge/server.py": "88c3d40854178d4a39f3a17f012377649ccea1d340a9ca8fa543c9066ddad248",
+    "../video-knowledge/runtime.py": "2ecbb7a4f451433156b4b939870b4fb2f40b3cc6bbe78fe788f0ada588adb8c9",
+    "../video-knowledge/core.py": "ca32e94231ece3048a02d1255c305819cf21f5d7bbfda928f97fbee335e63f1a",
+    "../../scripts/prepare-mandarin-asr.py": "ee750da164176eeea1efe78fb0b580ec1cae2e60c59c2bc2f64d0e9b6bc995ad"
+  },
+  "pipeline": "licensed Mandarin -> generated subtitle-free MP4 -> signed Python HTTP/SQLite/FFmpeg -> production ASR HTTP/offline tiny -> Loom HTTP/PGlite -> exact evidence read_ref",
+  "fixture": {
+    "source": {
+      "dataset": "google/fleurs",
+      "revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+      "config": "cmn_hans_cn",
+      "split": "test",
+      "archive_member": "test/10026684690566417990.wav",
+      "bytes": 664378,
+      "sha256": "a72c0b59fdba80850552af7991de07f9f4940846d2d70f0890eeb153c40f164b",
+      "source_url": "https://huggingface.co/datasets/google/fleurs/resolve/70bb2e84b976b7e960aa89f1c648e09c59f894dd/data/cmn_hans_cn/audio/test.tar.gz",
+      "license": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Conneau et al. (2022), FLEURS: Few-shot Learning Evaluation of Universal Representations of Speech, https://arxiv.org/abs/2205.12446",
+      "reference_text": "“这并不是告别。这是一个篇章的结束，也是新篇章的开始。”",
+      "modifications": "Audio re-encoded to AAC and combined with a generated plain-color video; no subtitles."
+    },
+    "model_lock": {
+      "repository": "Systran/faster-whisper-tiny",
+      "revision": "d90ca5fe260221311c53c58e660288d3deb8d356",
+      "files": [
+        {
+          "name": "README.md",
+          "sha256": "29fb8444a02c1f133ab7e538525aa478ff68845964f21cf42500842b0e4a7b20",
+          "bytes": 1991
+        },
+        {
+          "name": "config.json",
+          "sha256": "a73a28cdfe1c43ccc7202fa333d1f89c202477271407ae9a7f19afa52039cac8",
+          "bytes": 2249
+        },
+        {
+          "name": "tokenizer.json",
+          "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+          "bytes": 2203239
+        },
+        {
+          "name": "vocabulary.txt",
+          "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+          "bytes": 459861
+        },
+        {
+          "name": "model.bin",
+          "sha256": "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1",
+          "bytes": 75538270
+        }
+      ]
+    },
+    "installed_packages": [
+      {
+        "name": "argon2-cffi",
+        "version": "25.1.0",
+        "record_sha256": "58b5fb1d9684dc468685f7400d51c075e2c2f4ba739375f72867d1638abe27b3"
+      },
+      {
+        "name": "argon2-cffi-bindings",
+        "version": "26.1.0",
+        "record_sha256": "78b086878685f3efe657ca1bcf1e2db270d89c6121da2f1a1aa681f6ee75864a"
+      },
+      {
+        "name": "av",
+        "version": "14.1.0",
+        "record_sha256": "b18aaacdb0e34fef826225302f5a7f695e16bcb13f7313398c9d44330e5041c4"
+      },
+      {
+        "name": "certifi",
+        "version": "2026.10.23",
+        "record_sha256": "81c2883d30dcf2bdb6a830e4ab5a8b334c41f4914a4377c17e29b5e2a2bdee4a"
+      },
+      {
+        "name": "cffi",
+        "version": "2.1.1",
+        "record_sha256": "06194ef60d430ead322442fbefc4fe6c031b523a8167d48f180a3182232b39c0"
+      },
+      {
+        "name": "charset-normalizer",
+        "version": "3.5.2",
+        "record_sha256": "30a55bd86b45d70443d8ea2abafdfb16eae59d2e71653f50320ef2e3a0de233c"
+      },
+      {
+        "name": "coloredlogs",
+        "version": "15.0.1",
+        "record_sha256": "54f5ec2140b25299adf0fd4bf921b28968ce96123b8a8bc9692b5650c0178bcd"
+      },
+      {
+        "name": "ctranslate2",
+        "version": "4.8.4",
+        "record_sha256": "8af51262644bdc57bf5816414975936500407827d86340aa4a427f9d267ed490"
+      },
+      {
+        "name": "faster-whisper",
+        "version": "1.1.1",
+        "record_sha256": "8cd13cd5193b37cb0f2933bc99c6ec2fa9f3623dbeb2ed42ff4ffa384c7c388d"
+      },
+      {
+        "name": "filelock",
+        "version": "4.2.4",
+        "record_sha256": "17c9a631f3ac638fdf2454c3c8406585eb936446d227890148ddf717de20e192"
+      },
+      {
+        "name": "flatbuffers",
+        "version": "25.12.19",
+        "record_sha256": "66b31243cab415a9c8c38b3c7b1bfc67bf76a696e8887b2ce5171451fab4c708"
+      },
+      {
+        "name": "fsspec",
+        "version": "2026.9.0",
+        "record_sha256": "bb5b9da352a9f77e761fec5d02f2feec1d2ae55c5b8737d3250bbc201957ffe3"
+      },
+      {
+        "name": "huggingface-hub",
+        "version": "0.28.1",
+        "record_sha256": "5fce780aac3d625d062a95107c4f3c1d682a1f6683191c00a98b804fce0a6c0f"
+      },
+      {
+        "name": "humanfriendly",
+        "version": "10.0",
+        "record_sha256": "9d27cd2cfb8276d569434e4591f32bfef4b0a83e98a5a34fe5361d57bf5c6781"
+      },
+      {
+        "name": "idna",
+        "version": "3.20",
+        "record_sha256": "aeb7a626efab911b030d65c2cf53a321efd6fb279e749f17c9b74316520d5dea"
+      },
+      {
+        "name": "minio",
+        "version": "7.2.15",
+        "record_sha256": "eaca4a8283a89e0f7c8370b6e02ae90d0828aa4b3dbcda89525f4bddd547f678"
+      },
+      {
+        "name": "mpmath",
+        "version": "1.3.0",
+        "record_sha256": "6e0dc4362026a41beb2ad7081ec8f6fc9be0c48d9ce65784733aedc223c60100"
+      },
+      {
+        "name": "numpy",
+        "version": "2.2.2",
+        "record_sha256": "e92e950c2657361962198c512b93182245204f8952aa1a2640ec3c7a3257a22a"
+      },
+      {
+        "name": "onnxruntime",
+        "version": "1.20.1",
+        "record_sha256": "01264722dcc275f691969df72b53a0659b2dc7b62df87bf19defa3d4a575cc31"
+      },
+      {
+        "name": "packaging",
+        "version": "26.3",
+        "record_sha256": "8c69191044e577ab83c6b2990bc6fd7cfb441e6027ef5bb9e1c49c1dce2cedce"
+      },
+      {
+        "name": "pip",
+        "version": "25.0.1",
+        "record_sha256": "54acded9ebd916ed997969c55c0d09903190fc4e3b168c1ba3e6b29e7152834c"
+      },
+      {
+        "name": "protobuf",
+        "version": "7.36.2",
+        "record_sha256": "db842293b5dd47159aaf3e83f5563f181b14f0240a42ccef1dab665ebccad1cc"
+      },
+      {
+        "name": "pycparser",
+        "version": "3.12",
+        "record_sha256": "aa4140358193698685bab079a76cdb95f9eccc370b0be2278f783657dd6d23ea"
+      },
+      {
+        "name": "pycryptodome",
+        "version": "4.2.0",
+        "record_sha256": "27562b8bf820fe4afa9a64a67a58b30a13efc3dba093f93c45c3e394b8afea06"
+      },
+      {
+        "name": "PyYAML",
+        "version": "6.0.2",
+        "record_sha256": "59d8e0450ff724e2e86cec01aa1c80871e41bda536a79e8127521a4ec4f0e516"
+      },
+      {
+        "name": "requests",
+        "version": "2.34.2",
+        "record_sha256": "f6bd62ddca64dc9176c0085893fe2f153f553bef4869e9d53416a7c81be5532b"
+      },
+      {
+        "name": "sympy",
+        "version": "1.14.0",
+        "record_sha256": "fe9a7fe2226e03c0f854fc8c691d9c7cfb1e6238c3d72d9c22131e238cd8b9ab"
+      },
+      {
+        "name": "tokenizers",
+        "version": "0.21.0",
+        "record_sha256": "b36e70ce78c5a589b71602f99f6ed5b548160ca5f5857f9970114e56501a1efd"
+      },
+      {
+        "name": "tqdm",
+        "version": "4.67.1",
+        "record_sha256": "11a670814fa468cfdae490600e7a62a5632ba2673bf82bdf615269d2ac1fc2d3"
+      },
+      {
+        "name": "typing_extensions",
+        "version": "4.16.0",
+        "record_sha256": "a346a921aa5be35b34ced3258614183d152887b954caaae5de2a94be72d5f2ec"
+      },
+      {
+        "name": "urllib3",
+        "version": "2.8.0",
+        "record_sha256": "d1095c0d4222e159c7ceb2f8767d012e68bc1c4c0025518760aeec47e91326e2"
+      }
+    ],
+    "media_sha256": "7112c3946f6a7a2ff9093defa5e8c51ae6f754afc2e542b9e0a711051a21bc33",
+    "media_bytes": 80656,
+    "duration_seconds": 10.38,
+    "streams": [
+      "audio",
+      "video"
+    ],
+    "model_network_access": false,
+    "real_platform_acquisition": false,
+    "production_object_store": false
+  },
+  "recognition": {
+    "complete": true,
+    "engine": "faster-whisper:1.1.1",
+    "language": "zh",
+    "model_lock": {
+      "model_sha256": "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1",
+      "repository": "Systran/faster-whisper-tiny",
+      "revision": "d90ca5fe260221311c53c58e660288d3deb8d356"
+    },
+    "object_key": "tenants/mandarin_t/workspaces/mandarin_w/video/vj_0b725a5f19c72b660c4082ae/d604c63f70efbaaf354ca3f22d3b3ead730dae486b4bd5e1ed215306b3bf490f/audio.wav",
+    "output_format": "manifest",
+    "parts": [
+      {
+        "bytes": 191,
+        "object_key": "tenants/mandarin_t/workspaces/mandarin_w/video/vj_0b725a5f19c72b660c4082ae/47c898b4ffcc072bf7e1a0e1790782f8d6898b7e4f69f601d1b6ec2bdf8e0be2/asr-part.json",
+        "segment_count": 3,
+        "sha256": "47c898b4ffcc072bf7e1a0e1790782f8d6898b7e4f69f601d1b6ec2bdf8e0be2"
+      }
+    ],
+    "seconds": 10,
+    "segment_count": 3,
+    "sha256": "d604c63f70efbaaf354ca3f22d3b3ead730dae486b4bd5e1ed215306b3bf490f",
+    "status": "ok",
+    "text_sha256": "4786af74923cbb5792537323e597a1982e8f28ac289be50610435aec7be33c56"
+  },
+  "original_segments": [
+    {
+      "end": 3.58,
+      "start": 1.58,
+      "text": "这并不是告别"
+    },
+    {
+      "end": 5.58,
+      "start": 3.58,
+      "text": "这是一个偏胶的结束"
+    },
+    {
+      "end": 7.58,
+      "start": 5.58,
+      "text": "也是新偏胶的开始"
+    }
+  ],
+  "canonical_segments": [
+    {
+      "text": "这并不是告别",
+      "start_ms": 1580,
+      "end_ms": 3580,
+      "kind": "asr",
+      "alignment_method": "asr_segment"
+    },
+    {
+      "text": "这是一个偏胶的结束",
+      "start_ms": 3580,
+      "end_ms": 5580,
+      "kind": "asr",
+      "alignment_method": "asr_segment"
+    },
+    {
+      "text": "也是新偏胶的开始",
+      "start_ms": 5580,
+      "end_ms": 7580,
+      "kind": "asr",
+      "alignment_method": "asr_segment"
+    }
+  ],
+  "document_id": "doc_fc8e7080e80aa41e99467213",
+  "revision": 1,
+  "video_job_id": "vj_0b725a5f19c72b660c4082ae",
+  "full_text_sha256": "932a8845baafb2c1d8c88a637a6dae1d14ec0e3da11e01bdbfe4b4b2ae5dfed7",
+  "evidence": [
+    {
+      "evidence_id": "ev_45376761fff8c75ddf0e10d6",
+      "document_id": "doc_fc8e7080e80aa41e99467213",
+      "revision": 1,
+      "char_start": 47,
+      "char_end": 53,
+      "quote": "这并不是告别",
+      "snippet_hash": "8e5b1a60169d3f0a1a298ce9c30fafff22c6a31f8c72ce7b714ca9f94f6acc51",
+      "start_ms": 1580,
+      "end_ms": 3580,
+      "frame_ref": null,
+      "alignment_method": "asr_segment",
+      "media_sha256": "7112c3946f6a7a2ff9093defa5e8c51ae6f754afc2e542b9e0a711051a21bc33",
+      "quote_excerpt": null,
+      "quote_complete": true,
+      "read_ref": {
+        "document_id": "doc_fc8e7080e80aa41e99467213",
+        "revision": 1,
+        "offset": 47,
+        "max_chars": 6
+      }
+    },
+    {
+      "evidence_id": "ev_27d05ad0b274e2850b4ae8b0",
+      "document_id": "doc_fc8e7080e80aa41e99467213",
+      "revision": 1,
+      "char_start": 54,
+      "char_end": 63,
+      "quote": "这是一个偏胶的结束",
+      "snippet_hash": "58faeb8f72f76d6f7d80433e71e8a21141c008ee855c0968108bbe78195130b5",
+      "start_ms": 3580,
+      "end_ms": 5580,
+      "frame_ref": null,
+      "alignment_method": "asr_segment",
+      "media_sha256": "7112c3946f6a7a2ff9093defa5e8c51ae6f754afc2e542b9e0a711051a21bc33",
+      "quote_excerpt": null,
+      "quote_complete": true,
+      "read_ref": {
+        "document_id": "doc_fc8e7080e80aa41e99467213",
+        "revision": 1,
+        "offset": 54,
+        "max_chars": 9
+      }
+    },
+    {
+      "evidence_id": "ev_a5f6ceed787516d9373159bb",
+      "document_id": "doc_fc8e7080e80aa41e99467213",
+      "revision": 1,
+      "char_start": 64,
+      "char_end": 72,
+      "quote": "也是新偏胶的开始",
+      "snippet_hash": "3e3eb8181290a73ace482b761bf19535ac2b3855952ff136c54a1f70a91c85a5",
+      "start_ms": 5580,
+      "end_ms": 7580,
+      "frame_ref": null,
+      "alignment_method": "asr_segment",
+      "media_sha256": "7112c3946f6a7a2ff9093defa5e8c51ae6f754afc2e542b9e0a711051a21bc33",
+      "quote_excerpt": null,
+      "quote_complete": true,
+      "read_ref": {
+        "document_id": "doc_fc8e7080e80aa41e99467213",
+        "revision": 1,
+        "offset": 64,
+        "max_chars": 8
+      }
+    }
+  ],
+  "checks": {
+    "no_subtitle_stream": true,
+    "real_model_nonempty_chinese": true,
+    "original_asr_parts_preserved": true,
+    "exact_millisecond_mapping": true,
+    "evidence_reference_round_trip": true
+  },
+  "real_platform_acquisition": false,
+  "business_accuracy_threshold": "not specified by AC08; original reference and model recognition are retained without correction",
+  "production_ready": false,
+  "runtime_warnings": [
+    "UCX_VFS_SOCKET_PERMISSION_DENIED"
+  ],
+  "unclassified_stdout_lines": 0,
+  "stderr_line_count": 0,
+  "boundaries": [
+    "generated plain-color video",
+    "local filesystem object store",
+    "PGlite host database",
+    "no Go/browser/session claim",
+    "no paid model API"
+  ],
+  "prior_failed_synthetic_attempt": {
+    "generator": "eSpeak NG 1.52.0+dfsg-5",
+    "voice": "cmn",
+    "license": "GPL-3.0-or-later",
+    "source": "https://github.com/espeak-ng/espeak-ng",
+    "outcome": "production tiny/VAD returned zero segments; not an acceptance pass",
+    "audio_sha256": "44e548ff6e3efa7e4b694cd49181dee52f2c9d4ef6645b8d0468b00a5c217c11",
+    "recognition": [
+      "",
+      23,
+      "zh",
+      []
+    ],
+    "debian_packages": [
+      {
+        "file": "espeak-ng-data_1.52.0+dfsg-5_amd64.deb",
+        "source": "https://deb.debian.org/debian/pool/main/e/espeak-ng/espeak-ng-data_1.52.0+dfsg-5_amd64.deb",
+        "sha256": "7c239b30e419897313b5b8c98123cf3ec871cfedbf43bbb956b985a492e37f19"
+      },
+      {
+        "file": "espeak-ng_1.52.0+dfsg-5_amd64.deb",
+        "source": "https://deb.debian.org/debian/pool/main/e/espeak-ng/espeak-ng_1.52.0+dfsg-5_amd64.deb",
+        "sha256": "b64da7b5e21b3540a5cfe5a2fd5c650f6f366ffccb9b810eb337ea4677435d31"
+      },
+      {
+        "file": "libespeak-ng1_1.52.0+dfsg-5_amd64.deb",
+        "source": "https://deb.debian.org/debian/pool/main/e/espeak-ng/libespeak-ng1_1.52.0+dfsg-5_amd64.deb",
+        "sha256": "845886095f5be3ba7680c8e15de068f76d67600275cbd7b6f6c7d00e53c05b34"
+      },
+      {
+        "file": "libpcaudio0_1.3-1_amd64.deb",
+        "source": "https://deb.debian.org/debian/pool/main/p/pcaudiolib/libpcaudio0_1.3-1_amd64.deb",
+        "sha256": "db95c30434707a60774ed9ad0193ba680e061ae7d99f354a1a93f147317a4ea5"
+      },
+      {
+        "file": "libsonic0_0.2.0-13+b1_amd64.deb",
+        "source": "https://deb.debian.org/debian/pool/main/s/sonic/libsonic0_0.2.0-13+b1_amd64.deb",
+        "sha256": "07a1d67546465f07638be05f0931d79e0d6bb1a7831e1f67ac6611d1ba297009"
+      }
+    ]
+  },
+  "validation": {
+    "final_run": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "duration_ms": 5493.830969
+    },
+    "independent_reviewer_final_path": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "duration_seconds_rounded": 5.22,
+      "report_sha256": "3eb708a1228f0f8ecd0f8ad3eb95927b4442a909c2c4f1d2b7a670e6972217a6"
+    },
+    "fresh_official_fixture_download": true,
+    "invalid_fixture_hash_and_length_rejected": true,
+    "missing_explicit_ack_fails_without_skip": true,
+    "prior_published_evidence_sha256": "b065bef67a177603b79d3c7057f989c07bd6b5d9aeb194200cdfde093d82078e"
+  }
+}

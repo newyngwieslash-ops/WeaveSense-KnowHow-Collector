@@ -8,6 +8,33 @@ import { pathToFileURL } from 'node:url';
 const hash = value => createHash('sha256').update(value).digest('hex');
 let phase = 'configuration';
 
+export function longInputProfileRequest() {
+  return { method: 'POST', key: randomUUID(), body: {
+    name: 'Synthetic long subtitle acceptance', config: { language: 'zh', required_capabilities: ['transcript'], budget_micro: 10000,
+      knowledge_budget_micro: 0, knowledge_model_id: '' },
+  } };
+}
+
+const safeReasons = new Set(['idempotency_key_required', 'permission_denied', 'loom_unavailable', 'request_too_large', 'invalid_json',
+  'untrusted_authority_field', 'reconciliation_required', 'VIDEO_DISABLED', 'INVALID_PROFILE', 'INVALID_PROFILE_LIMIT',
+  'INVALID_CAPABILITIES', 'INVALID_VIDEO_SOURCE', 'PROFILE_NOT_FOUND', 'RESOURCE_QUOTA_EXCEEDED', 'AUTH_REQUIRED',
+  'SCOPE_DENIED', 'INPUT_UPLOAD_UNAVAILABLE', 'INVALID_LAWFUL_INPUT', 'MODEL_BUDGET_NOT_CONFIGURED']);
+
+export class LongInputAPIError extends Error {
+  constructor(httpStatus, code, reason) {
+    super('long_input_api_failed');
+    this.httpStatus = Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599 ? httpStatus : null;
+    this.apiCode = Number.isSafeInteger(code) ? code : null;
+    this.apiReason = safeReasons.has(reason) ? reason : 'unlisted_reason';
+  }
+}
+
+export function safeLongInputFailure(error) {
+  return error instanceof LongInputAPIError
+    ? { kind: 'api_error', http_status: error.httpStatus, code: error.apiCode, reason: error.apiReason }
+    : { kind: error?.code === 'ERR_ASSERTION' ? 'assertion_failed' : 'execution_failed' };
+}
+
 export function longInputFixture() {
   const title = '长字幕🧪e\u0301';
   const segments = Array.from({ length: 2101 }, (_, index) => ({
@@ -53,7 +80,7 @@ async function run() {
     const rawResponse = await response.text();
     let envelope;
     try { envelope = JSON.parse(rawResponse); } catch { throw new Error(`long_input_invalid_envelope_http_${response.status}`); }
-    if (!response.ok || envelope.code !== 0) throw new Error(`long_input_api_http_${response.status}_code_${Number(envelope.code) || -1}`);
+    if (!response.ok || envelope.code !== 0) throw new LongInputAPIError(response.status, envelope.code, envelope.reason);
     const session = response.headers.getSetCookie().find(value => value.startsWith('open_ai_canvas_session='));
     if (session) cookie = session.split(';')[0];
     return { data: envelope.data, bytes: Buffer.byteLength(rawResponse) };
@@ -69,14 +96,12 @@ async function run() {
     await api('/auth/login', { method: 'POST', body: { username: account.username, password: account.password } });
     assert.ok(cookie, 'real password login must establish a session');
     report.checks.authenticated_separate_tenant = true;
-    phase = 'profile_and_source';
-    const { data: profile } = await api('/intelligence/video/profiles', { method: 'POST', body: {
-      name: 'Synthetic long subtitle acceptance', config: { language: 'zh', required_capabilities: ['transcript'], budget_micro: 10000,
-        knowledge_budget_micro: 0, knowledge_model_id: '' },
-    } });
+    phase = 'profile_creation';
+    const { data: profile } = await api('/intelligence/video/profiles', longInputProfileRequest());
     const nativeId = 'BV1LONG00001';
     const sourceURL = `https://www.bilibili.com/video/${nativeId}`;
-    const { data: source } = await api('/intelligence/sources', { method: 'POST', body: { kind: 'bilibili', title: fixture.title, url: sourceURL,
+    phase = 'source_creation';
+    const { data: source } = await api('/intelligence/sources', { method: 'POST', key: randomUUID(), body: { kind: 'bilibili', title: fixture.title, url: sourceURL,
       config: { source_type: 'video', native_id: nativeId, profile_id: profile.id, profile_version: profile.version,
         usage_basis: 'Self-authored synthetic subtitle; no request to a real platform or third-party media.', allowed_uses: ['knowledge'] } } });
     const input = { source_id: source.id, native_id: nativeId, canonical_url: sourceURL, title: fixture.title, content_version: 'synthetic-long-overlap-v1',
@@ -148,10 +173,10 @@ async function run() {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) run().catch(() => {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) run().catch(error => {
   // Node AssertionError can echo full text operands. Fail without private or
   // unbounded response bodies; the service logs remain independently sanitized.
   console.log(JSON.stringify({ schema_version: 1, source_commit: /^[a-f0-9]{40}$/.test(process.env.VIDEO_FULLSTACK_SOURCE_SHA || '') ? process.env.VIDEO_FULLSTACK_SOURCE_SHA : null,
-    passed: false, failed_phase: phase, real_platform_acquisition: false, production_ready: false }));
+    passed: false, failed_phase: phase, failure: safeLongInputFailure(error), real_platform_acquisition: false, production_ready: false }));
   console.error('long_input_acceptance_failed'); process.exitCode = 1;
 });

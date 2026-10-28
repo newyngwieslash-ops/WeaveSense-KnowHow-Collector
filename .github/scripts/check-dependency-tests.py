@@ -19,6 +19,7 @@ VIDEO_REQUIRED = {
     ("server", "TestRuntimeServiceGuardedDBDrivesActualApprovedNativeSkill"),
     ("flow", "TestVideoQACrossLanguageGateway"),
     ("flow", "TestVideoQAMCPPagingAndCrossEntryReplay"),
+    ("flow", "TestVideoQADocumentReadHTTPAndRevocation"),
     ("flow", "TestVideoQASourcePromptCannotExpandNativeAuthority"),
     ("flow", "TestVideoQALoomExportBuildAndRunningRegistry"),
     ("app", "TestVideoAC24PeriodicCanvasFeatureToggleParity"),

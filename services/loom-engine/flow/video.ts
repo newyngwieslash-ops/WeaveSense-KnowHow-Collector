@@ -38,6 +38,26 @@ export class VideoCoordinator {
   }
   get db() { return this.engine.db; }
   get now() { return this.engine.now(); }
+  private async boundProvider(s: VideoScope, jobId: string, provider = this.provider): Promise<VideoProvider> {
+    if (!provider) throw videoError(503, "PROVIDER_UNAVAILABLE");
+    // An accepted/unknown submission's IDs and objects belong to that worker's namespace.
+    // A deployment/configuration change cannot silently adopt that durable identity.
+    const mismatch = (await this.db.query(`SELECT 1 FROM flow_video_submission_intents WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND provider_instance<>$4 LIMIT 1`, [...scopeParams(s), jobId, provider.instance])).rows[0];
+    if (mismatch) throw videoError(409, "PROVIDER_INSTANCE_CHANGED");
+    return provider;
+  }
+  private assertExternalTask(result: ProviderResult, expected: string) {
+    if (!result || result.task_id !== expected) throw videoError(409, "PROVIDER_TASK_MISMATCH");
+  }
+  private async attachExternalTask(q: Q, job: any, stage: string, taskId: string) {
+    // Unknown outcomes can be reconciled concurrently. Only the first receipt
+    // may bind an ID; a later stale response must match the now-durable identity.
+    if (typeof taskId !== "string" || !taskId) throw videoError(502, "PROVIDER_CONTRACT_CHANGED");
+    const intent = (await q.query(`SELECT external_task_id FROM flow_video_submission_intents WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4 FOR UPDATE`, [...scopeParams(job), job.id, stage])).rows[0];
+    if (!intent) throw videoError(409, "STALE_FENCE");
+    if (intent.external_task_id && intent.external_task_id !== taskId) throw videoError(409, "PROVIDER_TASK_MISMATCH");
+    await q.query(`UPDATE flow_video_submission_intents SET external_task_id=$5 WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(job), job.id, stage, taskId]);
+  }
   private enabledFor(s: VideoScope) {
     const allowed = (process.env.FLOW_VIDEO_WORKSPACES ?? "").split(",").map(x => x.trim()).filter(Boolean);
     if (!this.enabled || (allowed.length && !allowed.includes(s.workspace_id))) throw videoError(503, "VIDEO_DISABLED");
@@ -211,6 +231,7 @@ export class VideoCoordinator {
   }
   /** The authenticated original grantee supplies bytes, never an object key or fetch URL. */
   async uploadInput(s: VideoScope, id: string, body: AsyncIterable<Uint8Array>, length: number, contentType: string) {
+    const provider = this.provider;
     this.enabledFor(s); await assertVideoRetentionJournal(this.engine, s);
     const job = await this.job(s, id), descriptor = job.input.lawful_input;
     if (s.actor?.type !== "user" || actor(s) !== job.grant_actor) throw videoError(403, "INPUT_GRANT_MISMATCH");
@@ -220,21 +241,22 @@ export class VideoCoordinator {
       if (job.input.input_object && !["cancelled", "failed"].includes(job.state)) return this.project(job);
       throw videoError(409, "INPUT_NOT_ACCEPTING");
     }
-    if (job.stage !== "awaiting_input" || !this.provider?.uploadInput) throw videoError(503, "INPUT_UPLOAD_UNAVAILABLE");
+    if (job.stage !== "awaiting_input" || !provider?.uploadInput) throw videoError(503, "INPUT_UPLOAD_UNAVAILABLE");
+    await this.boundProvider(job, id, provider);
     await admitVideoResources(this.engine, job, await this.profile(s, job.profile_id, job.profile_version));
     async function* checked() {
       const hash = createHash("sha256"); let bytes = 0;
       for await (const chunk of body) { bytes += chunk.byteLength; if (bytes > descriptor.bytes) throw videoError(413, "LIMIT_EXCEEDED"); hash.update(chunk); yield chunk; }
       if (bytes !== descriptor.bytes || hash.digest("hex") !== descriptor.sha256) throw videoError(422, "INPUT_HASH_MISMATCH");
     }
-    const object = await this.provider.uploadInput(job, descriptor, checked());
-    return this.acceptInputReceipt(s, job, object);
+    const object = await provider.uploadInput(job, descriptor, checked());
+    return this.acceptInputReceipt(s, job, object, provider);
   }
-  private async acceptInputReceipt(s: VideoScope, job: any, object: any) {
+  private async acceptInputReceipt(s: VideoScope, job: any, object: any, provider = this.provider) {
     const id = job.id, descriptor = job.input.lawful_input;
     assertVideoObject(s, object.object_key, id);
     if (object.sha256 !== descriptor.sha256 || object.bytes !== descriptor.bytes || object.content_type !== descriptor.content_type) throw videoError(422, "INPUT_RECEIPT_MISMATCH");
-    await this.registerArtifacts(job, [object]);
+    await this.registerArtifacts(job, [object], provider);
     return this.db.tx(async q => {
       const current = (await q.query(`SELECT * FROM flow_video_jobs WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 FOR UPDATE`, [...scopeParams(s), id])).rows[0];
       await this.source(s, current.source_id, q, false);
@@ -256,15 +278,19 @@ export class VideoCoordinator {
   }
   /** Last confirmed response is historical evidence, not an assertion that remote work has stopped. */
   private async observeExternal(job: any, stage: any, result: ProviderResult, q?: Q): Promise<void> {
-    if (!result?.task_id || !['pending','completed','failed','reconciliation_required'].includes(result.state)) return;
+    if (!result?.task_id || !['pending','completed','failed','reconciliation_required'].includes(result.state)) throw videoError(502, "PROVIDER_CONTRACT_CHANGED");
     if (!q) return this.db.tx(tx => this.observeExternal(job, stage, result, tx));
     // Keep the current generation locked through the write, including against cancellation/takeover.
     const current = (await q.query(`SELECT attempt,fencing_token FROM flow_video_stages WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4 FOR SHARE`, [...scopeParams(job), job.id, stage.stage])).rows[0];
     if (!current || Number(current.attempt) !== Number(stage.attempt) || Number(current.fencing_token) !== Number(stage.fencing_token)) throw videoError(409, "STALE_FENCE");
+    const intent = (await q.query(`SELECT external_task_id FROM flow_video_submission_intents WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4 FOR UPDATE`, [...scopeParams(job), job.id, stage.stage])).rows[0];
+    if (!intent?.external_task_id) throw videoError(409, "STALE_FENCE");
+    this.assertExternalTask(result, intent.external_task_id);
     const state = ["EXTERNAL_OUTCOME_UNKNOWN", "USAGE_OUTCOME_UNKNOWN"].includes(result.error?.code ?? "") ? "reconciliation_required" : result.state;
-    await q.query(`UPDATE flow_video_submission_intents SET external_observed_state=$6,external_observed_at=$7
+    const recorded = affected(await q.query(`UPDATE flow_video_submission_intents SET external_observed_state=$6,external_observed_at=$7
       WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4 AND external_task_id=$5
-      AND (external_observed_at IS NULL OR external_observed_at<=$7)`, [...scopeParams(job), job.id, stage.stage, result.task_id, state, this.now.toISOString()]);
+      AND (external_observed_at IS NULL OR external_observed_at<=$7)`, [...scopeParams(job), job.id, stage.stage, result.task_id, state, this.now.toISOString()]));
+    if (recorded !== 1) throw videoError(409, "STALE_FENCE");
   }
   async list(s: VideoScope, cursor?: string, limit = 50, state?: string) {
     if (!finiteInt(limit, 1, 100)) throw videoError(400, "INVALID_PAGINATION");
@@ -453,13 +479,15 @@ export class VideoCoordinator {
       await q.query(`UPDATE flow_video_objects SET state='delete_pending' WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND state='accepted'`, [...scopeParams(s), id]);
       return j;
     });
-    const intents = (await this.db.query(`SELECT external_task_id FROM flow_video_submission_intents WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3`, [...scopeParams(s), id])).rows;
-    const responses = await Promise.all(intents.map(x => x.external_task_id ? Promise.resolve(this.provider?.cancel(job, x.external_task_id) ?? "unsupported").catch(() => "unknown") : "unknown"));
+    const provider = this.provider;
+    const intents = (await this.db.query(`SELECT external_task_id,provider_instance FROM flow_video_submission_intents WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3`, [...scopeParams(s), id])).rows;
+    const responses = await Promise.all(intents.map(x => x.external_task_id && provider && provider.instance === x.provider_instance ? Promise.resolve(provider.cancel(job, x.external_task_id)).catch(() => "unknown") : "unknown"));
     const remote = responses.length === 0 ? "confirmed" : responses.every(x => x === "confirmed") ? "confirmed" : responses.includes("unknown") ? "unknown" : "unsupported";
     await this.db.query(`UPDATE flow_video_jobs SET remote_cancel_status=$4 WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 AND state='cancelled'`, [...scopeParams(s), id, remote]);
     return this.get(s, id);
   }
   async reconcile(s: VideoScope, input: { video_job_id?: string; idempotency_key?: string }) {
+    const provider = this.provider;
     let id = input.video_job_id;
     if (!id && input.idempotency_key) id = (await this.db.query(`SELECT video_job_id FROM flow_video_requests WHERE tenant_id=$1 AND workspace_id=$2 AND namespace='start' AND idempotency_key=$3`, [...scopeParams(s), input.idempotency_key])).rows[0]?.video_job_id;
     if (!id && input.idempotency_key) {
@@ -468,10 +496,11 @@ export class VideoCoordinator {
     }
     if (!id) throw videoError(404, input.idempotency_key ? "VIDEO_SUBMISSION_NOT_FOUND" : "VIDEO_JOB_NOT_FOUND");
     const job = await this.job(s, id);
-    if (job.stage === "awaiting_input" && job.input.lawful_input && this.provider?.inputReceipt) {
+    if (job.stage === "awaiting_input" && job.input.lawful_input && provider?.inputReceipt) {
       await this.authorize(job);
-      const receipt = await this.provider.inputReceipt(job, job.input.lawful_input.sha256);
-      if (receipt) await this.acceptInputReceipt(s, job, receipt);
+      await this.boundProvider(job, job.id, provider);
+      const receipt = await provider.inputReceipt(job, job.input.lawful_input.sha256);
+      if (receipt) await this.acceptInputReceipt(s, job, receipt, provider);
       return this.get(s, id);
     }
     if (job.state === "reconciliation_required" && job.stage === "embedding") {
@@ -483,32 +512,47 @@ export class VideoCoordinator {
       });
       return this.get(s, id);
     }
-    if (job.state === "reconciliation_required" && this.provider?.reconcile) {
+    if (job.state === "reconciliation_required" && provider) {
       await this.authorize(job);
+      await this.boundProvider(job, job.id, provider);
       const intent = (await this.db.query(`SELECT * FROM flow_video_submission_intents WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(s), id, job.stage])).rows[0];
       const stage = (await this.db.query(`SELECT * FROM flow_video_stages WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(s), id, job.stage])).rows[0];
-      if (intent) {
-        const remote = await this.provider.reconcile(job, stage, intent.intent_key);
+      if (!intent && stage && job.error?.code === "PROVIDER_INSTANCE_CHANGED") {
+        // The next stage may have been blocked by its prior input's worker
+        // binding before any submission. Restoring that worker can resume it.
+        await this.db.tx(async q => {
+          const current = (await q.query(`SELECT state,stage FROM flow_video_jobs WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 FOR UPDATE`, [...scopeParams(s), id])).rows[0];
+          const live = (await q.query(`SELECT attempt,fencing_token FROM flow_video_stages WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4 FOR UPDATE`, [...scopeParams(s), id, job.stage])).rows[0];
+          if (current?.state !== "reconciliation_required" || current.stage !== job.stage || !live || Number(live.attempt) !== Number(stage.attempt) || Number(live.fencing_token) !== Number(stage.fencing_token)) throw videoError(409, "STALE_FENCE");
+          await q.query(`UPDATE flow_video_jobs SET state='queued',error=NULL WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [...scopeParams(s), id]);
+          await q.query(`UPDATE flow_video_stages SET state='queued',error=NULL,next_poll_at=$5 WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(s), id, job.stage, this.now.toISOString()]);
+        });
+      } else if (intent && provider.reconcile) {
+        const remote = await provider.reconcile(job, stage, intent.intent_key);
+        if (remote && intent.external_task_id) this.assertExternalTask(remote, intent.external_task_id);
         if (remote?.task_id && remote.state !== "reconciliation_required" && !["EXTERNAL_OUTCOME_UNKNOWN", "USAGE_OUTCOME_UNKNOWN"].includes(remote.error?.code ?? "")) await this.db.tx(async q => {
           const current = (await q.query(`SELECT attempt,fencing_token FROM flow_video_stages WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4 FOR UPDATE`, [...scopeParams(s), id, job.stage])).rows[0];
           if (!current || Number(current.attempt) !== Number(stage.attempt) || Number(current.fencing_token) !== Number(stage.fencing_token)) throw videoError(409, "STALE_FENCE");
-          await q.query(`UPDATE flow_video_submission_intents SET external_task_id=$5,state='accepted',updated_at=now() WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(s), id, job.stage, remote.task_id]);
+          await this.attachExternalTask(q, job, job.stage, remote.task_id);
+          await q.query(`UPDATE flow_video_submission_intents SET state='accepted',updated_at=now() WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(s), id, job.stage]);
           await this.observeExternal(job, stage, remote, q);
           await q.query(`UPDATE flow_video_jobs SET state='queued',error=NULL WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 AND state='reconciliation_required'`, [...scopeParams(s), id]);
           await q.query(`UPDATE flow_video_stages SET state='queued',next_poll_at=$5,lease_owner=NULL WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(s), id, job.stage, this.now.toISOString()]);
         });
-        else if (remote?.task_id) await this.observeExternal(job, stage, remote);
+        else if (remote?.task_id && intent.external_task_id) await this.observeExternal(job, stage, remote);
       }
     }
     return this.get(s, id);
   }
   async retry(s: VideoScope, id: string) {
+    const provider = this.provider;
     const j = await this.job(s, id);
     if (!["failed", "blocked_auth", "blocked_budget", "retry_wait"].includes(j.state)) throw videoError(409, "RETRY_NOT_ALLOWED");
     if (j.budget_closing_at) throw videoError(409, "BUDGET_RECONCILIATION_REQUIRED");
     const stage = (await this.db.query(`SELECT * FROM flow_video_stages WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(s), id, j.stage])).rows[0];
     if (!stage) throw videoError(409, "RETRY_STAGE_MISSING");
     await this.authorize(j);
+    if (j.stage !== "embedding") await this.boundProvider(j, id, provider);
     let renewedBudget: number | undefined;
     if (j.budget_reservation_id && this.budgetStatus) {
       const receipt = await this.budgetStatus(j);
@@ -524,9 +568,9 @@ export class VideoCoordinator {
     const intent = (await this.db.query(`SELECT * FROM flow_video_submission_intents WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(s), id, j.stage])).rows[0];
     let remote: ProviderResult | undefined;
     if (intent?.external_task_id && j.stage !== "embedding") {
-      if (!this.provider) throw videoError(503, "PROVIDER_UNAVAILABLE");
-      remote = await this.provider.poll(j, stage, intent.external_task_id);
-      if (remote.state === "failed" && !this.provider.retry) throw videoError(409, "PROVIDER_RESUME_UNSUPPORTED");
+      remote = await provider!.poll(j, stage, intent.external_task_id);
+      this.assertExternalTask(remote, intent.external_task_id);
+      if (remote.state === "failed" && !provider!.retry) throw videoError(409, "PROVIDER_RESUME_UNSUPPORTED");
     }
     const unknown = remote?.state === "reconciliation_required" || ["EXTERNAL_OUTCOME_UNKNOWN", "USAGE_OUTCOME_UNKNOWN"].includes(remote?.error?.code ?? "");
     await this.db.tx(async q => {
@@ -620,14 +664,14 @@ export class VideoCoordinator {
         [...scopeParams(st), st.video_job_id, st.stage, new Date(this.now.getTime() + 5000).toISOString(), this.now.toISOString(), new Date(this.now.getTime() + 90_000).toISOString()]);
     });
   }
-  private providerKey(job: any) { return canonicalHash({ instance: this.provider?.instance, platform: job.input.platform, credential_ref: job.input.credential_ref ?? null }); }
-  private async providerAdmission(job: any) {
-    const row = (await this.db.query(`SELECT blocked_until FROM flow_video_provider_health WHERE tenant_id=$1 AND workspace_id=$2 AND provider_key=$3`, [...scopeParams(job), this.providerKey(job)])).rows[0];
+  private providerKey(job: any, provider = this.provider) { return canonicalHash({ instance: provider?.instance, platform: job.input.platform, credential_ref: job.input.credential_ref ?? null }); }
+  private async providerAdmission(job: any, provider = this.provider) {
+    const row = (await this.db.query(`SELECT blocked_until FROM flow_video_provider_health WHERE tenant_id=$1 AND workspace_id=$2 AND provider_key=$3`, [...scopeParams(job), this.providerKey(job, provider)])).rows[0];
     if (row?.blocked_until && new Date(row.blocked_until).getTime() > this.now.getTime()) throw Object.assign(videoError(503, "PROVIDER_CIRCUIT_OPEN"), { retry_after: Math.ceil((new Date(row.blocked_until).getTime() - this.now.getTime()) / 1000) });
   }
-  private async providerOutcome(job: any, reason?: string, retryAfter = 0) {
+  private async providerOutcome(job: any, reason?: string, retryAfter = 0, provider = this.provider) {
     await this.db.tx(async q => {
-      const key = this.providerKey(job);
+      const key = this.providerKey(job, provider);
       await q.query(`INSERT INTO flow_video_provider_health(tenant_id,workspace_id,provider_key) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, [...scopeParams(job), key]);
       const row = (await q.query(`SELECT consecutive_failures FROM flow_video_provider_health WHERE tenant_id=$1 AND workspace_id=$2 AND provider_key=$3 FOR UPDATE`, [...scopeParams(job), key])).rows[0];
       const failures = reason ? Number(row.consecutive_failures) + 1 : 0;
@@ -637,6 +681,7 @@ export class VideoCoordinator {
     });
   }
   async workOnce(owner: string) {
+    const provider = this.provider;
     await assertVideoRetentionJournal(this.engine);
     const st = await this.claim(owner); if (!st) return null;
     const job = await this.job(st, st.video_job_id);
@@ -644,6 +689,7 @@ export class VideoCoordinator {
     const interval = setInterval(() => { void this.heartbeat(st).catch(e => { heartbeatError = e; }); }, 15_000);
     try {
       await this.authorize(job);
+      if (st.stage !== "embedding") await this.boundProvider(job, job.id, provider);
       const p = await this.profile(job, job.profile_id, job.profile_version);
       if (this.engine.budget && Number(p.config.budget_micro) <= 0) throw videoError(402, "BUDGET_EXCEEDED");
       if (this.engine.budget && Number(p.config.budget_micro) > 0 && !job.budget_reservation_id) {
@@ -689,23 +735,27 @@ export class VideoCoordinator {
         return this.get(job, job.id);
       }
       if (st.stage === "input") await admitVideoResources(this.engine, job, p);
-      if (!this.provider) throw videoError(503, "PROVIDER_UNAVAILABLE");
-      await this.providerAdmission(job);
+      if (!provider) throw videoError(503, "PROVIDER_UNAVAILABLE");
+      await this.providerAdmission(job, provider);
       const intentKey = `${st.stage}:${job.fingerprint}`;
       let intent = (await this.db.query(`SELECT * FROM flow_video_submission_intents WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(job), job.id, st.stage])).rows[0];
       let result: ProviderResult;
       if (intent?.external_task_id) {
         if (intent.state === "resume_requested") {
-          if (!this.provider.retry) throw videoError(409, "PROVIDER_RESUME_UNSUPPORTED");
-          try { result = await this.provider.retry(job, st, intent.external_task_id); }
+          if (!provider.retry) throw videoError(409, "PROVIDER_RESUME_UNSUPPORTED");
+          try { result = await provider.retry(job, st, intent.external_task_id); }
           catch {
             await this.park(st, "reconciliation_required", { code: "EXTERNAL_OUTCOME_UNKNOWN", retryable: false }); return this.get(job, job.id);
           }
+          this.assertExternalTask(result, intent.external_task_id);
           await this.db.tx(async q => {
             await this.fenced(q, st);
             await q.query(`UPDATE flow_video_submission_intents SET state='accepted',updated_at=now() WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(job), job.id, st.stage]);
           });
-        } else result = await this.provider.poll(job, st, intent.external_task_id);
+        } else {
+          result = await provider.poll(job, st, intent.external_task_id);
+          this.assertExternalTask(result, intent.external_task_id);
+        }
       }
       else if (intent) {
         // Intent exists without a confirmed task ID: never blindly repeat an external submission.
@@ -714,10 +764,10 @@ export class VideoCoordinator {
       } else {
         await this.db.tx(async q => {
           await this.fenced(q, st);
-          await q.query(`INSERT INTO flow_video_submission_intents(tenant_id,workspace_id,video_job_id,stage,intent_key,request_hash,provider_instance,state) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted')`, [...scopeParams(job), job.id, st.stage, intentKey, job.fingerprint, this.provider!.instance]);
+          await q.query(`INSERT INTO flow_video_submission_intents(tenant_id,workspace_id,video_job_id,stage,intent_key,request_hash,provider_instance,state) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted')`, [...scopeParams(job), job.id, st.stage, intentKey, job.fingerprint, provider.instance]);
         });
         const input = (await this.db.query(`SELECT manifest FROM flow_video_manifests WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND artifact_stage='input_ready'`, [...scopeParams(job), job.id])).rows[0]?.manifest;
-        try { result = await this.provider.submit(job, st, intentKey, p, input); }
+        try { result = await provider.submit(job, st, intentKey, p, input); }
         catch (e: any) {
           if ([400, 401, 403, 413, 429].includes(e.status)) {
             // Explicit pre-admission HTTP rejection is proof no operational task was accepted.
@@ -727,19 +777,20 @@ export class VideoCoordinator {
             });
             throw e;
           }
-          await this.providerOutcome(job, "EXTERNAL_OUTCOME_UNKNOWN");
+          await this.providerOutcome(job, "EXTERNAL_OUTCOME_UNKNOWN", 0, provider);
           await this.park(st, "reconciliation_required", { code: "EXTERNAL_OUTCOME_UNKNOWN", retryable: false }); return this.get(job, job.id);
         }
         if (!result.task_id) { await this.park(st, "reconciliation_required", { code: "EXTERNAL_OUTCOME_UNKNOWN", retryable: false }); return this.get(job, job.id); }
         await this.db.tx(async q => {
           await this.fenced(q, st);
-          await q.query(`UPDATE flow_video_submission_intents SET external_task_id=$5,state='accepted',updated_at=now() WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(job), job.id, st.stage, result.task_id]);
+          await this.attachExternalTask(q, job, st.stage, result.task_id);
+          await q.query(`UPDATE flow_video_submission_intents SET state='accepted',updated_at=now() WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(job), job.id, st.stage]);
         });
       }
       await this.observeExternal(job, st, result);
       await this.recordUsage(job, st.stage, result.usage ?? (result.manifest as any)?.usage ?? {});
-      await this.providerOutcome(job);
-      await this.registerResultArtifacts(job, result);
+      await this.providerOutcome(job, undefined, 0, provider);
+      await this.registerResultArtifacts(job, result, provider);
       if (["completed", "failed"].includes(result.state)) await this.db.query(`UPDATE flow_video_submission_intents SET state='terminal' WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(job), job.id, st.stage]);
       if (heartbeatError) throw heartbeatError;
       if (result.state === "pending") await this.pending(st);
@@ -747,15 +798,15 @@ export class VideoCoordinator {
       else if (result.state === "failed") throw Object.assign(videoError(422, result.error?.code ?? "PROCESSOR_FAILED"), { retry_after: result.error?.retry_after });
       else if (result.state === "completed" && result.manifest) {
         // The accepted external task is stable across lease takeovers; only this worker's current envelope can commit it.
-        await this.importManifest(job, job.id, { ...result.manifest, stage_attempt: st.attempt, fencing_token: Number(st.fencing_token) }, st);
+        await this.importManifest(job, job.id, { ...result.manifest, stage_attempt: st.attempt, fencing_token: Number(st.fencing_token) }, st, provider);
       } else throw videoError(502, "PROVIDER_CONTRACT_CHANGED");
     } catch (e: any) {
       if (e.reason === "STALE_FENCE") return { state: "stale" };
       const reason = e.reason ?? (e.status === 402 ? "BUDGET_EXCEEDED" : "PROCESSOR_FAILED");
       if (["SOURCE_UNAVAILABLE", "CONTENT_NOT_FOUND", "REMOTE_UNAVAILABLE"].includes(reason)) await this.db.query(`UPDATE flow_video_assets SET availability='remote_unavailable',remote_checked_at=$4 WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 AND revoked_at IS NULL`, [...scopeParams(job), job.asset_id, this.now.toISOString()]);
       if (st.stage === "input") await releaseUnsubmittedVideoResources(this.engine, job);
-      if (st.stage !== "embedding" && this.provider && ["PROVIDER_UNAVAILABLE", "RATE_LIMITED", "PROVIDER_CONTRACT_CHANGED"].includes(reason)) await this.providerOutcome(job, reason, Number(e.retry_after) || 0);
-      const state = ["EXTERNAL_OUTCOME_UNKNOWN", "USAGE_OUTCOME_UNKNOWN"].includes(reason) ? "reconciliation_required" : reason === "AUTH_REQUIRED" ? "blocked_auth" : reason === "BUDGET_EXCEEDED" ? "blocked_budget"
+      if (st.stage !== "embedding" && provider && ["PROVIDER_UNAVAILABLE", "RATE_LIMITED", "PROVIDER_CONTRACT_CHANGED"].includes(reason)) await this.providerOutcome(job, reason, Number(e.retry_after) || 0, provider);
+      const state = ["EXTERNAL_OUTCOME_UNKNOWN", "USAGE_OUTCOME_UNKNOWN", "PROVIDER_INSTANCE_CHANGED", "PROVIDER_TASK_MISMATCH"].includes(reason) ? "reconciliation_required" : reason === "AUTH_REQUIRED" ? "blocked_auth" : reason === "BUDGET_EXCEEDED" ? "blocked_budget"
         : ["PROVIDER_UNAVAILABLE", "PROVIDER_CIRCUIT_OPEN", "RATE_LIMITED", "STORAGE_ERROR", "STORAGE_PRESSURE", "DAILY_RESOURCE_LIMIT", "EMBEDDING_UNAVAILABLE"].includes(reason) && st.attempt < 8 ? "retry_wait" : "failed";
       const delay = Math.max(Number(e.retry_after) || 0, Math.min(1800, 15 * 2 ** Math.min(7, st.attempt)) + Math.floor(Math.random() * 10));
       try { await this.park(st, state, { code: reason, retryable: state === "retry_wait", stage: st.stage, retry_after: delay }, delay); } catch (f: any) { if (f.reason !== "STALE_FENCE") throw f; }
@@ -763,7 +814,7 @@ export class VideoCoordinator {
     return this.get(job, job.id);
   }
 
-  async importManifest(s: VideoScope, id: string, m: VideoManifest, claimed?: any) {
+  async importManifest(s: VideoScope, id: string, m: VideoManifest, claimed?: any, provider = this.provider) {
     await assertVideoRetentionJournal(this.engine, s);
     const job = await this.job(s, id);
     await this.authorize(job);
@@ -778,7 +829,8 @@ export class VideoCoordinator {
       if (job.state === "cancelled") throw videoError(409, "STALE_FENCE");
       return { ...this.project(job), manifest_sha256: manifestHash, replayed: true };
     }
-    if (!this.provider) throw videoError(503, "STORAGE_UNAVAILABLE");
+    if (!provider) throw videoError(503, "STORAGE_UNAVAILABLE");
+    await this.boundProvider(s, id, provider);
     const profile = await this.profile(s, job.profile_id, job.profile_version);
     if (stage === "input") await admitVideoResources(this.engine, job, profile);
     if (!Array.isArray(m.coverage.completed) || !Array.isArray(m.coverage.missing) || !Array.isArray(m.coverage.required)) throw videoError(422, "INVALID_COVERAGE");
@@ -803,12 +855,12 @@ export class VideoCoordinator {
         transcriptBytes += o.bytes;
         if (transcriptBytes > Number(profile.config.max_transcript_bytes ?? 64_000_000)) throw videoError(413, "TRANSCRIPT_LIMIT_EXCEEDED");
         if (o.bytes > 10_000_000) throw videoError(413, "ARTIFACT_PART_TOO_LARGE");
-        const bytes = await this.provider.readObject(s, id, o.object_key, o.bytes);
+        const bytes = await provider.readObject(s, id, o.object_key, o.bytes);
         if (bytes.byteLength !== o.bytes || sha(bytes) !== o.sha256) throw videoError(422, "ARTIFACT_HASH_MISMATCH");
         objectBytes.set(o.object_key, bytes);
       } else {
-        if (!this.provider.verifyObject) throw videoError(503, "STREAMING_VERIFICATION_UNAVAILABLE");
-        const verified = await this.provider.verifyObject(s, id, o.object_key, o.bytes);
+        if (!provider.verifyObject) throw videoError(503, "STREAMING_VERIFICATION_UNAVAILABLE");
+        const verified = await provider.verifyObject(s, id, o.object_key, o.bytes);
         if (verified.bytes !== o.bytes || verified.sha256 !== o.sha256) throw videoError(422, "ARTIFACT_HASH_MISMATCH");
         if (/^(video|audio|image)\//.test(o.content_type) && verified.content_type !== o.content_type) throw videoError(422, "ARTIFACT_TYPE_MISMATCH");
       }
@@ -1110,14 +1162,16 @@ export class VideoCoordinator {
       next_cursor: evidence.length > items.length ? String(offset + items.length) : null, complete: job.completion_level === "knowledge_ready", coverage: job.coverage };
   }
   private async visualArtifacts(s: VideoScope, job: any, offset: number, limit: number, textOffset = 0, conflictOffset = 0, textField = "text") {
+    const provider = this.provider;
     const origin = job.reused_from_job_id ?? job.id;
     const manifest = (await this.db.query(`SELECT manifest FROM flow_video_manifests WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND artifact_stage='processing_complete'`, [...scopeParams(s), origin])).rows[0]?.manifest as VideoManifest | undefined;
     const items: any[] = []; let index = 0, bytes = 0;
     for (const part of manifest?.visual?.parts ?? []) {
       if (index + part.record_count <= offset) { index += part.record_count; continue; }
       const object = (await this.db.query(`SELECT state,access_expires_at FROM flow_video_objects WHERE tenant_id=$1 AND workspace_id=$2 AND object_key=$3`, [...scopeParams(s), part.object_key])).rows[0];
-      if (object?.state !== "accepted" || object.access_expires_at && new Date(object.access_expires_at) <= this.now || !this.provider) throw videoError(410, "VISUAL_ARTIFACT_EXPIRED");
-      const raw = await this.provider.readObject(s, origin, part.object_key, 256 * 1024);
+      if (object?.state !== "accepted" || object.access_expires_at && new Date(object.access_expires_at) <= this.now || !provider) throw videoError(410, "VISUAL_ARTIFACT_EXPIRED");
+      await this.boundProvider(s, origin, provider);
+      const raw = await provider.readObject(s, origin, part.object_key, 256 * 1024);
       if (sha(raw) !== part.sha256) throw videoError(422, "ARTIFACT_HASH_MISMATCH");
       for (const record of validateVisualPart(manifest!, part, raw)) {
         if (index++ < offset) continue;
@@ -1179,8 +1233,9 @@ export class VideoCoordinator {
     });
   }
   /** Operational intermediates are cleanup inventory only, never evidence or ready receipts. */
-  async registerArtifacts(job: any, objects: NonNullable<ProviderResult["artifacts"]>) {
+  async registerArtifacts(job: any, objects: NonNullable<ProviderResult["artifacts"]>, provider = this.provider) {
     if (!Array.isArray(objects) || objects.length > 10000) throw videoError(422, "INVALID_ARTIFACT_OBJECT");
+    if (objects.length) await this.boundProvider(job, job.id, provider);
     const profile = await this.profile(job, job.profile_id, job.profile_version);
     for (const o of objects) {
       assertVideoObject(job, o.object_key, job.id);
@@ -1191,8 +1246,8 @@ export class VideoCoordinator {
         if (prior.sha256 !== o.sha256 || Number(prior.bytes) !== o.bytes || prior.content_type !== o.content_type) throw videoError(409, "ARTIFACT_CONFLICT");
         continue;
       }
-      if (!this.provider?.verifyObject) throw videoError(503, "STREAMING_VERIFICATION_UNAVAILABLE");
-      const actual = await this.provider.verifyObject(job, job.id, o.object_key, o.bytes);
+      if (!provider?.verifyObject) throw videoError(503, "STREAMING_VERIFICATION_UNAVAILABLE");
+      const actual = await provider.verifyObject(job, job.id, o.object_key, o.bytes);
       if (actual.sha256 !== o.sha256 || actual.bytes !== o.bytes) throw videoError(422, "ARTIFACT_HASH_MISMATCH");
       if (/^(video|audio|image)\//.test(o.content_type) && actual.content_type !== o.content_type) throw videoError(422, "ARTIFACT_TYPE_MISMATCH");
       await this.db.tx(async q => {
@@ -1205,24 +1260,25 @@ export class VideoCoordinator {
       });
     }
   }
-  private async registerResultArtifacts(job: any, result: ProviderResult) {
-    await this.registerArtifacts(job, result.artifacts ?? []);
+  private async registerResultArtifacts(job: any, result: ProviderResult, provider: VideoProvider) {
+    await this.boundProvider(job, job.id, provider);
+    await this.registerArtifacts(job, result.artifacts ?? [], provider);
     let cursor = result.next_artifact_cursor, pages = 0;
     const seen = new Set<string>();
     while (cursor) {
-      if (!this.provider?.artifactPage || seen.has(cursor) || ++pages > 1000) throw videoError(502, "ARTIFACT_PAGINATION_INVALID");
+      if (!provider.artifactPage || seen.has(cursor) || ++pages > 1000) throw videoError(502, "ARTIFACT_PAGINATION_INVALID");
       seen.add(cursor);
-      const page = await this.provider.artifactPage(job, result.task_id, cursor);
-      await this.registerArtifacts(job, page.artifacts);
+      const page = await provider.artifactPage(job, result.task_id, cursor);
+      await this.registerArtifacts(job, page.artifacts, provider);
       cursor = page.next_artifact_cursor;
     }
   }
-  private async harvestCleanupInventory(job: any) {
-    if (!this.provider?.inventoryPage) return;
+  private async harvestCleanupInventory(job: any, provider: VideoProvider) {
+    if (!provider.inventoryPage) return;
     let cursor: string | null = "0"; const seen = new Set<string>();
     while (cursor) {
       if (seen.has(cursor) || seen.size >= 1000) throw videoError(502, "ARTIFACT_PAGINATION_INVALID"); seen.add(cursor);
-      const page = await this.provider.inventoryPage(job, cursor);
+      const page = await provider.inventoryPage(job, cursor);
       if (!Array.isArray(page.artifacts) || page.artifacts.length > 100) throw videoError(502, "ARTIFACT_PAGINATION_INVALID");
       for (const object of page.artifacts) {
         assertVideoObject(job, object.object_key, job.id);
@@ -1239,35 +1295,41 @@ export class VideoCoordinator {
     }
   }
   async maintain(limit = 20) {
+    const provider = this.provider;
     await expireVideoObjects(this.engine, limit);
     // Harvest cancellation receipts without resuming processing or publishing late artifacts.
-    if (this.provider) {
+    if (provider) {
       const cleanup = (await this.db.query(`SELECT j.* FROM flow_video_jobs j JOIN flow_video_assets a ON a.id=j.asset_id AND a.tenant_id=j.tenant_id AND a.workspace_id=j.workspace_id
         JOIN flow_sources s ON s.id=j.source_id AND s.tenant_id=j.tenant_id AND s.workspace_id=j.workspace_id
         WHERE j.execution_erased_at IS NULL AND (j.state='cancelled' OR a.revoked_at IS NOT NULL OR s.status='revoked') ORDER BY j.updated_at LIMIT $1`, [limit])).rows;
       for (const job of cleanup) try {
-        await this.harvestCleanupInventory(job);
-        await this.provider.cleanupTemporary?.(job, Math.floor(this.now.getTime() / 1000) - 86400);
+        await this.boundProvider(job, job.id, provider);
+        await this.harvestCleanupInventory(job, provider);
+        await provider.cleanupTemporary?.(job, Math.floor(this.now.getTime() / 1000) - 86400);
       } catch (error: any) { await this.db.query(`UPDATE flow_video_jobs SET cleanup_error=$4,updated_at=$5 WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [...scopeParams(job), job.id, json({ code: error.reason ?? "INVENTORY_RECONCILIATION_PENDING" }), this.now.toISOString()]); }
-      const stopped = (await this.db.query(`SELECT j.*,i.stage AS intent_stage,i.intent_key,i.external_task_id FROM flow_video_jobs j
+      const stopped = (await this.db.query(`SELECT j.*,i.stage AS intent_stage,i.intent_key,i.external_task_id,i.provider_instance FROM flow_video_jobs j
         JOIN flow_video_submission_intents i ON i.tenant_id=j.tenant_id AND i.workspace_id=j.workspace_id AND i.video_job_id=j.id
-        WHERE j.state='cancelled' AND i.state<>'terminal' ORDER BY i.updated_at LIMIT $1`, [limit])).rows;
+        WHERE j.state='cancelled' AND (i.state<>'terminal' OR coalesce(i.external_observed_state,'unknown') NOT IN ('completed','failed')) ORDER BY i.updated_at LIMIT $1`, [limit])).rows;
       for (const j of stopped) {
         try {
+          await this.boundProvider(j, j.id, provider);
           await this.db.query(`UPDATE flow_video_submission_intents SET updated_at=now() WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(j), j.id, j.intent_stage]);
           const st = (await this.db.query(`SELECT * FROM flow_video_stages WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(j), j.id, j.intent_stage])).rows[0];
-          let result = j.external_task_id ? await this.provider.poll(j, st, j.external_task_id) : await this.provider.reconcile?.(j, st, j.intent_key);
+          let result = j.external_task_id ? await provider.poll(j, st, j.external_task_id) : await provider.reconcile?.(j, st, j.intent_key);
+          if (j.external_task_id) this.assertExternalTask(result!, j.external_task_id);
           if (!result?.task_id) continue; // Absence is not proof an external submit never happened.
-          if (!j.external_task_id) await this.db.query(`UPDATE flow_video_submission_intents SET external_task_id=$5 WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4 AND external_task_id IS NULL`, [...scopeParams(j), j.id, j.intent_stage, result.task_id]);
+          if (!j.external_task_id) await this.db.tx(q => this.attachExternalTask(q, j, j.intent_stage, result!.task_id));
           await this.observeExternal(j, st, result);
           if (result.state === "pending") {
-            const remote = await this.provider.cancel(j, result.task_id);
+            const remote = await provider.cancel(j, result.task_id);
             await this.db.query(`UPDATE flow_video_jobs SET remote_cancel_status=$4 WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [...scopeParams(j), j.id, remote]);
-            result = await this.provider.poll(j, st, result.task_id);
+            const acceptedTask = result.task_id;
+            result = await provider.poll(j, st, acceptedTask);
+            this.assertExternalTask(result, acceptedTask);
             await this.observeExternal(j, st, result);
           }
           await this.recordUsage(j, j.intent_stage, result.usage ?? (result.manifest as any)?.usage ?? {});
-          await this.registerResultArtifacts(j, result);
+          await this.registerResultArtifacts(j, result, provider);
           if (["completed", "failed"].includes(result.state)) await this.db.query(`UPDATE flow_video_submission_intents SET state='terminal' WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND stage=$4`, [...scopeParams(j), j.id, j.intent_stage]);
         } catch (error: any) {
           await this.db.query(`UPDATE flow_video_jobs SET cleanup_error=$4 WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [...scopeParams(j), j.id, json({ code: error.reason ?? "CLEANUP_RECONCILIATION_PENDING" })]);
@@ -1285,6 +1347,9 @@ export class VideoCoordinator {
       const terminal = (await this.db.query(`SELECT * FROM flow_video_jobs WHERE state IN ('completed','completed_with_gaps','failed','cancelled') AND budget_reservation_id IS NOT NULL AND budget_closed_at IS NULL ORDER BY created_at LIMIT $1`, [limit])).rows;
       for (const j of terminal) {
         try {
+        // No host child does not prove an external worker has stopped. Keep the
+        // original parent hold until its accepted/unknown submission is terminal.
+        if ((await this.db.query(`SELECT 1 FROM flow_video_submission_intents WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND (state<>'terminal' OR coalesce(external_observed_state,'unknown') NOT IN ('completed','failed')) LIMIT 1`, [...scopeParams(j), j.id])).rows.length) continue;
         if (!this.budgetStatus) continue; // Unknown external accounting is a hold, never assumed zero.
         const budget = await this.budgetStatus(j);
         if (budget.reservation_id !== j.budget_reservation_id || !finiteInt(budget.consumed_micro, 0, Number.MAX_SAFE_INTEGER)) throw videoError(502, "BUDGET_RECEIPT_INVALID");
@@ -1302,13 +1367,14 @@ export class VideoCoordinator {
         } catch { /* Financial uncertainty retains the hold; it must not prevent unrelated object cleanup. */ }
       }
     }
-    if (!this.provider?.deleteObject) return;
+    if (!provider?.deleteObject) return;
     const pending = (await this.db.query(`SELECT o.* FROM flow_video_objects o WHERE o.state='delete_pending' AND o.cleanup_next_at<=$1 AND NOT EXISTS
       (SELECT 1 FROM flow_video_stages st WHERE st.tenant_id=o.tenant_id AND st.workspace_id=o.workspace_id AND st.video_job_id=o.video_job_id AND st.state='running' AND st.lease_expires_at>$1) ORDER BY o.cleanup_next_at,o.created_at LIMIT $2`, [this.now.toISOString(), limit])).rows;
     for (const o of pending) {
       try {
         assertVideoObject(o, o.object_key, o.video_job_id);
-        const receipt = await this.provider.deleteObject(o, o.video_job_id, o.object_key, o.sha256);
+        await this.boundProvider(o, o.video_job_id, provider);
+        const receipt = await provider.deleteObject(o, o.video_job_id, o.object_key, o.sha256);
         if (!receipt.deleted || receipt.sha256 !== o.sha256) throw videoError(502, "DELETE_UNCONFIRMED");
         await this.db.tx(async q => {
           await q.query(`INSERT INTO flow_video_cleanup_receipts(tenant_id,workspace_id,object_key,sha256) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [...scopeParams(o), o.object_key, o.sha256]);
@@ -1320,15 +1386,16 @@ export class VideoCoordinator {
         await this.db.query(`UPDATE flow_video_objects SET cleanup_next_at=$4 WHERE tenant_id=$1 AND workspace_id=$2 AND object_key=$3`, [...scopeParams(o), o.object_key, new Date(this.now.getTime() + 60_000).toISOString()]);
       }
     }
-    if (this.provider.eraseJob) {
+    if (provider.eraseJob) {
       const erased = (await this.db.query(`SELECT j.* FROM flow_video_jobs j JOIN flow_video_assets a ON a.id=j.asset_id AND a.tenant_id=j.tenant_id AND a.workspace_id=j.workspace_id
         JOIN flow_sources s ON s.id=j.source_id AND s.tenant_id=j.tenant_id AND s.workspace_id=j.workspace_id
         WHERE j.execution_erased_at IS NULL AND (a.revoked_at IS NOT NULL OR s.status='revoked')
         AND NOT EXISTS (SELECT 1 FROM flow_video_objects o WHERE o.tenant_id=j.tenant_id AND o.workspace_id=j.workspace_id AND o.video_job_id=j.id AND o.state<>'deleted')
-        AND NOT EXISTS (SELECT 1 FROM flow_video_submission_intents i WHERE i.tenant_id=j.tenant_id AND i.workspace_id=j.workspace_id AND i.video_job_id=j.id AND i.state<>'terminal') ORDER BY j.created_at LIMIT $1`, [limit])).rows;
+        AND NOT EXISTS (SELECT 1 FROM flow_video_submission_intents i WHERE i.tenant_id=j.tenant_id AND i.workspace_id=j.workspace_id AND i.video_job_id=j.id AND (i.state<>'terminal' OR coalesce(i.external_observed_state,'unknown') NOT IN ('completed','failed'))) ORDER BY j.created_at LIMIT $1`, [limit])).rows;
       for (const j of erased) {
         try {
-          const receipt = await this.provider.eraseJob(j, j.id);
+          await this.boundProvider(j, j.id, provider);
+          const receipt = await provider.eraseJob(j, j.id);
           if (!receipt.erased || receipt.video_job_id !== j.id) throw videoError(502, "ERASURE_UNCONFIRMED");
           await this.db.query(`UPDATE flow_video_jobs SET execution_erased_at=$4,cleanup_error=NULL WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [...scopeParams(j), j.id, this.now.toISOString()]);
         } catch (error: any) {
@@ -1359,6 +1426,7 @@ export class VideoCoordinator {
       budget_micro: profile.config.budget_micro, max_duration_ms: profile.config.max_duration_ms, max_frames: profile.config.max_frames ?? 120, duration_ms: input?.coverage?.duration_ms ?? null };
   }
   async mediaObject(s: VideoScope, id: string, objectId: string, range?: string) {
+    const provider = this.provider;
     await assertVideoRetentionJournal(this.engine, s);
     const job = await this.job(s, id); await this.source(s, job.source_id, this.db, false); await this.readable(job);
     if (job.completion_level !== "knowledge_ready" || !/^[a-f0-9]{32}$/.test(objectId)) throw videoError(404, "OBJECT_NOT_FOUND");
@@ -1376,13 +1444,14 @@ export class VideoCoordinator {
       if (!finiteInt(start, 0, total - 1) || !finiteInt(end, start, total - 1)) throw videoError(416, "INVALID_RANGE");
       range = `bytes=${start}-${end}`;
     }
-    if (!this.provider?.openObject) throw videoError(503, "STREAMING_VERIFICATION_UNAVAILABLE");
+    if (!provider?.openObject) throw videoError(503, "STREAMING_VERIFICATION_UNAVAILABLE");
     let response: Response;
     if (object.replica_job_id) {
       const replica = (await this.db.query(`SELECT state,sha256,bytes,content_type,access_expires_at FROM flow_video_objects WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND object_key=$4`, [...scopeParams(s), object.replica_job_id, object.replica_object_key])).rows[0];
       if (!replica || replica.state !== "accepted" || replica.sha256 !== object.sha256 || Number(replica.bytes) !== Number(object.bytes) || replica.content_type !== object.content_type || replica.access_expires_at && new Date(replica.access_expires_at) <= this.now) throw videoError(404, "OBJECT_NOT_FOUND");
     }
-    try { response = await this.provider.openObject(s, object.replica_job_id ?? origin, object.replica_object_key ?? object.object_key, range); }
+    await this.boundProvider(s, object.replica_job_id ?? origin, provider);
+    try { response = await provider.openObject(s, object.replica_job_id ?? origin, object.replica_object_key ?? object.object_key, range); }
     catch (error: any) {
       if (error.status === 404) await this.db.query(`UPDATE flow_video_objects SET state='missing' WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND object_id=$4 AND state='accepted'`, [...scopeParams(s), origin, objectId]);
       throw error;
@@ -1394,17 +1463,19 @@ export class VideoCoordinator {
     return response;
   }
   async rawObject(s: VideoScope, id: string, key: string, fence?: { stage_attempt: number; fencing_token: number }) {
+    const provider = this.provider;
     const j = await this.job(s, id); await this.source(s, j.source_id, this.db, false); assertVideoObject(s, key, id);
     if (s.scopes?.includes("intel.video.model")) await this.modelAuthorization(s, id, fence);
     const asset = (await this.db.query(`SELECT revoked_at,availability FROM flow_video_assets WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [...scopeParams(s), j.asset_id])).rows[0];
     if (!asset || asset.revoked_at || asset.availability === "media_expired") throw videoError(403, "MEDIA_UNAVAILABLE");
     const object = (await this.db.query(`SELECT * FROM flow_video_objects WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 AND object_key=$4 AND state='accepted'`, [...scopeParams(s), id, key])).rows[0];
-    if (!this.provider) throw videoError(404, "OBJECT_NOT_FOUND");
+    if (!provider) throw videoError(404, "OBJECT_NOT_FOUND");
+    await this.boundProvider(s, id, provider);
     if (!object) {
       // Model-only staging read breaks the frame/OCR/VLM dependency cycle without creating evidence or ready state.
       if (!s.scopes?.includes("intel.video.model")) throw videoError(404, "OBJECT_NOT_FOUND");
       await this.modelAuthorization(s, id, fence);
-      const bytes = await this.provider.readObject(s, id, key, 10_000_000);
+      const bytes = await provider.readObject(s, id, key, 10_000_000);
       const digest = key.split("/")[6];
       if (sha(bytes) !== digest) throw videoError(422, "ARTIFACT_HASH_MISMATCH");
       const content_type = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 ? "image/png" : bytes[0] === 0xff && bytes[1] === 0xd8 ? "image/jpeg" : "";
@@ -1412,7 +1483,7 @@ export class VideoCoordinator {
       return { bytes, content_type, sha256: digest };
     }
     if (object.access_expires_at && new Date(object.access_expires_at) <= this.now) throw videoError(410, "MEDIA_EXPIRED");
-    const bytes = await this.provider.readObject(s, id, key, Math.min(Number(object.bytes), 10_000_000));
+    const bytes = await provider.readObject(s, id, key, Math.min(Number(object.bytes), 10_000_000));
     if (sha(bytes) !== object.sha256 || bytes.byteLength !== Number(object.bytes)) throw videoError(422, "ARTIFACT_HASH_MISMATCH");
     return { bytes, content_type: object.content_type, sha256: object.sha256 };
   }
