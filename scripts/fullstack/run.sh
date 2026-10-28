@@ -130,17 +130,15 @@ cp "$VIDEO_FULLSTACK_RESULT" "$out/browser-after-restart.json"
 observe > "$out/persistence-after-restart.json"
 python - "$out" <<'PY'
 import json, pathlib, sys
-from scripts.fullstack.skill_receipts import verify as verify_skill_receipts
+from scripts.fullstack.skill_receipts import verify as verify_skill_receipts, verify_native_authority
 root = pathlib.Path(sys.argv[1])
 before = json.loads((root / 'persistence-before-restart.json').read_text())
 after = json.loads((root / 'persistence-after-restart.json').read_text())
 browser = json.loads((root / 'browser-after-restart.json').read_text())
 skill_receipts = verify_skill_receipts(before, after, browser)
 (root / 'skill-evaluation-verification.json').write_text(json.dumps(skill_receipts) + '\n')
-native = [call for call in after['model_boundary']['calls'] if call.get('request_kind') == 'native_canvas']
-assert len(native) == 1 and native[0]['requests'] == 1, 'Native replay invoked the model more than once'
-assert native[0]['skill'] == browser['native']['skill'], 'Native model boundary differs from the frozen host skill'
-assert native[0]['knowledge_snapshot']['run_id'] == browser['native']['workflow_run_id'], 'Native request is not bound to the actual workflow run'
+native_authority = verify_native_authority(before, after, browser)
+(root / 'native-source-authority-verification.json').write_text(json.dumps(native_authority) + '\n')
 assert before['objects'] == after['objects'], 'Persisted object IDs/hashes changed across restart'
 assert [x['id'] for x in before['jobs']] == [x['id'] for x in after['jobs']], 'Job identity changed across restart'
 assert before['stable_identity_sha256'] == after['stable_identity_sha256'], 'Evidence/revision/release identity changed across restart'

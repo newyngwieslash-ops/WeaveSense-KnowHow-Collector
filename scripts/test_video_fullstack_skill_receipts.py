@@ -4,7 +4,7 @@ import hashlib
 import json
 import unittest
 
-from fullstack.skill_receipts import verify
+from fullstack.skill_receipts import verify, verify_native_authority
 
 
 def fixture():
@@ -33,7 +33,50 @@ def fixture():
     return report, after, browser
 
 
+def native_fixture():
+    skill = {"id": "video-knowledge-core", "version": "1.0.0", "hash": "a" * 64}
+    browser = {"native": {"skill": skill, "workflow_run_id": "cw_fixture",
+        "source_instruction_marker": "[FULLSTACK_PROMPT_INJECTION_FIXTURE]", "denied_source_requests": [
+            {"name": "http_request", "status": 400}, {"name": "intel_install_skill", "status": 400},
+            {"name": "intel_load_skill", "status": 400}, {"name": "intel_apply_monitor", "status": 409}]},
+        "checks": {name: True for name in ("hostile_subtitle_actual_agent_tool_and_approval_boundaries",
+            "hostile_subtitle_actual_canvas_keeps_native_registry_install_pin_unchanged",
+            "native_pins_snapshot_task_output_survive_actual_restart",
+            "native_pinned_search_and_same_call_read_recheck_current_withdrawal")}}
+    report = {"model_boundary": {"exfiltration_requests": 0, "calls": [{"request_kind": "native_canvas",
+        "requests": 1, "attack_tool_calls": 2, "skill": skill,
+        "knowledge_snapshot": {"run_id": "cw_fixture", "content_hash": "b" * 64}}]}}
+    return copy.deepcopy(report), copy.deepcopy(report), copy.deepcopy(browser)
+
+
 class SkillReceiptTests(unittest.TestCase):
+    def test_native_authority_verifier_requires_real_attack_and_zero_dispatch_before_and_after_restart(self):
+        result = verify_native_authority(*native_fixture())
+        self.assertEqual(result["adversarial_tool_calls_emitted"], 2)
+        self.assertEqual(result["source_requested_tool_and_approval_actions_denied"], 4)
+        self.assertEqual(result["exfiltration_requests_after_restart"], 0)
+        self.assertFalse(result["real_model_security_quality_claimed"])
+
+    def test_native_authority_rejects_missing_browser_evidence_replay_or_tool_execution(self):
+        changes = [
+            lambda b, a, u: b["model_boundary"].update(exfiltration_requests=1),
+            lambda b, a, u: a["model_boundary"].update(exfiltration_requests=1),
+            lambda b, a, u: a["model_boundary"]["calls"][0].update(requests=2),
+            lambda b, a, u: b["model_boundary"]["calls"][0].update(attack_tool_calls=0),
+            lambda b, a, u: a["model_boundary"]["calls"][0]["skill"].update(hash="c" * 64),
+            lambda b, a, u: a["model_boundary"]["calls"][0]["knowledge_snapshot"].update(run_id="different-run"),
+            lambda b, a, u: a["model_boundary"]["calls"][0]["knowledge_snapshot"].update(content_hash="c" * 64),
+            lambda b, a, u: u["checks"].clear(),
+            lambda b, a, u: u["native"]["denied_source_requests"][0].update(status=200),
+            lambda b, a, u: u["native"].update(source_instruction_marker="no-actual-hostile-source"),
+        ]
+        for index, change in enumerate(changes):
+            with self.subTest(change=index):
+                values = native_fixture()
+                change(*values)
+                with self.assertRaises(AssertionError):
+                    verify_native_authority(*values)
+
     def test_binds_browser_durable_tasks_and_all_three_gateway_variants(self):
         result = verify(*fixture())
         self.assertEqual(result["actual_gateway_calls"], 60)

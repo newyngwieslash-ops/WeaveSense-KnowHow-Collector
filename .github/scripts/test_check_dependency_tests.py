@@ -37,6 +37,16 @@ class DependencyChecks(unittest.TestCase):
             self.assertTrue(check.missing_tests(events + [dict(events[-1], Action=action)]))
         self.assertTrue(check.missing_tests([dict(e, Test=e["Test"] + "Renamed") for e in events]))
 
+    def test_video_gate_requires_actual_crosslayer_and_compiled_lifecycle_execution(self):
+        required = check.REQUIRED | check.VIDEO_REQUIRED
+        events = [{"Package": "example/internal/" + package, "Test": name, "Action": action}
+                  for package, name in required for action in ("run", "pass")]
+        self.assertFalse(check.missing_tests(events, required))
+        for package, name in check.VIDEO_REQUIRED:
+            omitted = [e for e in events if e["Test"] != name]
+            self.assertIn((package, name), check.missing_tests(omitted, required))
+            self.assertIn((package, name), check.missing_tests(events + [{"Package": "example/internal/" + package, "Test": name, "Action": "skip"}], required))
+
 
 if __name__ == "__main__":
     unittest.main()

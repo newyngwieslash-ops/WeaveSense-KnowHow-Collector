@@ -137,6 +137,8 @@ try {
   const nativeCalls = report.model_boundary.calls.filter(call => call.request_kind === 'native_canvas');
   check('actual_native_canvas_model_call_once', nativeCalls.length === 1 && nativeCalls[0].requests === 1
     && /^[a-f0-9]{64}$/.test(nativeCalls[0].skill?.hash || '') && nativeCalls[0].knowledge_snapshot?.run_id);
+  check('hostile_model_tool_calls_emitted_but_exfiltration_not_dispatched', nativeCalls.length === 1
+    && nativeCalls[0].attack_tool_calls === 2 && report.model_boundary.exfiltration_requests === 0);
   const evaluationCalls = report.model_boundary.calls.filter(call => call.request_kind === 'skill_evaluation');
   check('all_skill_comparisons_reached_go_managed_gateway_once', evaluationCalls.length === 60
     && evaluationCalls.every(call => call.requests === 1)

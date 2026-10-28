@@ -85,6 +85,23 @@ class SupplyChainTests(unittest.TestCase):
             self.assertIn('installed_version_lock_mismatch', result.stderr)
             self.assertEqual(result.stdout, '')
 
+    def test_npm_inventory_rejects_missing_required_but_allows_omitted_dev_and_optional(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self.npm_fixture(root)
+            lock_path = root / 'package-lock.json'
+            lock = json.loads(lock_path.read_text())
+            for flag in ['dev', 'optional', 'devOptional']:
+                lock['packages'][f'node_modules/{flag}'] = {'version': '1.0.0', flag: True}
+            lock_path.write_text(json.dumps(lock))
+            subprocess.run(['node', str(ROOT / 'scripts/video-installed-npm.mjs')], cwd=d, capture_output=True, check=True)
+            lock['packages']['node_modules/missing'] = {'version': '1.0.0', 'integrity': 'sha512-YQ=='}
+            lock_path.write_text(json.dumps(lock))
+            result = subprocess.run(['node', str(ROOT / 'scripts/video-installed-npm.mjs')], cwd=d, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('required_installed_package_missing', result.stderr)
+            self.assertEqual(result.stdout, '')
+
     def test_missing_evidence_does_not_get_a_success_manifest(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -98,6 +115,12 @@ class SupplyChainTests(unittest.TestCase):
         commit = 'a' * 40
         (root / 'source-commit.txt').write_text(commit)
         inputs = [{'path': path, 'sha256': 'b' * 64} for path in ['services/loom-engine/LICENSE', 'services/video-knowledge/NOTICE', 'services/video-knowledge/requirements.lock']]
+        binary_sources = json.dumps({'images': [{'notices': [{'image_destination': '/usr/local/share/licenses/video-backup/node/LICENSE', 'sha256': 'c' * 64}]}],
+                                     'supplemental_notices': [{'source_path': 'deploy/flow/backup/licenses/minio-mc.LICENSE', 'image_destination': '/usr/local/share/licenses/video-backup/minio-client/LICENSE', 'sha256': 'd' * 64}]})
+        (root / 'backup-binary-notice-sources.json').write_text(binary_sources)
+        inputs.append({'path': 'deploy/flow/backup/binary-notice-sources.json', 'sha256': hashlib.sha256(binary_sources.encode()).hexdigest()})
+        inputs.append({'path': 'deploy/flow/backup/licenses/minio-mc.LICENSE', 'sha256': 'd' * 64})
+        (root / 'backup-binary-notices.sha256').write_text('c' * 64 + '  /usr/local/share/licenses/video-backup/node/LICENSE\n' + 'd' * 64 + '  /usr/local/share/licenses/video-backup/minio-client/LICENSE\n')
         (root / 'source-inputs.json').write_text(json.dumps({'source_commit': commit, 'tracked_inputs_match_commit': True, 'files': inputs}))
         for name in ['images.json', 'backup-npm.json', 'worker-pip.json', 'video-image-lock.json', 'worker-lock.json']:
             (root / name).write_text('{}')
@@ -124,9 +147,29 @@ class SupplyChainTests(unittest.TestCase):
             for row in result['files']:
                 self.assertEqual(row['sha256'], hashlib.sha256((root / row['path']).read_bytes()).hexdigest())
 
+    def test_supplemental_binary_license_is_exact_immutable_upstream_blob(self):
+        doc = json.loads((ROOT / 'deploy/flow/backup/binary-notice-sources.json').read_text())
+        self.assertFalse(doc['license_approval'])
+        notice = doc['supplemental_notices'][0]
+        data = (ROOT / notice['source_path']).read_bytes()
+        self.assertEqual(len(data), notice['bytes'])
+        self.assertEqual(hashlib.sha256(data).hexdigest(), notice['sha256'])
+        self.assertEqual(hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest(), notice['git_blob'])
+        self.assertEqual(notice['source_commit'], 'ee72571936f15b0e65dc8b4a231a4dd445e5ccb6')
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self.seal_fixture(root)
+            inputs = json.loads((root / 'source-inputs.json').read_text())
+            inputs['files'] = [row for row in inputs['files'] if row['path'] != notice['source_path']]
+            (root / 'source-inputs.json').write_text(json.dumps(inputs))
+            with self.assertRaisesRegex(ValueError, 'supplemental_binary_notice_source_mismatch'):
+                provenance.seal(root)
+
     def test_seal_rejects_sbom_tamper_and_missing_packaged_notice(self):
         for filename, replacement, reason in [('worker.spdx.json', '{"tampered":true}', 'inventory_summary_hash_mismatch'),
-                                              ('backup-notice.sha256', '', 'packaged_notice_or_lock_mismatch')]:
+                                              ('backup-notice.sha256', '', 'packaged_notice_or_lock_mismatch'),
+                                              ('backup-binary-notice-sources.json', '{}', 'binary_notice_source_mismatch'),
+                                              ('backup-binary-notices.sha256', '', 'packaged_binary_notice_mismatch')]:
             with self.subTest(filename=filename), tempfile.TemporaryDirectory() as d:
                 root = Path(d)
                 self.seal_fixture(root)

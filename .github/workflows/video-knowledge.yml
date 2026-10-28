@@ -132,6 +132,18 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg tesseract-ocr
       - run: python -m pip install -r services/video-knowledge/requirements.txt
       - run: python -m unittest discover -s services/video-knowledge -p 'test_*.py' -v
+      - name: Bounded real media worker capacity calibration
+        run: |
+          set -euo pipefail
+          for n in 1 2 4; do
+            python services/video-knowledge/capacity.py --concurrency "$n" > "$RUNNER_TEMP/video-media-capacity-c${n}.json"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-media-capacity
+          path: ${{ runner.temp }}/video-media-capacity-c*.json
+          if-no-files-found: error
       - name: Verify the separate host ASR dependency profile
         run: |
           python -m venv .local/ci-asr
@@ -188,7 +200,7 @@ jobs:
         run: |
           set -o pipefail
           go test -p 2 -json -timeout=20m ./... | tee "$RUNNER_TEMP/video-host-tests.jsonl"
-          python3 ../.github/scripts/check-dependency-tests.py "$RUNNER_TEMP/video-host-tests.jsonl"
+          python3 ../.github/scripts/check-dependency-tests.py "$RUNNER_TEMP/video-host-tests.jsonl" --require-video
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -329,8 +331,44 @@ func (s *Service) wakeCanvasWorkflow(record model.CanvasWorkflowExecution) error
 	}
 	// The durable admitted row is the recovery queue; managed execution owns leases
 	// and checkpoints. No model/engine calls happen under the approval transaction.
-	go func() { _ = s.canvasWorkflowRunner(context.Background(), s.CanvasWorkflowExecutions(), record) }()
+	go func() {
+		err := s.canvasWorkflowRunner(context.Background(), s.CanvasWorkflowExecutions(), record)
+		logCanvasWorkflowRunnerFailure(slog.Default(), record.ID, err)
+	}()
 	return nil
+}
+
+func logCanvasWorkflowRunnerFailure(logger *slog.Logger, runID string, err error) {
+	if err == nil {
+		return
+	}
+	status := flow.CanvasWorkflowHTTPStatus(err)
+	reason := "internal"
+	switch {
+	case errors.Is(err, context.Canceled):
+		reason = "cancelled"
+	case errors.Is(err, context.DeadlineExceeded):
+		reason = "deadline_exceeded"
+	case errors.Is(err, flow.ErrLeaseHeld):
+		reason = "lease_held"
+	case errors.Is(err, flow.ErrApprovalRequired):
+		reason = "approval_required"
+	case errors.Is(err, flow.ErrNoCapabilitySnapshot), errors.Is(err, flow.ErrModelNotInSnapshot), errors.Is(err, flow.ErrToolNotInSnapshot):
+		reason = "capability_snapshot"
+	case status == http.StatusBadRequest:
+		reason = "invalid"
+	case status == http.StatusForbidden:
+		reason = "forbidden"
+	case status == http.StatusConflict:
+		reason = "conflict"
+	case status == http.StatusPaymentRequired:
+		reason = "budget"
+	case status == http.StatusNotFound:
+		reason = "not_found"
+	}
+	// Error messages can contain provider payloads or source material. This is
+	// diagnostic only: the durable row and lease keep their recovery semantics.
+	logger.Warn("canvas workflow runner stopped", "run_id", runID, "reason", reason, "status", status)
 }
 
 // VerifyCloudAgentPlanApproval is an in-process server verifier, never a client

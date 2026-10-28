@@ -61,7 +61,8 @@ def seal(directory):
     required = {'images.json', 'backup.spdx.json', 'worker.spdx.json', 'inventory-summary.json',
                 'backup-npm.json', 'worker-pip.json', 'backup-dpkg.tsv', 'worker-dpkg.tsv',
                 'backup-notice.sha256', 'worker-notice.sha256', 'backup-smoke.txt', 'worker-smoke.txt',
-                'backup-runtime.txt', 'video-image-lock.json', 'worker-lock.json'}
+                'backup-runtime.txt', 'video-image-lock.json', 'worker-lock.json',
+                'backup-binary-notices.sha256', 'backup-binary-notice-sources.json'}
     if not all((directory / name).is_file() for name in required):
         raise ValueError('incomplete_build_evidence')
     summaries = json.loads((directory / 'inventory-summary.json').read_text())
@@ -71,6 +72,18 @@ def seal(directory):
         if row.get('source_commit') != commit or sha((directory / row['file']).read_bytes()) != row.get('sha256'):
             raise ValueError('inventory_summary_hash_mismatch')
     inputs = {row['path']: row['sha256'] for row in source['files']}
+    binary_source = (directory / 'backup-binary-notice-sources.json').read_bytes()
+    if sha(binary_source) != inputs.get('deploy/flow/backup/binary-notice-sources.json'):
+        raise ValueError('binary_notice_source_mismatch')
+    binary_document = json.loads(binary_source)
+    binary_expected = {notice['image_destination']: notice['sha256'] for image in binary_document['images'] for notice in image['notices']}
+    for notice in binary_document.get('supplemental_notices', []):
+        if inputs.get(notice['source_path']) != notice['sha256']:
+            raise ValueError('supplemental_binary_notice_source_mismatch')
+        binary_expected[notice['image_destination']] = notice['sha256']
+    binary_observed = dict((line.split()[1], line.split()[0]) for line in (directory / 'backup-binary-notices.sha256').read_text().splitlines())
+    if not binary_expected or binary_observed != binary_expected:
+        raise ValueError('packaged_binary_notice_mismatch')
     notice_paths = {'backup-notice.sha256': {'/app/LICENSE': 'services/loom-engine/LICENSE'},
                     'worker-notice.sha256': {'/app/NOTICE': 'services/video-knowledge/NOTICE', '/app/requirements.lock': 'services/video-knowledge/requirements.lock'}}
     for output, mapping in notice_paths.items():

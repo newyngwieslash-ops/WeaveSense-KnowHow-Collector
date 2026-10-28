@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "images": [
+    {
+      "image": "node:22-bookworm-slim@sha256:ea11b74b986d520137cdef9a5346e447a00f275ecc4abc0055b7151226231e09",
+      "env": "VIDEO_BACKUP_NODE_IMAGE",
+      "notices": [
+        {
+          "path": "/usr/local/LICENSE",
+          "bytes": 145485,
+          "sha256": "c738ae413cf561f174e34f6961f8ca458aae2369a73640dda6234c629b98bcc4",
+          "layer": "sha256:ba8be34911c2eabcd63c9da67f2e8887ddf912df62c1223ca377ef9e9655cfba",
+          "image_destination": "/usr/local/share/licenses/video-backup/node/LICENSE"
+        }
+      ]
+    },
+    {
+      "image": "bitnamilegacy/minio-client:2025.7.21@sha256:9f5decb1b742e92638b689d503f6c0564b3adaf84baf8ab97462ea3e8d5d162c",
+      "env": "VIDEO_BACKUP_MC_IMAGE",
+      "notices": [
+        {
+          "path": "/opt/bitnami/minio-client/licenses/agpl-source-links.txt",
+          "bytes": 107,
+          "sha256": "1d83f5571b1e75ee47648e8b3c3fed68be52f9f97ed76bbfd9d0783c36672bb8",
+          "layer": "sha256:70eb84176bf768d90bfdd1d0b4aaa99aefec250fe88cb4522a84852bccd77ad3",
+          "image_destination": "/usr/local/share/licenses/video-backup/minio-client/agpl-source-links.txt"
+        },
+        {
+          "path": "/opt/bitnami/minio-client/licenses/minio-client-2025.7.21.txt",
+          "bytes": 59,
+          "sha256": "d9ec2ac84b97d075ca4fb474c6e4ed143bc70e4ddde99fee6881933000ad27ea",
+          "layer": "sha256:70eb84176bf768d90bfdd1d0b4aaa99aefec250fe88cb4522a84852bccd77ad3",
+          "image_destination": "/usr/local/share/licenses/video-backup/minio-client/minio-client-2025.7.21.txt"
+        }
+      ]
+    }
+  ],
+  "supplemental_notices": [
+    {
+      "source_path": "deploy/flow/backup/licenses/minio-mc.LICENSE",
+      "source_repository": "minio/mc",
+      "source_commit": "ee72571936f15b0e65dc8b4a231a4dd445e5ccb6",
+      "source_url": "https://github.com/minio/mc/blob/ee72571936f15b0e65dc8b4a231a4dd445e5ccb6/LICENSE",
+      "git_blob": "be3f7b28e564e7dd05eaf59d64adba1a4065ac0e",
+      "bytes": 34523,
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "image_destination": "/usr/local/share/licenses/video-backup/minio-client/LICENSE",
+      "binding_evidence": "Actual CI backup-smoke.txt from source commit 1baf5366209ee12ad7694404ac6d3ad98da50ed6 reports this upstream mc commit-id; exact LICENSE Git blob bytes were fetched from that immutable source commit. This does not prove a reproducible binary build or complete corresponding-source distribution."
+    }
+  ],
+  "verification": "OCI manifest bytes and every downloaded layer SHA256 matched their pinned descriptors; original records are read-only tar member evidence. Supplemental source LICENSE is separately byte-bound. Actual final-image notice bytes are checked by container CI.",
+  "license_approval": false,
+  "mc_source_reference": "https://github.com/minio/mc#refs/tags/RELEASE.2025-07-21T05-28-08Z",
+  "limits": [
+    "Node notice includes bundled notices supplied by its pinned image.",
+    "MC image provides AGPL identifier and source links, not the full project license or corresponding-source distribution.",
+    "Earlier MC tag-to-commit lookup returned HTTP 403 and GNU retrieval returned HTTP 503. Later actual CI binary runtime supplied an exact upstream commit, enabling a distinct successful immutable LICENSE read; no failed tag API retry was used.",
+    "Notice preservation is not license compatibility or commercial distribution approval."
+  ]
+}

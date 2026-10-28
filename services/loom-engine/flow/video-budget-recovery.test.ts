@@ -159,4 +159,3 @@ test("COL020 a later admission denial never erases an earlier unknown reservatio
   assert.equal(current.budget_reservation_id, "accepted-parent"); assert.equal(current.budget_reserving_at, null); assert.ok(current.budget_closed_at);
   assert.equal(calls, 2); assert.deepEqual(closed, ["accepted-parent"]);
 });
-

@@ -15,7 +15,13 @@ const inside = path => {
 const notice = name => /^(licen[cs]e|notice|copying|copyright)([._-].*)?$/i.test(name);
 const records = [];
 for (const [path, declared] of Object.entries(lock.packages)) {
-  if (!path || !existsSync(resolve(path, 'package.json'))) continue;
+  if (!path) continue;
+  if (!existsSync(resolve(path, 'package.json'))) {
+    // npm ci --omit=dev can omit development and platform-optional packages,
+    // never an ordinary required production dependency.
+    if (!declared.dev && !declared.optional && !declared.devOptional) throw new Error('required_installed_package_missing');
+    continue;
+  }
   const directory = inside(path);
   const raw = readFileSync(inside(resolve(directory, 'package.json')));
   const actual = JSON.parse(raw);

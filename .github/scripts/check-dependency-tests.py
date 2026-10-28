@@ -15,8 +15,17 @@ REQUIRED = {
     ("flow", "TestBackgroundWorkIsTenantScoped"),
 }
 
+VIDEO_REQUIRED = {
+    ("server", "TestRuntimeServiceGuardedDBDrivesActualApprovedNativeSkill"),
+    ("flow", "TestVideoQACrossLanguageGateway"),
+    ("flow", "TestVideoQAMCPPagingAndCrossEntryReplay"),
+    ("flow", "TestVideoQASourcePromptCannotExpandNativeAuthority"),
+    ("flow", "TestVideoQALoomExportBuildAndRunningRegistry"),
+    ("app", "TestVideoAC24PeriodicCanvasFeatureToggleParity"),
+}
 
-def missing_tests(events):
+
+def missing_tests(events, required=REQUIRED):
     ran, passed, failed = set(), set(), set()
     for event in events:
         key = (event.get("Package", "").rsplit("/", 1)[-1], event.get("Test"))
@@ -27,7 +36,7 @@ def missing_tests(events):
             passed.add(key)
         elif action in {"skip", "fail"}:
             failed.add(key)
-    return REQUIRED - ((ran & passed) - failed)
+    return required - ((ran & passed) - failed)
 
 
 def test_summary(events):
@@ -51,7 +60,8 @@ if __name__ == "__main__":
     with open(sys.argv[1], encoding="utf-8") as stream:
         events = [json.loads(line) for line in stream if line.strip()]
     print("GO_TEST_SUMMARY=" + json.dumps(test_summary(events), sort_keys=True))
-    missing = missing_tests(events)
+    required = REQUIRED | VIDEO_REQUIRED if "--require-video" in sys.argv[2:] else REQUIRED
+    missing = missing_tests(events, required)
     if missing:
         sys.exit("Dependency tests missing, skipped or failed: " + repr(sorted(missing)))
     print("All dependency-backed tests ran and passed.")

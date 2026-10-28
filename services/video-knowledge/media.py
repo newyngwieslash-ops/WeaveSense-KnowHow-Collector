@@ -320,7 +320,11 @@ class Processor:
         objects, parts, frames, completed, missing_optional, text_segments = [], [], [], [], [], []
         visual_records = []
         coverage = {"required": required, "completed": completed, "missing": [], "optional_missing": missing_optional, "processing_mode": mode}
-        usage = checkpoint.setdefault("usage", {"asr_seconds": 0, "ocr_requests": 0, "frame_count": 0, "model_tasks": []})
+        usage = checkpoint.setdefault("usage", {})
+        # A pre-processing disk-pressure failure already records execution usage.
+        # Resume must add missing processor counters without resetting billed work.
+        for key, default in (("asr_seconds", 0), ("ocr_requests", 0), ("frame_count", 0), ("model_tasks", [])):
+            usage.setdefault(key, default)
         active()
         if manifest["input_kind"] == "platform_subtitles":
             if manifest.get("media_sha256") is not None or manifest.get("availability") != "not_acquired":

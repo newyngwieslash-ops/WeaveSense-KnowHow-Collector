@@ -25,8 +25,11 @@ RUN printf '%s' "$POSTGRES_IMAGE" | grep -Eq '^(docker.io/library/)?postgres:17(
     && apt-get update && apt-get install -y --no-install-recommends libstdc++6 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=dependencies /usr/local/bin/node /usr/local/bin/node
+COPY --from=dependencies /usr/local/LICENSE /usr/local/share/licenses/video-backup/node/LICENSE
 COPY --from=dependencies /app/node_modules /app/node_modules
 COPY --from=minio-client /mc-export/mc /usr/local/bin/mc
+COPY --from=minio-client /opt/bitnami/minio-client/licenses /usr/local/share/licenses/video-backup/minio-client
+COPY deploy/flow/backup/licenses/minio-mc.LICENSE /usr/local/share/licenses/video-backup/minio-client/LICENSE
 WORKDIR /app
 COPY services/loom-engine/package.json services/loom-engine/package-lock.json ./
 COPY services/loom-engine/flow ./flow
