@@ -127,7 +127,7 @@ test("K021/022: exact evidence, UTF16, source provenance, unsupported numbers an
 });
 
 test("K008/K016 fixed temporal media identity never follows mutable asset hash; repost origins do not verify each other", async () => {
-  const { db, k, engine, material, seed } = await setup();
+  const { db, k, engine, material, seed, create, publish } = await setup();
   try {
     await db.query(`INSERT INTO flow_video_jobs(id,operation_id,tenant_id,workspace_id,source_id,asset_id,profile_id,profile_version,fingerprint,input,grant_actor,policy_version)
       VALUES('fixed-media','fixture-operation',$1,$2,$3,$4,'profile',1,'fixed-media-fingerprint','{}','user:reviewer','fixture')`, [A.tenant_id, A.workspace_id, material.source, material.asset]);
@@ -135,6 +135,30 @@ test("K008/K016 fixed temporal media identity never follows mutable asset hash; 
       VALUES($1,$2,$3,'fixed-media',0,1000,'segment',$4,'platform_subtitles')`, [material.ref.evidence_id, A.tenant_id, A.workspace_id, "a".repeat(64)]);
     await db.query(`UPDATE flow_video_assets SET media_sha256=$1 WHERE id=$2`, ["b".repeat(64), material.asset]);
     assert.equal((await k.resolveEvidence(A, [material.ref]))[0].media_sha256, "a".repeat(64));
+    const pgRows = { query: async (sql: string, params?: unknown[]) => {
+      const result = await db.query(sql, params);
+      return { ...result, rows: result.rows.map(row => ({ ...row, start_ms: "0", end_ms: "1000" })) };
+    } };
+    const numeric = (await k.resolveEvidence(A, [material.ref], pgRows))[0];
+    assert.equal(numeric.start_ms, 0); assert.equal(numeric.end_ms, 1000);
+    const candidate = await create("temporal-snapshot");
+    const legacy = candidate.evidence_snapshot.map((ev: any) => ({ ...ev, start_ms: "0", end_ms: "1000" }));
+    await db.query(`UPDATE flow_knowledge_versions SET evidence_snapshot=$1 WHERE knowledge_id=$2`, [JSON.stringify(legacy), candidate.id]);
+    const current = await k.get(A, candidate.id, false);
+    assert.equal(current.evidence_snapshot[0].start_ms, 0); assert.equal(current.evidence_snapshot[0].end_ms, 1000);
+    assert.equal(current.content_hash, candidate.content_hash);
+    assert.equal((await db.query(`SELECT evidence_snapshot FROM flow_knowledge_versions WHERE knowledge_id=$1`, [candidate.id])).rows[0].evidence_snapshot[0].start_ms, "0", "read projection must not rewrite immutable snapshots");
+    const released = await publish(candidate);
+    const corrupt = legacy.map((ev: any) => ({ ...ev, start_ms: "9007199254740992", end_ms: "9007199254740992" }));
+    await db.query(`UPDATE flow_knowledge_versions SET evidence_snapshot=$1 WHERE knowledge_id=$2`, [JSON.stringify(corrupt), candidate.id]);
+    await assert.rejects(k.get(A, candidate.id), /INVALID_EVIDENCE_TIME/);
+    const withdrawn = await k.withdraw(A, candidate.id, "withdraw-corrupt-time", expected(released));
+    assert.equal(withdrawn.state, "withdrawn"); assert.equal(withdrawn.unavailable, true);
+    assert.equal(withdrawn.evidence_snapshot, undefined);
+    assert.equal((await k.withdraw(A, candidate.id, "withdraw-corrupt-time", expected(released))).unavailable, true);
+    assert.ok((await db.query(`SELECT revoked_at FROM flow_knowledge_releases WHERE id=$1`, [released.release_id])).rows[0].revoked_at);
+    const stored = (await db.query(`SELECT content_hash,evidence_snapshot FROM flow_knowledge_versions WHERE knowledge_id=$1`, [candidate.id])).rows[0];
+    assert.equal(stored.content_hash, candidate.content_hash); assert.deepEqual(stored.evidence_snapshot, corrupt);
     await db.query(`UPDATE flow_video_temporal_evidence SET media_sha256=NULL WHERE evidence_id=$1`, [material.ref.evidence_id]);
     assert.equal((await k.resolveEvidence(A, [material.ref]))[0].media_sha256, null);
     const repost = await seed("repost-media", "original"), reports = new Reports(engine);

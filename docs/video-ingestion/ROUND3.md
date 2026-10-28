@@ -15,6 +15,7 @@
 | 第二次真实整栈启动 | `11ce4538` 的 [运行40615728450](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40615728450)已空环境启动8个服务并通过真实注册/工作区引导；平台重建后Nginx缓存旧IP，登录会话返回502，真实UI正确显示认证恢复错误 | 不是浏览器闭环成功。已修正生产Nginx动态DNS上游并固定1.27.5，保留Web不重建断言，待重跑确认 |
 | 代理恢复与真实登录 | `9a2e16ed` 的 [运行40616976301](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40616976301)确认后端容器已重建、Web容器未重建、匿名会话代理恢复200；真实页面登录与知识域创建通过 | 浏览器误点AntD虚拟下拉的离屏辅助选项而超时，尚未创建来源或触达worker；修正为真实键盘选取后重跑。8个真实应用/数据服务之外另有1个模型fixture |
 | 下拉选取和宿主并发回归 | `c8eda3f0` 的 [运行40619479679](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40619479679)已实际选中知识域，但通用文本断言同时匹配了选中项和aria-live播报而严格失败；同提交宿主集成job已通过 | 仍未触达视频处理。依据实际DOM缩小到选中显示项的title，并新增现有真实页面的局部回归；本地Chromium因sandbox的socket权限被拒而未启动页面，交由已获准的CI执行，不使用旁路参数。这类模拟HTTP边界UI诊断不算整栈验收 |
+| 已到达真实知识发布 | `3ae32c88` 的 [运行40621061982](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40621061982)完成实际worker处理、文档/revision、知识整理、无效输入拒绝、旧批准失效409、重批及发布；10项检查通过、pageerror为0，记录实际job/document/knowledge/release ID | 随后测试错误使用textbox角色定位实际searchbox而失败；尚未执行对象只读观察器、重启及撤回，不能称整栈全部通过。该运行模型仍为合成fixture |
 | 整栈及最终 head CI | 待实际结果与产物核验 | 不沿用第二轮或中间提交的成功结果 |
 | 正式 V1 台账 | 本轮映射不修改 [PROGRESS.json](PROGRESS.json)；29 项全局 AC 均未由本页认定完成 | 测试数量不是业务验收百分比 |
 
@@ -46,8 +47,9 @@ Loom 知识整理 → 真实 Go Model Gateway / 预算入口
 2. **媒体执行器秘密过度暴露。** video-worker 原本继承整份 `.env.flow`，因此显式配置了低权限对象账号仍不能防止数据库、MinIO root、独立删除日志和模型秘密进入解码器环境。现在移除该服务的广义 `env_file`，只枚举所需变量。静态回归检查禁止整份继承及上述无关秘密。
 3. **后端重建后代理地址失效。** Nginx原静态上游会继续连接已经释放的容器IP。现在固定支持动态解析的`nginx:1.27.5-alpine`，使用共享上游zone和Docker DNS resolver，保留原有五条代理的URI、SSE配置和内部接口404隔离。`9a2e16ed`运行已实际验证后端重建而Web不重启时的代理恢复；这不是只靠配置文本推定成功。
 4. **并发幂等请求的SQLite快照竞争。** 同提交的宿主集成测试暴露`EnsureCloudAgent`在WAL过期读快照上升级写事务时返回锁错误。修复仅对已回滚、纯数据库事务中的类型化`SQLITE_BUSY`做有界重试；每次重新检查撤权屏障，不重试整个请求、模型调用或扣费。测试保持生产8连接池和4个同时提交，要求全部返回同一ID且任务/执行/账单/账本各一条；确定性旧快照和重试间撤权用例同时保留。
+5. **真实PostgreSQL证据时间类型错误。** `3ae32c88`产物中的0–4000毫秒被驱动输出为字符串，前端的数字校验因而判为未知时间。现在只在已知证据时间的响应投影中转换规范十进制为安全非负整数，保留双null未知时间，拒绝不安全/倒序/损坏值；不改全局PG解析器、原始manifest、不可变快照或内容hash。回归同时要求损坏的旧快照不能阻止授权撤回。
 
-源码与检查：[docker-compose.video.yml](../../docker-compose.video.yml)、[test_video_deployment.py](../../scripts/test_video_deployment.py)。静态检查只证明配置合同；运行时环境与闭环仍须由实际 TEST 产物建立。
+源码与检查：[docker-compose.video.yml](../../docker-compose.video.yml)、[test_video_deployment.py](../../scripts/test_video_deployment.py)、[SQLite事务回归](../../backend/internal/repository/cloud_agent_admission_test.go)、[时间投影回归](../../services/loom-engine/flow/video-temporal-projection.test.ts)。静态检查只证明配置合同；运行时环境与闭环仍须由实际 TEST 产物建立。
 
 已知但不阻塞本轮失败关闭检查的诊断缺陷：宿主`HTTPVideoProvider.uploadInput`把worker的所有422映射为`INPUT_HASH_MISMATCH`，包括空字幕的`NO_SUBTITLES`。因此负向用例只断言422、无文档、无ready，不宣称失败原因分类已正确；后续应单独补充错误分类合同与回归。
 

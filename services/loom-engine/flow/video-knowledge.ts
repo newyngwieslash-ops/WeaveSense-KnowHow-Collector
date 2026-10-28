@@ -2,7 +2,7 @@ import type { Engine } from "./engine.ts";
 import type { Q } from "./db.ts";
 import type { ExecutionContext } from "./auth.ts";
 import { requireScope } from "./auth.ts";
-import { newVideoId, sha } from "./video-contract.ts";
+import { newVideoId, sha, videoEvidenceTime } from "./video-contract.ts";
 import { knowledgeHash, fail, textField, hashField, validateUnit, validateMethod, evidenceRefs, MATERIAL_TYPES, KNOWLEDGE_STATES } from "./video-knowledge-contract.ts";
 import { knowledgeRuntime } from "./video-knowledge-runtime.ts";
 import { appendVideoRetentionIntent, markVideoRetentionApplied, assertVideoRetentionJournal, lockVideoRetentionTransaction, videoRetentionCheckpoint } from "./video-journal.ts";
@@ -15,6 +15,13 @@ const json = (v: any) => typeof v === "string" ? JSON.parse(v) : v;
 export const page = (o: any = {}) => ({ limit: Math.min(100, Math.max(1, Number(o.limit) || 25)), cursor: typeof o.cursor === "string" ? o.cursor : "" });
 const resultPage = (rows: any[], limit: number) => ({ items: rows.slice(0, limit), next_cursor: rows.length > limit ? rows[limit - 1].id : null });
 const splitSurrogate = (s: string, n: number) => n > 0 && n < s.length && /[\uD800-\uDBFF]/.test(s[n - 1]) && /[\uDC00-\uDFFF]/.test(s[n]);
+const knowledgeView = (row: any) => {
+  if (!row || !Object.hasOwn(row, "evidence_snapshot")) return row;
+  if (["withdrawn", "superseded"].includes(row.state)) return { id: row.id, version: row.version, state: row.state, content_hash: row.content_hash, unavailable: true };
+  // Project legacy int8 strings only at response boundaries. Internal control
+  // reads must still allow withdrawal of a corrupt immutable snapshot.
+  return { ...row, evidence_snapshot: row.evidence_snapshot.map((ev: any) => ({ ...ev, ...videoEvidenceTime(ev) })) };
+};
 
 /** Startup-only replay of an already authenticated external deletion intent. */
 export async function applyVideoRetention(engine: Engine, q: Q, scope: Scope, input: { action: string; source_id?: string; asset_id?: string }) {
@@ -123,7 +130,7 @@ export class VideoKnowledgeService {
           const current = await this.current(ctx, result.id, q);
           if (["withdrawn", "superseded"].includes(current.state)) return { id: current.id, version: current.version, state: current.state, unavailable: true } as T;
           await this.resolveEvidence(ctx, evidenceRefs(current.unit.evidence), q);
-          return current;
+          return knowledgeView(current);
         }
         if (result.id && namespace.startsWith("skill_candidate.")) {
           const current = (await q.query(`SELECT * FROM flow_video_skill_candidates WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3`, [ctx.tenant_id, ctx.workspace_id, result.id])).rows[0];
@@ -132,7 +139,7 @@ export class VideoKnowledgeService {
         }
         return result;
       }
-      const result = await fn(q);
+      const result = knowledgeView(await fn(q));
       await q.query(`INSERT INTO flow_knowledge_commands(tenant_id,workspace_id,namespace,idempotency_key,request_hash,result) VALUES($1,$2,$3,$4,$5,$6)`, [ctx.tenant_id, ctx.workspace_id, namespace, key, hash, JSON.stringify(result)]);
       return result;
     });
@@ -162,7 +169,7 @@ export class VideoKnowledgeService {
       if (!Number.isSafeInteger(ev.char_start) || !Number.isSafeInteger(ev.char_end) || ev.char_start < 0 || ev.char_end <= ev.char_start || ev.char_end > text.length
         || splitSurrogate(text, ev.char_start) || splitSurrogate(text, ev.char_end) || text.slice(ev.char_start, ev.char_end) !== ev.quote) fail("evidence_quote_mismatch");
       // Hash computed by the host at evidence creation, not accepted from a worker as authority.
-      return { ...ev, alignment_method: ev.alignment_method ?? "unknown", start_ms: ev.start_ms ?? null, end_ms: ev.end_ms ?? null };
+      return { ...ev, alignment_method: ev.alignment_method ?? "unknown", ...videoEvidenceTime(ev) };
     });
   }
 
@@ -324,7 +331,7 @@ export class VideoKnowledgeService {
     row.evidence = await this.resolveEvidence(ctx, evidenceRefs(row.unit.evidence));
     row.reviews = (await this.db.query(`SELECT version,content_hash,decision,reason,actor,created_at FROM flow_knowledge_reviews WHERE tenant_id=$1 AND workspace_id=$2 AND knowledge_id=$3 ORDER BY created_at,id`, [ctx.tenant_id, ctx.workspace_id, id])).rows;
     row.conflicts = (await this.db.query(`SELECT * FROM flow_knowledge_conflicts WHERE tenant_id=$1 AND workspace_id=$2 AND (left_id=$3 OR right_id=$3) ORDER BY id LIMIT 100`, [ctx.tenant_id, ctx.workspace_id, id])).rows;
-    return row;
+    return knowledgeView(row);
   }
 
   validNow(unit: any) { const now = this.e.now().getTime(); return (!unit.valid_from || Date.parse(unit.valid_from) <= now) && (!unit.valid_until || Date.parse(unit.valid_until) > now); }

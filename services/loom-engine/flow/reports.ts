@@ -7,6 +7,7 @@ import { BUILTIN_TERM_GROUPS, termPattern } from "./terms.ts";
 import { verifySnippet, renderReport, snippetHash } from "./gaps9.ts";
 import { reportEvidenceClaims, reportPayloadHash, validateReportEvidence } from "./report-payload.ts";
 import { videoAccess } from "./video-access.ts";
+import { videoEvidenceTime } from "./video-contract.ts";
 
 type Scope = Pick<ExecutionContext, "tenant_id" | "workspace_id">;
 export const MAX_RESEARCH_CHILDREN = 3;
@@ -57,7 +58,7 @@ export class Reports {
         AND NOT EXISTS(SELECT 1 FROM flow_video_deletion_tombstones t WHERE t.tenant_id=d.tenant_id AND t.workspace_id=d.workspace_id AND t.document_id=d.id)`, [s.tenant_id, s.workspace_id, [...new Set(ids ?? [])].slice(0, 200), videoAccess(this.e)]);
     return r.rows.map((x: any) => ({ evidence_id: x.evidence_id, document_id: x.document_id, source_id: x.source_id, title: x.title, revision: x.revision,
       current_revision: x.current_revision, chunk_index: x.chunk_index ?? 0, char_start: x.char_start, char_end: x.char_end, quote: x.quote,
-      start_ms: x.start_ms == null ? null : Number(x.start_ms), end_ms: x.end_ms == null ? null : Number(x.end_ms), frame_ref: x.frame_ref ?? null,
+      ...videoEvidenceTime(x), frame_ref: x.frame_ref ?? null,
       alignment_method: x.alignment_method ?? "unknown", media_sha256: x.media_sha256 ?? null, material_type: x.material_type,
       origin_cluster: x.origin_cluster ?? null, origin_pending: x.origin_pending, offset_unit: "utf16", availability: x.availability ?? null,
       truncated: (x.chunk_end != null && x.char_end > x.chunk_end) || x.quote.length < x.char_end - x.char_start,

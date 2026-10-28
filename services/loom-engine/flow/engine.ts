@@ -100,7 +100,7 @@ import { HttpError } from "./errors.ts";
 import { rawItem, snippetHash, enqueueDerived, extractionCompleteness, extractionMethodFor, costEstimate, monitorExpansion, archiveRawResponse, objectStoreWriterFromEnv, embedderFromEnv, cosineSimilarity, type Embedder, type PriceHint, type ObjectStore, type ObjectStorePut, objectStoreFromEnv } from "./gaps9.ts";
 import { nextCron, previousCron, checkTimezone } from "./cron.ts";
 import { VideoCoordinator } from "./video.ts";
-import { isVideoKind } from "./video-contract.ts";
+import { isVideoKind, videoEvidenceTime } from "./video-contract.ts";
 import { revokeVideoDependencies, applyVideoRetention } from "./video-knowledge.ts";
 import { appendVideoRetentionIntent, markVideoRetentionApplied, lockVideoRetentionTransaction, assertVideoRetentionJournal } from "./video-journal.ts";
 import { videoAccess } from "./video-access.ts";
@@ -1426,7 +1426,7 @@ export class Engine {
       JOIN flow_documents d ON d.id=e.document_id AND d.tenant_id=e.tenant_id AND d.workspace_id=e.workspace_id
       LEFT JOIN flow_video_temporal_evidence t ON t.evidence_id=e.id AND t.tenant_id=e.tenant_id AND t.workspace_id=e.workspace_id
       WHERE e.tenant_id=$1 AND e.workspace_id=$2 AND ${videoAccessSQL(this)} AND ($3::text IS NULL OR e.document_id=$3) ORDER BY e.created_at DESC LIMIT 200`,
-      [s.tenant_id, s.workspace_id, documentId || null])).rows;
+      [s.tenant_id, s.workspace_id, documentId || null])).rows.map(row => ({ ...row, ...videoEvidenceTime(row) }));
   }
 
   async workOnce(owner: string) {

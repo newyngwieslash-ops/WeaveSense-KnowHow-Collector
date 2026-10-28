@@ -1,7 +1,7 @@
 import type { Engine } from "./engine.ts";
 import type { Q } from "./db.ts";
 import { affected } from "./db.ts";
-import { assertVideoObject, canonicalHash, canonicalTranscript, isVideoKind, newVideoId, normalizeVideoURL, sha, TERMINAL_VIDEO_STATES, videoError,
+import { assertVideoObject, canonicalHash, canonicalTranscript, isVideoKind, newVideoId, normalizeVideoURL, sha, TERMINAL_VIDEO_STATES, videoError, videoEvidenceTime,
   type VideoManifest, type VideoScope, type VideoSegment } from "./video-contract.ts";
 import { videoProviderFromEnv, type VideoProvider, type ProviderResult, type DiscoveryPage } from "./video-provider.ts";
 import { enqueueVideoKnowledgeReady } from "./video-knowledge-extractor.ts";
@@ -1036,7 +1036,7 @@ export class VideoCoordinator {
     const manifests = (await this.db.query(`SELECT artifact_stage,sha256,manifest FROM flow_video_manifests WHERE tenant_id=$1 AND workspace_id=$2 AND video_job_id=$3 ORDER BY artifact_stage`, [...scopeParams(s), id])).rows;
     const items: any[] = []; let bytes = 0;
     for (const e of evidence.slice(0, limit)) {
-      const item = { ...e, quote: e.quote.length <= 1200 ? e.quote : null, quote_excerpt: e.quote.length > 1200 ? e.quote.slice(0, 1200) : null,
+      const item = { ...e, ...videoEvidenceTime(e), quote: e.quote.length <= 1200 ? e.quote : null, quote_excerpt: e.quote.length > 1200 ? e.quote.slice(0, 1200) : null,
         quote_complete: e.quote.length <= 1200, read_ref: { document_id: e.document_id, revision: e.revision, offset: e.char_start, max_chars: e.char_end - e.char_start } };
       const size = Buffer.byteLength(json(item)); if (items.length && bytes + size > 4500) break;
       bytes += size; items.push(item);

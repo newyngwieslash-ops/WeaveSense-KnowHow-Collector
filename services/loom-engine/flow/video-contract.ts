@@ -17,6 +17,18 @@ export function assertVideoObject(scope: VideoScope, key: string, job?: string) 
 }
 export type VideoObject = { object_key: string; sha256: string; bytes: number; content_type: string; artifact_type?: string; retention_class?: string };
 export type VideoSegment = { text: string; start_ms: number | null; end_ms: number | null; kind?: "subtitle" | "asr" | "ocr" | "observation"; frame_ref?: string; alignment_method?: string };
+/** PostgreSQL int8 fields are strings; expose exact, validated JSON milliseconds. */
+export function videoEvidenceTime(row: { start_ms?: unknown; end_ms?: unknown }) {
+  const parse = (value: unknown): number | null => {
+    if (value == null) return null;
+    const number = typeof value === "string" && /^(0|[1-9]\d*)$/.test(value) ? Number(value) : value;
+    if (typeof number !== "number" || !Number.isSafeInteger(number) || number < 0) throw videoError(422, "INVALID_EVIDENCE_TIME");
+    return number;
+  };
+  const start_ms = parse(row.start_ms), end_ms = parse(row.end_ms);
+  if ((start_ms === null) !== (end_ms === null) || start_ms !== null && end_ms! < start_ms) throw videoError(422, "INVALID_EVIDENCE_TIME");
+  return { start_ms, end_ms };
+}
 export type VideoManifest = {
   schema_version: 1; artifact_stage: "input_ready" | "processing_complete"; video_job_id: string;
   stage_attempt: number; fencing_token: number; input_kind: "platform_subtitles" | "media";

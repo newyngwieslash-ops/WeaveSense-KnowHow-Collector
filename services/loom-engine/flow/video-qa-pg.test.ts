@@ -11,7 +11,9 @@ import { join } from "node:path";
 import { pgDb, migrate, withTenant } from "./db.ts";
 import { Engine } from "./engine.ts";
 import { initializeVideoDeletionJournal, configureVideoRetentionJournal, replayVideoRetentionJournal } from "./video-journal.ts";
-import { applyVideoRetention } from "./video-knowledge.ts";
+import { applyVideoRetention, VideoKnowledgeService } from "./video-knowledge.ts";
+import { sha } from "./video-contract.ts";
+import { Reports } from "./reports.ts";
 
 const url = process.env.FLOW_VIDEO_TEST_PG_URL;
 test("QA PostgreSQL: real independent connections serialize claims, preserve restart fence and enforce video FORCE RLS", { skip: !url && "FLOW_VIDEO_TEST_PG_URL not configured" }, async t => {
@@ -76,5 +78,29 @@ test("QA PostgreSQL: real independent connections serialize claims, preserve res
   assert.ok(Number(afterKill.fencing_token) > Number((stage as any).fencing_token));
   await assert.rejects(restarted.video.heartbeat(stage), (e: any) => e.reason === "STALE_FENCE");
   await restarted.video.cancel(scope, interrupted.video_job_id, "Finish isolated killed-worker fixture");
+  // Use the real node-postgres int8 decoder, not PGlite's numeric representation.
+  const title = "Synthetic temporal fixture", quote = "Self-authored temporal source.";
+  const asset = (await db.query(`SELECT asset_id FROM flow_video_jobs WHERE id=$1`, [job.video_job_id])).rows[0].asset_id;
+  await db.query(`INSERT INTO flow_documents(id,tenant_id,workspace_id,source_id,external_id,url,title,video_asset_id,video_text_access_expires_at)
+    VALUES('pg-temporal-doc',$1,$2,$3,'pg-temporal','https://www.bilibili.com/video/BV1PGQA00001',$4,$5,now()+interval '1 day')`, [scope.tenant_id, scope.workspace_id, source.id, title, asset]);
+  await db.query(`INSERT INTO flow_document_revisions(document_id,revision,tenant_id,content_hash,title,body,collected_by_run,material_type)
+    VALUES('pg-temporal-doc',1,$1,$2,$3,$4,'fixture','platform_subtitles')`, [scope.tenant_id, sha(title + "\n\n" + quote), title, quote]);
+  await db.query(`INSERT INTO flow_evidence(id,tenant_id,workspace_id,document_id,revision,char_start,char_end,quote,created_by,snippet_hash,url)
+    VALUES('pg-temporal-ev',$1,$2,'pg-temporal-doc',1,$3,$4,$5,'fixture',$6,'https://www.bilibili.com/video/BV1PGQA00001')`, [scope.tenant_id, scope.workspace_id, title.length + 2, title.length + 2 + quote.length, quote, sha(quote)]);
+  await db.query(`INSERT INTO flow_video_temporal_evidence(evidence_id,tenant_id,workspace_id,video_job_id,start_ms,end_ms,alignment_method,material_type)
+    VALUES('pg-temporal-ev',$1,$2,$3,0,4000,'segment','platform_subtitles')`, [scope.tenant_id, scope.workspace_id, job.video_job_id]);
+  await db.query(`UPDATE flow_video_jobs SET document_id='pg-temporal-doc',revision=1 WHERE id=$1`, [job.video_job_id]);
+  assert.equal(typeof (await db.query(`SELECT start_ms FROM flow_video_temporal_evidence WHERE evidence_id='pg-temporal-ev'`)).rows[0].start_ms, "string");
+  const knowledge = new VideoKnowledgeService(restarted), reports = new Reports(restarted);
+  const projections = [
+    (await knowledge.resolveEvidence(scope, [{ evidence_id: "pg-temporal-ev", revision: 1, snippet_hash: sha(quote) }]))[0],
+    (await restarted.listEvidence(scope, "pg-temporal-doc"))[0],
+    (await restarted.video.artifacts(scope, job.video_job_id)).items[0],
+    (await reports.resolveEvidence(scope, ["pg-temporal-ev"]))[0],
+  ];
+  for (const item of projections) {
+    assert.equal(item.start_ms, 0); assert.equal(item.end_ms, 4000);
+  }
+  assert.equal((await restarted.listEvidence({ ...scope, tenant_id: "pg_qa_b" }, "pg-temporal-doc")).length, 0);
   t.diagnostic("actual PostgreSQL non-superuser FORCE RLS, two pools, close/reopen, real SIGKILL worker replacement and stale-fence rejection; no platform/model calls");
 });

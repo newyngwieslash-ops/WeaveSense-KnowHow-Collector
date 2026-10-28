@@ -133,8 +133,8 @@ async function decision(page, action, title, approve = false) {
 async function publishedUI(page, title) {
   await page.goto('/intelligence/video-knowledge');
   await expect(page.getByText('普通检索只返回有效的已发布知识', { exact: true })).toBeVisible();
-  await page.getByRole('textbox', { name: '检索已发布知识', exact: true }).fill('Synthetic');
-  await page.getByRole('textbox', { name: '检索已发布知识', exact: true }).press('Enter');
+  await page.getByRole('searchbox', { name: '检索已发布知识', exact: true }).fill('Synthetic');
+  await page.getByRole('searchbox', { name: '检索已发布知识', exact: true }).press('Enter');
   await expect(page.getByText(title, { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '查看与复核', exact: true }).click();
   const detail = page.getByRole('dialog', { name: '知识复核与发布', exact: true });
@@ -142,8 +142,11 @@ async function publishedUI(page, title) {
   const evidence = page.getByRole('dialog', { name: '时间轴与原文证据', exact: true });
   await expect(evidence.locator('mark')).toHaveText(quote);
   await expect(evidence.getByText('UTF-16 偏移', { exact: true })).toBeVisible();
+  await expect(evidence.getByText('0:00.000 — 0:04.000', { exact: true })).toBeVisible();
   await evidence.getByRole('button', { name: '展开按需读取', exact: true }).click();
-  await expect(evidence.getByText(quote, { exact: true }).last()).toBeVisible();
+  const transcript = evidence.getByRole('tabpanel', { name: '来源文本', exact: true });
+  await expect(transcript.locator('blockquote')).toHaveText(quote);
+  await expect(transcript.getByRole('button', { name: '定位 0:00.000', exact: true })).toBeEnabled();
   await evidence.getByRole('tab', { name: '受权播放', exact: true }).click();
   await expect(evidence.getByText('本页没有音视频对象；字幕输入可能从未采集媒体，可继续翻页核对', { exact: true })).toBeVisible();
   // Subtitle-only input must not grow an invented player or platform URL.
@@ -228,6 +231,11 @@ test(`live host lawful-input pipeline (${phase})`, async ({ page }, testInfo) =>
       const artifactPage = accepted(await api(`/video/jobs/${job.video_job_id}/artifacts`), 'registered artifacts');
       evidence.temporal_evidence_count = artifactPage.items.length;
       expect(evidence.temporal_evidence_count).toBeGreaterThan(0);
+      for (const item of artifactPage.items) {
+        expect(typeof item.start_ms).toBe('number');
+        expect(typeof item.end_ms).toBe('number');
+        expect([item.start_ms, item.end_ms]).toEqual([0, 4000]);
+      }
       evidence.manifests = artifactPage.manifests;
       expect(artifactPage.manifests.reduce((total, item) => total + item.object_count, 0)).toBeGreaterThan(0);
       expect(artifactPage.manifests.some(item => item.input_kind === 'platform_subtitles' && item.availability === 'not_acquired')).toBe(true);
@@ -281,6 +289,11 @@ test(`live host lawful-input pipeline (${phase})`, async ({ page }, testInfo) =>
       evidence.knowledge_version = published.version;
       evidence.knowledge_hash = published.content_hash;
       evidence.release_id = published.release_id;
+      for (const item of published.evidence) {
+        expect(typeof item.start_ms).toBe('number');
+        expect(typeof item.end_ms).toBe('number');
+        expect([item.start_ms, item.end_ms]).toEqual([0, 4000]);
+      }
       evidence.evidence = published.evidence.map(item => ({ evidence_id: item.evidence_id, document_id: item.document_id, revision: item.revision, snippet_hash: item.snippet_hash, char_start: item.char_start, char_end: item.char_end, start_ms: item.start_ms, end_ms: item.end_ms }));
       evidence.checks.ui_review_approve_publish = true;
       await publishedUI(page, evidence.knowledge_title);
