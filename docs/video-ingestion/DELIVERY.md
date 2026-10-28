@@ -1,5 +1,19 @@
 # WeaveSense-KnowHow-Collector 开发版交付说明
 
+## 当前接手入口：V1 工程闭环
+
+请使用 [feat/knowhow-fullstack-acceptance 分支](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/tree/feat/knowhow-fullstack-acceptance)。已验证的应用源码为 [`ff03a18f34d80b1b894b3d89a58df06b594346df`](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/commit/ff03a18f34d80b1b894b3d89a58df06b594346df)，其四项 CI、13 个 job 全部成功：
+
+- [真实整栈 TEST](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40714774787)：实际登录、Go/Loom/Python、PostgreSQL/MinIO、原生 Agent/Canvas、候选评测、长 Unicode 原文、服务重启、撤回和权限失效。60 个评测任务与宿主网关及持久记录逐一绑定，重启无重放；恶意模型夹具返回两次工具调用，外联接收器计数为零。
+- [组件集成](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40714775082)：Loom 281/281、零跳过；Go 1,965 个顶层测试通过、5 个明确条件跳过、零失败；必选视频门禁均实际执行。真实双编译 Skill 生命周期专项包含 120 个宿主 ModelTasks、安装/升级/回滚及历史 pin。
+- [容器构建及来源核验](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40714774831) 与 [质量检查](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40714774947) 均成功。实际普通话离线 ASR 的独立、非默认 CI 证据见 [AC08-ASR.md](AC08-ASR.md)。
+
+**工程实现、范围化执行证据与业务正式签收分别记录。** 原 29 条 V1 用例中，23 条客观技术验收已在各自明示边界内通过；AC01/02/03/14/27/29 的真实平台、所选模型语义质量或约定试点条件仍待补。原 100 项任务、29 条用例的逐项现状及证据见 [V1-CLOSURE.md](V1-CLOSURE.md) 与 [机器可读矩阵](evidence/v1-closure-matrix.json)。
+
+`PROGRESS.json`、生成视图和执行工作簿已同步当前事实：FND-004 改为待验收，K-020 的授权正负样本阈值校准明确为阻塞。按原依赖图与整项签收规则，任务总数仍是“2 已完成 / 88 待验收 / 10 阻塞”，**这不是代码完成比例**；原依赖未签收不表示相关功能未实现。外部平台及多数模型使用受控夹具；真实行业质量、授权平台样本、独立金标和约定试点尚不能由这些测试代签。没有合并 main、创建新 PR 或执行生产部署。
+
+以下章节保留首次交付及第二轮收尾的历史事实；其中旧分支、待验证工程项与计数只适用于对应历史快照。当前接手分支和工程证据以上述入口及闭环矩阵为准，不再按旧工程清单判断当前实现状态。
+
 ## 结论
 
 已在独立工作目录实现宿主扩展、补齐逐条审计发现的应用代码缺口，并完成本轮冻结源码的本地回归。**这是可继续本地测试和二次开发的源码开发版，不是完整 V1 已验收、开箱安装包或生产上线证明。**

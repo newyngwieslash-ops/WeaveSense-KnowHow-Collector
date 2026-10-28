@@ -1,12 +1,12 @@
 {
   "valid": true,
   "baseline_sha256": "0c38c8136ef7fa9a28b16ec9fc5eadcdf3364ba01d326a7f092999a402f2d357",
-  "execution_sha256": "1a069e786d09d2a10499abd04c7e1f016e0e91847e750faf72c3e40c689e9049",
+  "execution_sha256": "f8154425b6b367b0ddd1e2b45a567f086d6f1512d55680ef2d553aeb98005aec",
   "sheets": 6,
   "formulas_preserved": 323,
   "formula_cached_values": 323,
-  "unaffected_cells_preserved": 4059,
-  "expected_edits": 300,
+  "unaffected_cells_preserved": 3966,
+  "expected_edits": 393,
   "defects": [],
   "style_differences": [],
   "native_feature_differences": [],
@@ -15,229 +15,229 @@
       "sheet": "开发任务",
       "row": 8,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 9,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 10,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 11,
       "before": 32,
-      "after": 95
+      "after": 132
     },
     {
       "sheet": "开发任务",
       "row": 12,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 13,
       "before": 32,
-      "after": 95
+      "after": 132
     },
     {
       "sheet": "开发任务",
       "row": 15,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 16,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 17,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 18,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 19,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 20,
       "before": 32,
-      "after": 82
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 21,
       "before": 32,
-      "after": 82
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 22,
       "before": 32,
-      "after": 82
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 23,
       "before": 32,
-      "after": 82
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 24,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 25,
       "before": 32,
-      "after": 82
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 26,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 27,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 28,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 29,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 30,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 31,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 32,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 33,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 34,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 35,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 36,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 37,
       "before": 32,
-      "after": 82
+      "after": 120
     },
     {
       "sheet": "开发任务",
       "row": 38,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 39,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 40,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 41,
       "before": 32,
-      "after": 69
+      "after": 82
     },
     {
       "sheet": "开发任务",
       "row": 42,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 43,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 44,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 45,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 46,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
@@ -249,163 +249,163 @@
       "sheet": "开发任务",
       "row": 48,
       "before": 32,
-      "after": 82
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 49,
       "before": 32,
-      "after": 82
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 50,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 51,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 52,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 53,
       "before": 32,
-      "after": 69
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 54,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 55,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 56,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 57,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 58,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 59,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 60,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 61,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 62,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 63,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 64,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 65,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 66,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 67,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 68,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 69,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 70,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 71,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 72,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 73,
       "before": 35.20000076293945,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 74,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
@@ -417,19 +417,19 @@
       "sheet": "开发任务",
       "row": 76,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 77,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 78,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
@@ -441,103 +441,103 @@
       "sheet": "开发任务",
       "row": 80,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 81,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 82,
       "before": 32,
-      "after": 82
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 83,
       "before": 35.20000076293945,
-      "after": 82
+      "after": 120
     },
     {
       "sheet": "开发任务",
       "row": 84,
       "before": 32,
-      "after": 107
+      "after": 132
     },
     {
       "sheet": "开发任务",
       "row": 85,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 86,
       "before": 35.20000076293945,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 87,
       "before": 35.20000076293945,
-      "after": 107
+      "after": 132
     },
     {
       "sheet": "开发任务",
       "row": 88,
       "before": 32,
-      "after": 69
+      "after": 82
     },
     {
       "sheet": "开发任务",
       "row": 89,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 90,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 91,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 92,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 93,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 94,
       "before": 32,
-      "after": 82
+      "after": 120
     },
     {
       "sheet": "开发任务",
       "row": 95,
       "before": 32,
-      "after": 69
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 96,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
@@ -549,31 +549,31 @@
       "sheet": "开发任务",
       "row": 98,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 99,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 100,
       "before": 32,
-      "after": 95
+      "after": 107
     },
     {
       "sheet": "开发任务",
       "row": 101,
       "before": 32,
-      "after": 82
+      "after": 95
     },
     {
       "sheet": "开发任务",
       "row": 102,
       "before": 32,
-      "after": 107
+      "after": 145
     },
     {
       "sheet": "开发任务",
@@ -591,16 +591,16 @@
       "sheet": "开发任务",
       "row": 105,
       "before": 32,
-      "after": 107
+      "after": 132
     },
     {
       "sheet": "开发任务",
       "row": 106,
       "before": 32,
-      "after": 107
+      "after": 132
     }
   ],
-  "ledger_sha256": "5562c326690b11419f516adc5e01d294e425f532a8a77c0e552dfdcff8624463",
+  "ledger_sha256": "e035f7eb2e160d199b6fb54a40319fe91f7a7481d9338806d9ef4dbb789afdc3",
   "independently_verified_results": 678,
   "serialization_notes": {
     "comparison": "Relationships resolved to targets; conditional styles resolved by rule; relative rule priority preserved.",
