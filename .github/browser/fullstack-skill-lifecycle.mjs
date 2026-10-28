@@ -23,7 +23,7 @@ async function mutation(page, action, suffix) {
   return result.data;
 }
 
-export async function selectCandidateOption(page, control, label, optionCount) {
+export async function selectCandidateOption(page, control, label, optionCount, { multiple = false } = {}) {
   expect(Number.isSafeInteger(optionCount) && optionCount > 0 && optionCount <= 1000).toBe(true);
   await control.click();
   await expect(control).toHaveAttribute('aria-expanded', 'true');
@@ -36,10 +36,16 @@ export async function selectCandidateOption(page, control, label, optionCount) {
     await expect(active).toBeAttached();
     if (await active.getAttribute('aria-label') === label) {
       await control.press('Enter');
-      if (await control.getAttribute('aria-expanded') === 'true') await control.press('Escape');
-      await expect(control).toHaveAttribute('aria-expanded', 'false');
       const select = control.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]');
       await expect(select.getByTitle(label, { exact: true })).toBeVisible();
+      // Single Select closes asynchronously after Enter. Never infer its mode
+      // from a transient aria-expanded read: a late Escape can close the modal.
+      if (multiple) {
+        await expect(control).toHaveAttribute('aria-expanded', 'true');
+        await control.press('Escape');
+      }
+      await expect(control).toHaveAttribute('aria-expanded', 'false');
+      await expect(control.locator('xpath=ancestor::*[@role="dialog"][1]')).toBeVisible();
       return;
     }
     if (index + 1 < optionCount) {
@@ -66,8 +72,8 @@ export async function exerciseSkillCandidate(page, state, evidence) {
   await expect(page.getByRole('button', { name: '创建候选', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: '创建候选', exact: true }).click();
   const form = page.getByRole('dialog', { name: '创建可执行原生方法候选', exact: true });
-  await selectCandidateOption(page, form.getByLabel('基础原生版本（已部署）', { exact: true }), `${base.name} v${base.version}`, catalog.packs.flatMap(p => p.skills).length);
-  await selectCandidateOption(page, form.getByLabel('冻结已发布知识与证据', { exact: true }), `${evidence.knowledge_title} v${evidence.knowledge_version}`, 30);
+  await selectCandidateOption(page, form.getByLabel('基础原生版本（已部署）', { exact: true }), `${base.name} v${base.version}`, catalog.packs.flatMap(p => p.skills).length, { multiple: false });
+  await selectCandidateOption(page, form.getByLabel('冻结已发布知识与证据', { exact: true }), `${evidence.knowledge_title} v${evidence.knowledge_version}`, 30, { multiple: true });
   await form.getByLabel('完整原生 JSON skillpack（不是 SKILL.md，服务端执行 schema 校验）', { exact: true }).fill(JSON.stringify(pack));
   await form.getByLabel('逐规则证据映射 JSON（method 与每一步均须唯一映射）', { exact: true }).fill(JSON.stringify([
     { rule: 'method', evidence_ids: [evidence.evidence[0].evidence_id] }, { rule: 'step:0', evidence_ids: [evidence.evidence[0].evidence_id] },

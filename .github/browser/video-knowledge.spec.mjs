@@ -207,11 +207,35 @@ test('actual Skill candidate virtual single and multi Select reach offscreen opt
       evidence: [{ evidence_id: `evidence-${index}`, revision: 1, snippet_hash: 'c'.repeat(64) }] } }));
   const state = await fixtures(page, { skillCatalog: { packs: [{ id: 'synthetic-pack', required_tools: ['intel_search_knowledge'], skills }], installed: [] }, publishedKnowledge: knowledge });
   await page.goto('/intelligence/video-skills');
-  await page.getByRole('button', { name: '创建候选', exact: true }).click();
   const form = page.getByRole('dialog', { name: '创建可执行原生方法候选', exact: true });
   const base = skills.at(-1), published = knowledge.at(-1);
-  await selectCandidateOption(page, form.getByLabel('基础原生版本（已部署）', { exact: true }), `${base.name} v${base.version}`, skills.length);
-  await selectCandidateOption(page, form.getByLabel('冻结已发布知识与证据', { exact: true }), `${published.unit.title} v${published.version}`, knowledge.length);
+  // Observe actual keyboard events only; do not alter component state/timing.
+  await page.evaluate(() => {
+    window.candidateSelectKeys = [];
+    document.addEventListener('keydown', event => {
+      if (event.target instanceof HTMLInputElement && ['base', 'knowledge'].includes(event.target.id)
+        && ['Enter', 'Escape'].includes(event.key)) window.candidateSelectKeys.push({ control: event.target.id, key: event.key });
+    }, true);
+  });
+  const expectedKeys = [];
+  // An actual Cancel/reopen cycle must reset the form without carrying an
+  // overlay or selected value into the next draft; this is not a test retry.
+  for (let draft = 0; draft < 2; draft++) {
+    await page.getByRole('button', { name: '创建候选', exact: true }).click();
+    await expect(form.getByTitle(`${base.name} v${base.version}`, { exact: true })).toHaveCount(0);
+    await selectCandidateOption(page, form.getByLabel('基础原生版本（已部署）', { exact: true }), `${base.name} v${base.version}`, skills.length, { multiple: false });
+    expectedKeys.push({ control: 'base', key: 'Enter' });
+    expect(await page.evaluate(() => window.candidateSelectKeys)).toEqual(expectedKeys);
+    await expect(form).toBeVisible();
+    await selectCandidateOption(page, form.getByLabel('冻结已发布知识与证据', { exact: true }), `${published.unit.title} v${published.version}`, knowledge.length, { multiple: true });
+    expectedKeys.push({ control: 'knowledge', key: 'Enter' }, { control: 'knowledge', key: 'Escape' });
+    expect(await page.evaluate(() => window.candidateSelectKeys)).toEqual(expectedKeys);
+    if (draft === 0) {
+      await form.getByRole('button', { name: /取\s*消/ }).click();
+      await expect(form).not.toBeVisible();
+      expect(state.writes).toEqual([]);
+    }
+  }
   await expect(form).toBeVisible();
   await expect(form.getByText('evidence-29', { exact: false })).toBeVisible();
   await form.getByLabel('完整原生 JSON skillpack（不是 SKILL.md，服务端执行 schema 校验）', { exact: true }).fill('{}');

@@ -18,6 +18,18 @@ retry, denied mutation preserving draft, source modal dismissal and browser hist
 and virtual profile selection with persisted source configuration (not aria-live text).
 Trace, screenshots on failure and JSON/HTML reports are CI artifacts.
 
+The candidate Select regression also checks offscreen single/multiple options,
+the exact frozen identities submitted, and the parent dialog staying open. In
+[job 122933538159](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40721555588/job/122933538159),
+the helper read a stale `aria-expanded=true` just after a single-select Enter.
+By the time its Escape arrived the popup had closed, so Escape dismissed the
+parent modal. The fix follows the declared selection mode rather than this
+time-of-check/time-of-use snapshot: single selection waits for its normal close;
+multiple selection closes its popup only after the selected value is committed.
+This is test-driver synchronization, not a product permission or state change.
+It must not be replaced by force-clicks, longer timeouts, hidden UI bypasses or
+automatic retries that hide a failed attempt.
+
 The legacy Go `TestGeneratedAssetBrowserIdentity` is a different optional external
 Node-runner test; it is not these Chromium tests and remains separately disclosed.
 
@@ -53,6 +65,10 @@ The real Python worker persists and processes the uploaded bytes through MinIO a
 Loom/PostgreSQL. Only the model provider response is synthetic. Review, approval,
 publication, ordinary search, fixed-revision evidence and withdrawal use the real
 host UI. Subtitle-only input must report no acquired media or player; this does not
-prove audio/video playback, live platform acquisition, model quality, industry
-acceptance or native Skill execution. Execution must be reported separately from
-the existence of this harness.
+prove audio/video playback, live platform acquisition, model quality or industry
+acceptance. The additional `fullstack-native.mjs` and
+`fullstack-skill-lifecycle.mjs` paths exercise actual Agent/Canvas authorization,
+managed native execution, frozen candidate evaluation and restart/withdrawal
+receipts; their external model remains synthetic. Actual execution evidence is
+recorded separately from the existence of these scripts in
+[`V1-CLOSURE.md`](../../docs/video-ingestion/V1-CLOSURE.md).
