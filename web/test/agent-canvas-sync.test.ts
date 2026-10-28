@@ -1,4 +1,4 @@
-import { expect, mock, test } from "bun:test";
+import { expect, mock, spyOn, test } from "bun:test";
 import { createAgentCanvasSync } from "@/services/agent-canvas-sync";
 import type { AgentEvent } from "@/services/api/agent";
 
@@ -98,6 +98,7 @@ test("cleanup and other-canvas events cannot update the new canvas", async () =>
 
 test("fallback snapshots obey the configured minimum refresh interval", async () => {
     const times: number[] = [];
+    const clock = spyOn(Date, "now").mockReturnValue(0);
     const sync = createAgentCanvasSync({
         canvasId: "canvas",
         applyPatches: async () => {},
@@ -108,15 +109,24 @@ test("fallback snapshots obey the configured minimum refresh interval", async ()
         batchMs: 0,
         refreshIntervalMs: 100,
     });
-    sync.reconcile();
-    await sleep(15);
-    for (let index = 0; index < 50; index++) sync.reconcile();
-    await sleep(15);
-    expect(times).toHaveLength(1);
-    await sleep(120);
-    sync.dispose();
-    expect(times).toHaveLength(2);
-    expect(times[1] - times[0]).toBeGreaterThanOrEqual(100);
+    try {
+        sync.reconcile();
+        await sleep();
+        expect(times).toEqual([0]);
+        // Keep the limiter and callback on the same clock tick: observing
+        // Date.now separately could cross a millisecond boundary in CI.
+        clock.mockReturnValue(99);
+        for (let index = 0; index < 50; index++) sync.reconcile();
+        await sleep();
+        expect(times).toEqual([0]);
+        clock.mockReturnValue(100);
+        await sleep();
+        expect(times).toEqual([0, 100]);
+        expect(times[1] - times[0]).toBeGreaterThanOrEqual(100);
+    } finally {
+        sync.dispose();
+        clock.mockRestore();
+    }
 });
 
 test("a full invalidation and undo still refresh after delta support was detected", async () => {

@@ -14,6 +14,7 @@
 | 首次实际构建/启动 | `f0347739` 的 [运行 40614875677](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40614875677)已构建5个应用/fixture镜像，PG/Redis/MinIO及Go/Web启动；Web仅接internal网络没有发布端口，宿主bootstrap连接被拒绝 | 不是整栈成功；未执行浏览器闭环。已按产物修正仅Nginx双网络入口，后台保持内部网络 |
 | 第二次真实整栈启动 | `11ce4538` 的 [运行40615728450](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40615728450)已空环境启动8个服务并通过真实注册/工作区引导；平台重建后Nginx缓存旧IP，登录会话返回502，真实UI正确显示认证恢复错误 | 不是浏览器闭环成功。已修正生产Nginx动态DNS上游并固定1.27.5，保留Web不重建断言，待重跑确认 |
 | 代理恢复与真实登录 | `9a2e16ed` 的 [运行40616976301](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40616976301)确认后端容器已重建、Web容器未重建、匿名会话代理恢复200；真实页面登录与知识域创建通过 | 浏览器误点AntD虚拟下拉的离屏辅助选项而超时，尚未创建来源或触达worker；修正为真实键盘选取后重跑。8个真实应用/数据服务之外另有1个模型fixture |
+| 下拉选取和宿主并发回归 | `c8eda3f0` 的 [运行40619479679](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40619479679)已实际选中知识域，但通用文本断言同时匹配了选中项和aria-live播报而严格失败；同提交宿主集成job已通过 | 仍未触达视频处理。依据实际DOM缩小到选中显示项的title，并新增现有真实页面的局部回归；本地Chromium因sandbox的socket权限被拒而未启动页面，交由已获准的CI执行，不使用旁路参数。这类模拟HTTP边界UI诊断不算整栈验收 |
 | 整栈及最终 head CI | 待实际结果与产物核验 | 不沿用第二轮或中间提交的成功结果 |
 | 正式 V1 台账 | 本轮映射不修改 [PROGRESS.json](PROGRESS.json)；29 项全局 AC 均未由本页认定完成 | 测试数量不是业务验收百分比 |
 

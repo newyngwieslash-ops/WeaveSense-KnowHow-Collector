@@ -100,7 +100,9 @@ async function saveSource(page, profile) {
   await profileSelector.press('ArrowDown');
   await profileSelector.press('Enter');
   await expect(profileSelector).toHaveAttribute('aria-expanded', 'false');
-  await expect(modal.getByText(profileLabel, { exact: true })).toBeVisible();
+  // Select also announces this label in an aria-live span; the title belongs
+  // to the selected visual value, not that accessibility announcement.
+  await expect(modal.getByTitle(profileLabel, { exact: true })).toBeVisible();
   await modal.getByLabel('内容使用依据', { exact: true }).fill('Self-authored synthetic test subtitle; no platform request, account or rights assertion about real media.');
   const [out] = await Promise.all([
     page.waitForResponse(r => new URL(r.url()).pathname === '/api/intelligence/sources' && r.request().method() === 'POST', { timeout: 30000 }),

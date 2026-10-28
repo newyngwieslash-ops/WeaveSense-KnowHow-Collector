@@ -14,7 +14,8 @@ fail; permission denials are explicit negative fixtures.
 
 Coverage: unauthenticated routing, required-field validation, cancel/reopen, duplicate
 submission guard, workspace/idempotency headers, reload after save, denied read and
-retry, denied mutation preserving draft, source modal dismissal and browser history.
+retry, denied mutation preserving draft, source modal dismissal and browser history,
+and virtual profile selection with persisted source configuration (not aria-live text).
 Trace, screenshots on failure and JSON/HTML reports are CI artifacts.
 
 The legacy Go `TestGeneratedAssetBrowserIdentity` is a different optional external
