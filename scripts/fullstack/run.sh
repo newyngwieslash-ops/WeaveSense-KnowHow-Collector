@@ -57,7 +57,10 @@ journal_created=true
 "${compose[@]}" up -d postgres redis minio
 "${compose[@]}" run --rm minio-init
 "${compose[@]}" up -d --wait --wait-timeout 180 platform web
+node scripts/fullstack/readiness.mjs > "$out/auth-readiness-initial.json"
 node .github/browser/fullstack-bootstrap.mjs > "$out/bootstrap.json"
+platform_before="$("${compose[@]}" ps -q platform)"
+web_before="$("${compose[@]}" ps -q web)"
 python scripts/fullstack/configure.py scope
 set -a
 . ./.env.flow
@@ -75,6 +78,15 @@ set +a
     mc admin policy attach flow fullstack-video --user "$VIDEO_OBJECT_ACCESS_KEY" >/dev/null
   '
 "${compose[@]}" up -d --wait --wait-timeout 240 platform web loom-engine loom-scheduler video-worker provider-fixture
+curl --fail --silent --show-error --retry 30 --retry-delay 1 --retry-connrefused --max-time 3 "$VIDEO_FULLSTACK_BASE_URL/api/health/ready" > "$out/proxy-readiness.json"
+node scripts/fullstack/readiness.mjs > "$out/auth-readiness-recreated.json"
+platform_after="$("${compose[@]}" ps -q platform)"
+web_after="$("${compose[@]}" ps -q web)"
+test "$platform_before" != "$platform_after"
+test "$web_before" = "$web_after"
+"${compose[@]}" exec -T web nginx -v > "$out/nginx-runtime.txt" 2>&1
+"${compose[@]}" exec -T web nginx -t >> "$out/nginx-runtime.txt" 2>&1
+printf '{"backend_recreated":true,"web_not_recreated":true,"proxied_readiness_after_recreation":true}\n' > "$out/proxy-recreation.json"
 "${compose[@]}" images --format json > "$out/images.json"
 "${compose[@]}" ps --all --format json | python scripts/fullstack/sanitize.py > "$out/healthy-start.jsonl"
 export FULLSTACK_TENANT_ID="$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.VIDEO_FULLSTACK_STATE)).tenantId)")"
@@ -88,6 +100,8 @@ observe > "$out/persistence-before-restart.json"
 # Browser process has exited. Restart real services with the same volumes.
 "${compose[@]}" restart platform loom-engine loom-scheduler video-worker
 "${compose[@]}" up -d --wait --wait-timeout 240 platform web loom-engine loom-scheduler video-worker provider-fixture
+curl --fail --silent --show-error --retry 30 --retry-delay 1 --retry-connrefused --max-time 3 "$VIDEO_FULLSTACK_BASE_URL/api/health/ready" > "$out/proxy-readiness-after-restart.json"
+node scripts/fullstack/readiness.mjs > "$out/auth-readiness-restarted.json"
 (cd .github/browser && VIDEO_FULLSTACK_PHASE=restart npx playwright test --config playwright.fullstack.config.mjs) 2>&1 | python scripts/fullstack/sanitize.py
 cp "$VIDEO_FULLSTACK_RESULT" "$out/browser-after-restart.json"
 observe > "$out/persistence-after-restart.json"

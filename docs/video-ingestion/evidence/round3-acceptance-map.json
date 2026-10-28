@@ -58,7 +58,7 @@
     },
     "deployment_unit": {
       "source": "scripts/test_video_deployment.py",
-      "result": "included in 45 passing local script tests; static deployment contracts, not Docker execution"
+      "result": "included in 46 passing local script tests; static deployment contracts, not Docker execution"
     },
     "test_network_contract": {
       "source": "scripts/fullstack/compose.test.yml",

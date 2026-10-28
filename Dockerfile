@@ -23,7 +23,7 @@ ENV CANVAS_BUILD_TIME=${BUILD_TIME}
 RUN bun --bun ./node_modules/vite/bin/vite.js build
 
 # 运行镜像：nginx 托管静态前端，并在 Compose 中把 /api 转发到后端服务。
-FROM nginx:1.27-alpine
+FROM nginx:1.27.5-alpine
 
 COPY --from=web-build /app/web/dist /opt/canvas-release
 COPY docker/canvas-web-entrypoint.sh /usr/local/bin/canvas-web-entrypoint

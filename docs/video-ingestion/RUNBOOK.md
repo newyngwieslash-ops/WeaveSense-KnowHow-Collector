@@ -10,6 +10,8 @@
 
 ## 2. 开发环境
 
+第三轮清洁 TEST 整栈、真实浏览器与逐项 AC 证据边界见 [ROUND3.md](ROUND3.md)。容器健康检查不能替代登录接口和真实闭环。Docker Web 镜像使用 Nginx 1.27.5，固定内部 `backend:8080` 通过 Docker DNS 动态刷新；平台容器重建后无需重建 Web 才能恢复上游。`resolve` 需要共享 upstream zone，开源版须为 1.27.3 或更新，见 [Nginx 官方说明](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#server)。不要将该 Docker DNS 配置原样用于没有 Docker DNS 的独立 Nginx 主机。
+
 Windows WSL2 / Linux 的第二轮只读预检和隔离镜像构建步骤见 [LOCAL_QUICKSTART.md](LOCAL_QUICKSTART.md)，实际执行结果与提交绑定见 [ROUND2.md](ROUND2.md)。预检不创建凭据、不初始化日志、不启用视频功能；通过预检也不等于生产就绪。
 
 首轮本地验证环境使用 Go 1.25.14、Node 24.22.1、Bun 1.4.4、PostgreSQL 17.11/pgvector 0.8.0；第二轮 CI 的具体环境以各工作流和运行日志为准，不沿用历史版本作为当前测量值。现有宿主依赖保持其锁文件；Python 依赖见各服务的 requirements 与锁定说明。视频执行还需要 FFmpeg、Tesseract；本地 ASR 是独立依赖环境及只读模型目录，不与视频 API 的轻量依赖混装。

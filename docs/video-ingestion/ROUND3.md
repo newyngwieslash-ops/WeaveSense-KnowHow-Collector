@@ -8,10 +8,11 @@
 
 | 项目 | 本页记录的状态 | 不能推导出的结论 |
 | --- | --- | --- |
-| 局部脚本检查 | 45 项本地脚本测试通过，包括 4 项模型 fixture 契约/HTTP 测试及 3 项配置安全测试；Shell/Python/Node 语法与 diff 检查通过 | 不代表容器、浏览器或业务用例已执行 |
+| 局部脚本检查 | 46 项本地脚本测试通过，包括 4 项模型 fixture 契约/HTTP 测试、3 项配置安全测试及Nginx动态上游配置回归；Shell/Python/Node 语法与 diff 检查通过 | 不代表容器、浏览器或业务用例已执行 |
 | 浏览器 harness | live suite 发现 1 个场景，initial / restart 分两次调用；旧模拟边界 suite 保持独立 | 不代表页面选择器、服务交互或重启已通过 |
 | 第一次 Actions 验证 | `20fce7b` 的 [整栈运行 40614778081](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40614778081)因 job 环境中使用不可用的 `runner.temp` 上下文而未启动 job；`f0347739` 将其移到 step 环境 | 工作流解析修正不是运行成功 |
 | 首次实际构建/启动 | `f0347739` 的 [运行 40614875677](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40614875677)已构建5个应用/fixture镜像，PG/Redis/MinIO及Go/Web启动；Web仅接internal网络没有发布端口，宿主bootstrap连接被拒绝 | 不是整栈成功；未执行浏览器闭环。已按产物修正仅Nginx双网络入口，后台保持内部网络 |
+| 第二次真实整栈启动 | `11ce4538` 的 [运行40615728450](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40615728450)已空环境启动8个服务并通过真实注册/工作区引导；平台重建后Nginx缓存旧IP，登录会话返回502，真实UI正确显示认证恢复错误 | 不是浏览器闭环成功。已修正生产Nginx动态DNS上游并固定1.27.5，保留Web不重建断言，待重跑确认 |
 | 整栈及最终 head CI | 待实际结果与产物核验 | 不沿用第二轮或中间提交的成功结果 |
 | 正式 V1 台账 | 本轮映射不修改 [PROGRESS.json](PROGRESS.json)；29 项全局 AC 均未由本页认定完成 | 测试数量不是业务验收百分比 |
 

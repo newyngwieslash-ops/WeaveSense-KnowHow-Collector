@@ -12,6 +12,7 @@ const model = process.env.VIDEO_FULLSTACK_MODEL || 'fullstack-synthetic';
 const nativeId = 'BV1test000001';
 const sourceURL = `https://www.bilibili.com/video/${nativeId}`;
 const digest = value => createHash('sha256').update(value).digest('hex');
+const buttonName = label => /^[\u4E00-\u9FA5]{2}$/.test(label) ? new RegExp(`^${label[0]}\\s*${label[1]}$`) : label;
 
 async function browserAPI(page, workspaceId, path, { method = 'GET', body, raw, key, anonymous = false } = {}) {
   return page.evaluate(async args => {
@@ -52,7 +53,7 @@ async function login(page, credentials) {
     element.dispatchEvent(new Event('change', { bubbles: true }));
   }, credentials.password);
   const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/auth/login' && r.request().method() === 'POST');
-  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await page.getByRole('button', { name: buttonName('登录'), exact: true }).click();
   expect((await response).status()).toBe(200);
   await expect(page).toHaveURL(/\/intelligence\/domains$/);
   await expect(page.getByRole('button', { name: '新建知识域', exact: true })).toBeEnabled();
@@ -102,7 +103,7 @@ async function saveSource(page, profile) {
 
 async function decision(page, action, title, approve = false) {
   const detail = page.getByRole('dialog', { name: '知识复核与发布', exact: true });
-  await detail.getByRole('button', { name: action, exact: true }).click();
+  await detail.getByRole('button', { name: buttonName(action), exact: true }).click();
   const modal = page.getByRole('dialog', { name: title, exact: true });
   await modal.getByLabel('复核或发布理由', { exact: true }).fill('Isolated engineering acceptance of self-authored synthetic source; not industry validation.');
   if (approve) {
@@ -131,7 +132,7 @@ async function publishedUI(page, title) {
   await expect(evidence.getByText('本页没有音视频对象；字幕输入可能从未采集媒体，可继续翻页核对', { exact: true })).toBeVisible();
   // Subtitle-only input must not grow an invented player or platform URL.
   await expect(evidence.locator('video,audio')).toHaveCount(0);
-  await evidence.getByRole('button', { name: /close/i }).click();
+  await evidence.getByRole('button', { name: /^(关闭|close)$/i }).click();
   return detail;
 }
 
@@ -245,7 +246,7 @@ test(`live host lawful-input pipeline (${phase})`, async ({ page }, testInfo) =>
       await expect(detail.getByText(candidate.unit.title, { exact: true })).toBeVisible();
       await decision(page, '提交复核', '提交复核');
       await decision(page, '批准', '批准此版本', true);
-      await expect(detail.getByRole('button', { name: '发布', exact: true })).toBeEnabled();
+      await expect(detail.getByRole('button', { name: buttonName('发布'), exact: true })).toBeEnabled();
       const approved = accepted(await api(`${recordPath}?mode=review`), 'approved snapshot');
       await detail.getByRole('button', { name: '编辑为新版本', exact: true }).click();
       const editor = page.getByRole('dialog', { name: '编辑知识 · 产生新版本并使旧批准失效', exact: true });

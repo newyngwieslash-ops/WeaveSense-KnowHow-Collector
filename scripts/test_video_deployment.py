@@ -55,6 +55,15 @@ class VideoDeploymentTests(unittest.TestCase):
         self.assertIn("workflow_dispatch", events)
         self.assertNotIn("push", events)
 
+    def test_nginx_refreshes_fixed_docker_backend_without_exposing_internal_routes(self):
+        nginx = (ROOT / "nginx.conf").read_text()
+        self.assertIn("zone canvas_backend 64k;", nginx)
+        self.assertIn("resolver 127.0.0.11 valid=5s ipv6=off;", nginx)
+        self.assertIn("server backend:8080 resolve;", nginx)
+        self.assertEqual(nginx.count("proxy_pass http://canvas_backend;"), 5)
+        self.assertNotIn("proxy_pass http://backend:8080;", nginx)
+        self.assertIn("location ^~ /api/internal/ {\n        return 404;", nginx)
+
 
 if __name__ == "__main__":
     unittest.main()
