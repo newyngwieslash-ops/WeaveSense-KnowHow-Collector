@@ -40,6 +40,14 @@
 
 当前修正使用生成TEST配置共享的明确秘密清单及私有账号状态，不按变量名子串猜测；脱敏后再严格解析所有保留的JSON/JSONL。解析失败阻止上传，临时环境与账号文件仍清理。修正后的最终提交必须重新执行并核对原始产物，不能继承上述运行的附件完整性结论。
 
+### 恢复核验：脱敏修正提交的实际结果
+
+已从远端恢复并独立核对 `cff1388eb7d6860be1261732ccfc1c8b5e3787eb`：四组工作流、13个job全部成功，分别为[整栈40628942855](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40628942855)、[集成40628942818](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40628942818)、[质量40628942834](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40628942834)、[容器40628942821](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40628942821)。通用付款job的跨平台条件步骤仍跳过，不能称所有步骤或所有测试零跳过。
+
+该次[原始整栈artifact 12790358620](https://github.com/newyngwieslash-ops/WeaveSense-KnowHow-Collector/actions/runs/40628942855/artifacts/12790358620)共30文件，ZIP SHA-256为`c14c1a2ebb715fc945f617f596f614ccec84c321612b5712baef1889dffc555a`，与Actions摘要一致。重新下载后21份JSON及2份JSONL均可解析（包含先前损坏的两阶段Playwright报告）；source-commit与该SHA一致。浏览器累计14项检查通过，重启前后观察器各14项通过，两个MinIO对象重新核对152/215字节及SHA-256。稳定身份摘要均为`60982ed05af9ba3b05e70556bad881bb7437aeed40c41ee51df5cda12c6ade5d`。清理报告的五项退出码全0，所属容器、项目卷及确切独立日志卷均无残留；退出码0。产物不含`.env.flow`或私有账号state，采证完整性缺陷在该次归档中未再出现。
+
+恢复核验同时确认下文的422错误误分类仍存在，因此本次继续修复该窄范围协议缺陷并加强真实浏览器负向断言。上述成功结果只属于`cff1388e`，不提前证明后续修复提交通过；后续交付仍另核对最终SHA全部CI和原始产物，不递归提交自身SHA。
+
 ### 如实披露的条件跳过
 
 - 集成 Go 的 5 个顶层 skip：`TestDDCatLiveImageRoundTrip`（无付费模型 key）；`TestGeneratedAssetBrowserIdentity`（未设置独立 `CANVAS_TEST_GENERATION_BROWSER_RUNNER`）；`TestVideoReleaseCompiledChild`、`TestVideoQALoomReleaseCompiledChild`（只由隔离归档父测试执行，父测试通过，顶层仍记 skip）；`TestRPCProviderRejectsIncompatibleFallbackBinary`（Linux 条件路径，另有适用测试）。
@@ -93,7 +101,7 @@ Loom 知识整理 → 真实 Go Model Gateway / 预算入口
 
 源码与检查：[docker-compose.video.yml](../../docker-compose.video.yml)、[test_video_deployment.py](../../scripts/test_video_deployment.py)、[SQLite事务回归](../../backend/internal/repository/cloud_agent_admission_test.go)、[时间投影回归](../../services/loom-engine/flow/video-temporal-projection.test.ts)。静态检查只证明配置合同；上述运行时结论由候选提交的实际 TEST 产物补齐，不扩展到未执行场景。
 
-已知但不阻塞本轮失败关闭检查的诊断缺陷：宿主`HTTPVideoProvider.uploadInput`把worker的所有422映射为`INPUT_HASH_MISMATCH`，包括空字幕的`NO_SUBTITLES`。因此负向用例只断言422、无文档、无ready，不宣称失败原因分类已正确；后续应单独补充错误分类合同与回归。
+恢复后补充修复：`HTTPVideoProvider.uploadInput`不再把worker所有422误报为`INPUT_HASH_MISMATCH`，只从≤4096字节错误信封保留已知输入校验代码，其他详情安全回退为`INPUT_UPLOAD_FAILED`；不泄露任意worker消息。新增20项协议断言（含子测试）覆盖空字幕、hash错误、格式/时轴错误、未知/损坏/超大信封、响应取消和成功收据，本地全部通过。真实整栈负向用例新增`NO_SUBTITLES`断言及证据字段，同时保留422、无文档、无ready门禁；需最终提交CI证明真实内部链路。既有`21410a7e`和`cff1388e`成功归档仍只证明其原来的拒绝状态，不回填原因分类成功。
 
 ## 可重复运行：仅新建、可销毁的 TEST checkout
 

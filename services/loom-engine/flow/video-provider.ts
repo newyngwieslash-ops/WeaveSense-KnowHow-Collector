@@ -4,6 +4,7 @@ import { assertVideoObject, videoError, type VideoManifest, type VideoObject, ty
 
 export type ProviderResult = { task_id: string; state: "pending" | "completed" | "failed" | "reconciliation_required"; manifest?: VideoManifest; error?: { code: string; retry_after?: number }; usage?: Record<string, number>; artifacts?: VideoObject[]; next_artifact_cursor?: string | null };
 export type DiscoveryPage = { items: any[]; next_cursor: unknown; complete: boolean; reached_boundary?: boolean; watermark?: unknown; mode?: "live" | "fixture" };
+const INPUT_REJECTION_CODES = new Set(["INPUT_HASH_MISMATCH", "INCOMPLETE_ARTIFACT", "NO_SUBTITLES", "INVALID_SUBTITLES", "INVALID_SUBTITLE_TIME", "SUBTITLE_LANGUAGE_MISMATCH"]);
 export interface VideoProvider {
   instance: string;
   discover(source: any, checkpoint: unknown, deadline: number): Promise<DiscoveryPage>;
@@ -91,7 +92,26 @@ export class HTTPVideoProvider implements VideoProvider {
     const query = new URLSearchParams({ video_job_id: job.id, sha256: descriptor.sha256, bytes: String(descriptor.bytes), content_type: descriptor.content_type, input_kind: descriptor.input_kind });
     const response = await fetch(`${this.instance}/v1/inputs?${query}`, { method: "PUT", redirect: "error", signal: AbortSignal.timeout(120_000),
       headers: { authorization: `Bearer ${this.serviceToken}`, "x-flow-execution-context": token, "content-type": descriptor.content_type, "content-length": String(descriptor.bytes) }, body: body as any, duplex: "half" } as any);
-    if (!response.ok) throw videoError(response.status, response.status === 413 ? "LIMIT_EXCEEDED" : response.status === 422 ? "INPUT_HASH_MISMATCH" : "INPUT_UPLOAD_FAILED");
+    if (!response.ok) {
+      let reason = response.status === 413 ? "LIMIT_EXCEEDED" : "INPUT_UPLOAD_FAILED";
+      const reader = response.body?.getReader();
+      try {
+        // Only the worker's bounded, allowlisted validation code may cross the
+        // public API boundary. Never relay its body, messages or arbitrary codes.
+        if (response.status === 422 && reader && Number(response.headers.get("content-length")) <= 4096) {
+          const parts: Uint8Array[] = []; let size = 0;
+          while (true) {
+            const { done, value } = await reader.read(); if (done) break;
+            size += value.byteLength; if (size > 4096) throw new Error("upload error envelope too large");
+            parts.push(value);
+          }
+          const code = JSON.parse(Buffer.concat(parts, size).toString("utf8"))?.error?.code;
+          if (typeof code === "string" && INPUT_REJECTION_CODES.has(code)) reason = code;
+        }
+      } catch { /* Malformed/unavailable details retain the generic failure. */ }
+      finally { try { await reader?.cancel(); } catch { /* Preserve the upload failure. */ } reader?.releaseLock(); }
+      throw videoError(response.status, reason);
+    }
     return this.json(response);
   }
   async inputReceipt(job: any, sha256: string) {

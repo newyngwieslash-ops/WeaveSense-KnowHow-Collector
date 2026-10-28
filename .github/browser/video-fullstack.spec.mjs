@@ -210,7 +210,10 @@ test(`live host lawful-input pipeline (${phase})`, async ({ page }, testInfo) =>
       const invalidRaw = JSON.stringify({ kind: 'manual', language: 'en', segments: [] });
       const invalidInput = { ...input, content_version: 'invalid-required-transcript', lawful_input: { ...input.lawful_input, sha256: digest(invalidRaw), bytes: Buffer.byteLength(invalidRaw) } };
       const invalidJob = accepted(await api('/video/jobs', { method: 'POST', body: invalidInput, key: randomUUID() }), 'negative lawful start');
-      expect((await api(`/video/jobs/${invalidJob.video_job_id}/input`, { method: 'PUT', raw: invalidRaw })).status).toBe(422);
+      const invalidUpload = await api(`/video/jobs/${invalidJob.video_job_id}/input`, { method: 'PUT', raw: invalidRaw });
+      expect(invalidUpload.status).toBe(422);
+      expect(invalidUpload.reason).toBe('NO_SUBTITLES');
+      evidence.invalid_input_reason = invalidUpload.reason;
       const invalidResult = accepted(await api(`/video/jobs/${invalidJob.video_job_id}`), 'negative task remains blocked');
       expect(invalidResult.stage).toBe('awaiting_input');
       expect(invalidResult.completion_level).not.toBe('knowledge_ready');

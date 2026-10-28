@@ -106,6 +106,8 @@ ready 后另建 `flow_video_knowledge_runs`，幂等冻结 profile/证据/原生
 
 POST jobs 可带 `lawful_input:{input_kind:'platform_subtitles'|'media',sha256,bytes,content_type}`。任务先 `stage=awaiting_input`，不会下载。原用户通过 PUT input 流式上传冻结字节；字幕为规范 JSON（≤8MiB），媒体≤2GiB且受 profile 更低上限。worker 预登记写入意图、实际 hash/格式核验并返回受控对象收据；丢回复可 reconcile，不必重跑处理。用户上传字幕标记 `authorized_user_upload` / `transcript`，不声称已由平台验证。
 
+上传被 worker 拒绝时保留 HTTP status。422 只透传有界（≤4096字节）JSON `error.code` 的已知输入校验代码：`INPUT_HASH_MISMATCH`、`INCOMPLETE_ARTIFACT`、`NO_SUBTITLES`、`INVALID_SUBTITLES`、`INVALID_SUBTITLE_TIME`、`SUBTITLE_LANGUAGE_MISMATCH`。空字幕不是 hash 错误。未知代码、损坏或超大错误信封回退为 `INPUT_UPLOAD_FAILED`，不返回 worker 消息、正文或任意代码；413 仍为 `LIMIT_EXCEEDED`。拒绝不产生文档或 ready 状态。
+
 processing manifest 可携带 `visual:{schema_version:1,record_count,parts:[{object_key,sha256,bytes,content_type,record_count,start_ms,end_ms}]}`。每部分≤100记录、256KiB。记录类型 frame、ocr、model_observation、model_inference、alignment；每条 record_id 是其余字段规范哈希。模型记录必须 derived=true/unreviewed，并保留实际任务 provenance；frame_ids 与真实 frame_refs 一一对应，时间包络不可编造。alignment 只声明 temporal_overlap/unaligned，semantic_relation=not_assessed，不证明语义一致。
 
 GET result `kind=visual` 返回有界记录页；长文字每次≤500 UTF-16字符，`next_text_offset`/`read_ref` 可继续同 cursor 完整读取；不能把 excerpt 当完整证据。`frame_media`/`frame_media_items` 是服务端关联的受控媒体描述。`kind=media` 只列已登记可访问对象的相对鉴权路径。GET媒体支持单 Range 200/206，固定 ETag 为真实 SHA256；未找到404、到期410、撤销403，发现对象丢失后标记 missing 并去掉后续可用链接。
